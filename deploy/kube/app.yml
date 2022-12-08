@@ -1,0 +1,78 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: auo-project
+  name: auo-project-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auo-project-app
+  template:
+    metadata:
+      labels:
+        app: auo-project-app
+    spec:
+      containers:
+      - name: app
+        image: auo_project:latest
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: api-port
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        env:
+        - name: AUO_PROJECT_HOST
+          value: "0.0.0.0"
+        - name: AUO_PROJECT_WORKERS_COUNT
+          value: "10"
+        - name: AUO_PROJECT_DB_HOST
+          value: "auo-project-db-service"
+        - name: AUO_PROJECT_REDIS_HOST
+          value: "auo-project-redis-service"
+        resources:
+          limits:
+            memory: "200Mi"
+            cpu: "100m"
+        ports:
+        - containerPort: 8000
+          name: api-port
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: auo-project
+  name: auo-project-app-service
+spec:
+  selector:
+    app: auo-project-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: api-port
+    name: api-port
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: auo-project-app
+  namespace: auo-project
+  labels:
+    name: auo-project-app
+spec:
+  rules:
+  - host: auo-project.local
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: auo-project-app-service
+            port:
+              name: api-port
+
+---

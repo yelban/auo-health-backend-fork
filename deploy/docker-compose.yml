@@ -1,0 +1,72 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    image: auo_project:${AUO_PROJECT_VERSION:-latest}
+    restart: always
+    env_file:
+    - .env
+    labels:
+      # Enables traefik for this container.
+    - traefik.enable=true
+    - traefik.http.routers.auo_project.rule=Host(`${AUO_PROJECT_TRAEFIK_HOST:-auo_project.localhost}`)
+    - traefik.http.routers.auo_project.entrypoints=http
+    - traefik.http.routers.auo_project.service=auo_project
+    - traefik.http.services.auo_project.loadbalancer.server.port=${AUO_PROJECT_PORT:-8000}
+    networks:
+    - default
+    - traefik-shared
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      AUO_PROJECT_HOST: 0.0.0.0
+      AUO_PROJECT_DB_HOST: auo_project-db
+      AUO_PROJECT_DB_PORT: 5432
+      AUO_PROJECT_DB_USER: auo_project
+      AUO_PROJECT_DB_PASS: auo_project
+      AUO_PROJECT_DB_BASE: auo_project
+
+  db:
+    image: postgres:13.6-bullseye
+    hostname: auo_project-db
+    environment:
+      POSTGRES_PASSWORD: "auo_project"
+      POSTGRES_USER: "auo_project"
+      POSTGRES_DB: "auo_project"
+    volumes:
+    - auo_project-db-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: pg_isready -U auo_project
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  redis:
+    image: bitnami/redis:6.2.5
+    hostname: "auo_project-redis"
+    restart: always
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+    healthcheck:
+      test: redis-cli ping
+      interval: 1s
+      timeout: 3s
+      retries: 50
+
+
+
+volumes:
+  auo_project-db-data:
+    name: auo_project-db-data
+
+networks:
+  # Network for traefik.
+  traefik-shared:
+    name: traefik-shared

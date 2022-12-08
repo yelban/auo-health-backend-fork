@@ -1,0 +1,44 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: auo-project
+  name: auo-project-db
+spec:
+  selector:
+    matchLabels:
+      app: auo-project-db
+  template:
+    metadata:
+      labels:
+        app: auo-project-db
+    spec:
+      containers:
+      - name: database
+        image: postgres:13.6-bullseye
+        resources:
+          limits:
+            memory: "300Mi"
+            cpu: "200m"
+        env:
+        - name: POSTGRES_PASSWORD
+          value: "auo_project"
+        - name: POSTGRES_USER
+          value: "auo_project"
+        - name: POSTGRES_DB
+          value: "auo_project"
+        ports:
+        - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: auo-project
+  name: "auo-project-db-service"
+spec:
+  selector:
+    app: auo-project-db
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
