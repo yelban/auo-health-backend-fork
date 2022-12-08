@@ -36,7 +36,7 @@ repos:
     entry: poetry run autoflake
     language: system
     types: [python]
-    args: [--in-place, --remove-all-unused-imports, --remove-duplicate-keys]
+    args: [--in-place, --remove-all-unused-imports, "--ignore-init-module-imports", --remove-duplicate-keys]
 
   # - id: flake8
   #   name: Check with Flake8
