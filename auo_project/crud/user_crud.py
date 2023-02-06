@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi_async_sqlalchemy import db
 from pydantic.networks import EmailStr
+from sqlalchemy.orm import lazyload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -16,7 +17,9 @@ from auo_project.schemas.user_schema import UserCreate, UserUpdate
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     async def get_by_email(
-        self, db_session: AsyncSession, *, email: str
+        self,
+        db_session: AsyncSession,
+        email: str,
     ) -> Optional[User]:
         users = await db_session.execute(select(User).where(User.email == email))
         return users.scalar_one_or_none()
@@ -33,7 +36,11 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         db_session: AsyncSession,
         username: str,
     ) -> Optional[User]:
-        users = await db_session.execute(select(User).where(User.username == username))
+        users = await db_session.execute(
+            select(User)
+            .where(User.username == username)
+            .options(lazyload(User.uploads), lazyload(User.all_files)),
+        )
         return users.scalar_one_or_none()
 
     async def create(

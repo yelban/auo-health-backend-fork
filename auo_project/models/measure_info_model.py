@@ -1,0 +1,284 @@
+from datetime import datetime
+from uuid import UUID
+
+from sqlmodel import Field, Relationship, UniqueConstraint
+
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
+
+
+# TODO: 脈波通過率過低項目定義為何 pass_rate
+class MeasureInfoBase(BaseModel):
+    subject_id: UUID = Field(
+        index=True,
+        nullable=False,
+        foreign_key="measure.subjects.id",
+        title="受測者資料庫編號",
+    )
+    file_id: UUID = Field(
+        index=True,
+        nullable=True,
+        foreign_key="app.upload_files.id",
+        title="檔案編號",
+        default=None,
+        unique=True,
+    )
+    org_id: UUID = Field(
+        index=True,
+        nullable=False,
+        foreign_key="app.auth_orgs.id",
+        title="檢測單位編號",
+    )
+    uid: str = Field(nullable=True, max_length=128, title="脈診儀 UID", default=None)
+    number: str = Field(nullable=True, max_length=128, title="病歷號碼", default=None)
+    has_measure: int = Field(nullable=True, index=True, title="脈象量測", default=None)
+    has_bcq: bool = Field(nullable=True, index=True, title="BCQ體質量表", default=None)
+    has_tongue: bool = Field(nullable=True, index=True, title="舌象", default=None)
+    has_memo: bool = Field(nullable=True, index=True, title="是否有檢測標記", default=None)
+    has_low_pass_rate: bool = Field(
+        nullable=True,
+        index=True,
+        title="是否有脈波通過率過低項目",
+        default=None,
+    )
+    measure_time: datetime = Field(
+        default=None,
+        nullable=True,
+        index=True,
+        title="檢測時間",
+    )
+    measure_operator: str = Field(
+        default=None,
+        max_length=128,
+        index=True,
+        nullable=True,
+        title="檢測人員名稱",
+    )
+    mean_prop_range_1_l_cu: float = Field(default=None, title="左寸浮振幅平均值佔比")
+    mean_prop_range_2_l_cu: float = Field(default=None, title="左寸中振幅平均值佔比")
+    mean_prop_range_3_l_cu: float = Field(default=None, title="左寸沉振幅平均值佔比")
+    mean_prop_range_1_l_qu: float = Field(default=None, title="左關浮振幅平均值佔比")
+    mean_prop_range_2_l_qu: float = Field(default=None, title="左關中振幅平均值佔比")
+    mean_prop_range_3_l_qu: float = Field(default=None, title="左關沉振幅平均值佔比")
+    mean_prop_range_1_l_ch: float = Field(default=None, title="左尺浮振幅平均值佔比")
+    mean_prop_range_2_l_ch: float = Field(default=None, title="左尺中振幅平均值佔比")
+    mean_prop_range_3_l_ch: float = Field(default=None, title="左尺沉振幅平均值佔比")
+    mean_prop_range_1_r_cu: float = Field(default=None, title="右寸浮振幅平均值佔比")
+    mean_prop_range_2_r_cu: float = Field(default=None, title="右寸中振幅平均值佔比")
+    mean_prop_range_3_r_cu: float = Field(default=None, title="右寸沉振幅平均值佔比")
+    mean_prop_range_1_r_qu: float = Field(default=None, title="右關浮振幅平均值佔比")
+    mean_prop_range_2_r_qu: float = Field(default=None, title="右關中振幅平均值佔比")
+    mean_prop_range_3_r_qu: float = Field(default=None, title="右關沉振幅平均值佔比")
+    mean_prop_range_1_r_ch: float = Field(default=None, title="右尺浮振幅平均值佔比")
+    mean_prop_range_2_r_ch: float = Field(default=None, title="右尺中振幅平均值佔比")
+    mean_prop_range_3_r_ch: float = Field(default=None, title="右尺沉振幅平均值佔比")
+    mean_prop_range_max_l_cu: int = Field(
+        default=None,
+        title="左寸浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+    )
+    mean_prop_range_max_l_qu: int = Field(
+        default=None,
+        title="左關浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+    )
+    mean_prop_range_max_l_ch: int = Field(
+        default=None,
+        title="左尺浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+    )
+    mean_prop_range_max_r_cu: int = Field(
+        default=None,
+        title="右寸浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+    )
+    mean_prop_range_max_r_qu: int = Field(
+        default=None,
+        title="右關浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+    )
+    mean_prop_range_max_r_ch: int = Field(
+        default=None,
+        title="右尺浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+    )
+    max_amp_depth_of_range_l_cu: int = Field(
+        default=None,
+        title="左寸浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+    )
+    max_amp_depth_of_range_l_qu: int = Field(
+        default=None,
+        title="左關浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+    )
+    max_amp_depth_of_range_l_ch: int = Field(
+        default=None,
+        title="左尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+    )
+    max_amp_depth_of_range_r_cu: int = Field(
+        default=None,
+        title="右寸浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+    )
+    max_amp_depth_of_range_r_qu: int = Field(
+        default=None,
+        title="右關浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+    )
+    max_amp_depth_of_range_r_ch: int = Field(
+        default=None,
+        title="右尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+    )
+    max_empt_value_l_cu: float = Field(
+        default=None,
+        nullable=True,
+        title="左寸-有效範圍內最大振幅值",
+    )
+    max_empt_value_l_qu: float = Field(
+        default=None,
+        nullable=True,
+        title="左關-有效範圍內最大振幅值",
+    )
+    max_empt_value_l_ch: float = Field(
+        default=None,
+        nullable=True,
+        title="左尺-有效範圍內最大振幅值",
+    )
+    max_empt_value_r_cu: float = Field(
+        default=None,
+        nullable=True,
+        title="右寸-有效範圍內最大振幅值",
+    )
+    max_empt_value_r_qu: float = Field(
+        default=None,
+        nullable=True,
+        title="右關-有效範圍內最大振幅值",
+    )
+    max_empt_value_r_ch: float = Field(
+        default=None,
+        nullable=True,
+        title="右尺-有效範圍內最大振幅值",
+    )
+    irregular_hr_l_cu: bool = Field(default=None, nullable=True, title="左寸-有無脈律不整")
+    irregular_hr_l_qu: bool = Field(default=None, nullable=True, title="左關-有無脈律不整")
+    irregular_hr_l_ch: bool = Field(default=None, nullable=True, title="左尺-有無脈律不整")
+    irregular_hr_r_cu: bool = Field(default=None, nullable=True, title="右寸-有無脈律不整")
+    irregular_hr_r_qu: bool = Field(default=None, nullable=True, title="右關-有無脈律不整")
+    irregular_hr_r_ch: bool = Field(default=None, nullable=True, title="右尺-有無脈律不整")
+    irregular_hr_l: int = Field(default=None, title="左手節律是否異常; 正常:0/異常:1")
+    irregular_hr_type_l: int = Field(
+        default=None,
+        title="左手節律異常類型; 無:null/止無定數:0/止有定數:1",
+    )
+    irregular_hr_r: int = Field(default=None, title="右手節律是否異常; 正常:0/異常:1")
+    irregular_hr_type_r: int = Field(
+        default=None,
+        title="右手節律異常類型; 無:null/止無定數:0/止有定數:1",
+    )
+    irregular_hr: int = Field(
+        default=None,
+        nullable=True,
+        index=True,
+        title="節律標記：有任一個 true 就是異常：irregular_hr_L_cu, irregular_hr_L_qu, irregular_hr_L_ch, irregular_hr_R_cu, irregular_hr_R_qu, irregular_hr_R_ch",
+    )
+    max_slope_value_l_cu: float = Field(default=None, title="左寸斜率最大值")
+    max_slope_value_l_qu: float = Field(default=None, title="左關斜率最大值")
+    max_slope_value_l_ch: float = Field(default=None, title="左尺斜率最大值")
+    max_slope_value_r_cu: float = Field(default=None, title="右寸斜率最大值")
+    max_slope_value_r_qu: float = Field(default=None, title="右關斜率最大值")
+    max_slope_value_r_ch: float = Field(default=None, title="右尺斜率最大值")
+
+    strength_l_cu: int = Field(default=None, title="左寸力量; 無:null/無力:0/正常:1/有力:2")
+    strength_l_qu: int = Field(default=None, title="左關力量; 無:null/無力:0/正常:1/有力:2")
+    strength_l_ch: int = Field(default=None, title="左尺力量; 無:null/無力:0/正常:1/有力:2")
+    strength_r_cu: int = Field(default=None, title="右寸力量; 無:null/無力:0/正常:1/有力:2")
+    strength_r_qu: int = Field(default=None, title="右關力量; 無:null/無力:0/正常:1/有力:2")
+    strength_r_ch: int = Field(default=None, title="右尺力量; 無:null/無力:0/正常:1/有力:2")
+    width_l_cu: int = Field(default=None, title="左寸粗細; 無:null/細:0/正常:1/粗:2")
+    width_l_qu: int = Field(default=None, title="左關粗細; 無:null/細:0/正常:1/粗:2")
+    width_l_ch: int = Field(default=None, title="左尺粗細; 無:null/細:0/正常:1/粗:2")
+    width_r_cu: int = Field(default=None, title="右寸粗細; 無:null/細:0/正常:1/粗:2")
+    width_r_qu: int = Field(default=None, title="右關粗細; 無:null/細:0/正常:1/粗:2")
+    width_r_ch: int = Field(default=None, title="右尺粗細; 無:null/細:0/正常:1/粗:2")
+
+    sex: int = Field(default=None, nullable=True, title="性別")
+    age: int = Field(default=None, nullable=True, title="檢測時年齡")
+    height: int = Field(default=None, nullable=True, title="身高")
+    weight: int = Field(default=None, nullable=True, title="體重")
+    bmi: float = Field(
+        default=None,
+        index=True,
+        nullable=True,
+        title="BMI=weight/(height/100)^2",
+    )
+
+    sbp: int = Field(default=None, nullable=True, title="收縮壓")
+    dbp: int = Field(default=None, nullable=True, title="舒張壓")
+    judge_time: datetime = Field(default=None, nullable=True, title="診斷時間")
+    judge_dr: str = Field(default=None, max_length=128, nullable=True, title="診斷醫師")
+
+    hr_l: int = Field(default=None, nullable=True, title="左脈率")  # TODO: check 遲/正常/數 區間
+    hr_r: int = Field(default=None, nullable=True, title="右脈率")
+    special_l: str = Field(default=None, max_length=10, nullable=True, title="左手特殊脈")
+    special_r: str = Field(default=None, max_length=10, nullable=True, title="右手特殊脈")
+
+    comment: str = Field(
+        default=None,
+        max_length=1024,
+        nullable=True,
+        title="診斷內容",
+    )  # TODO: handle multiple lines issue
+    memo: str = Field(default=None, max_length=1024, nullable=True, title="檢測標記")
+    proj_num: str = Field(
+        default=None,
+        index=True,
+        nullable=True,
+        title="計畫編號",
+    )  # from report.txt
+    ver: str = Field(default=None, max_length=100, nullable=True, title="ver.ini")
+
+    is_active: bool = Field(index=True, nullable=False, default=True)
+
+
+class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True):
+    __tablename__ = "infos"
+    __table_args__ = (
+        UniqueConstraint(
+            "subject_id",
+            "measure_time",
+            name="measure_infos_subject_id_measure_time_key",
+        ),
+        {"schema": "measure"},
+    )
+    subject: "Subject" = Relationship(
+        back_populates="measure_infos",
+        sa_relationship_kwargs={
+            "lazy": "selectin",
+            "uselist": False,
+        },
+    )
+    bcq: "BCQ" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={
+            "lazy": "select",
+            "uselist": False,
+        },
+    )
+    raw: "MeasureRaw" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={
+            "lazy": "select",
+            "uselist": False,
+        },
+    )
+    statistics: "MeasureStatistic" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={
+            "lazy": "select",
+            "uselist": True,
+        },
+    )
+    tongue: "MeasureTongue" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={
+            "lazy": "select",
+            "uselist": False,
+        },
+    )
+    org: "Org" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={
+            "lazy": "select",
+            "uselist": False,
+        },
+    )

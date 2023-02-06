@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/me", response_model=schemas.UserRead)
-def read_user_me(
+async def read_user_me(
     *,
     current_user: schemas.UserRead = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),

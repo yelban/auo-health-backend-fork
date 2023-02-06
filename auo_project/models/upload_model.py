@@ -2,24 +2,14 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship
 
 from auo_project.core.constants import FileStatusType, UploadStatusType
 from auo_project.core.translation import i18n as _
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
-
-# class MySmartQueryMixin(SmartQueryMixin, BaseUUIDModel):
-#     __config__ = None
-#     __tablename__ = "uploads"
-#     json_encoders = jsonable_encoder
-#     # def __config__(self):
-#     #     pass
-#     # def __table__(self):
-#     #     pass
-#     pass
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 
-class UploadBase(SQLModel):
+class UploadBase(BaseModel):
     owner_id: UUID = Field(
         index=True,
         nullable=False,

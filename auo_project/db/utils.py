@@ -1,9 +1,25 @@
 from sqlalchemy import text
-from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine
 
-# from auo_project.settings import settings
 from auo_project.core.config import settings
+
+
+def get_url():
+    # return  make_url(str(f"postgresql+asyncpg://{settings.DATABASE_USER}:{settings.DATABASE_PASSWORD}@{settings.DATABASE_HOST}:{settings.DATABASE_PORT}"))
+    return settings.ASYNC_DATABASE_URI
+
+
+def get_engine():
+    db_url = get_url()
+    conn_args = {}
+    if settings.DATABASE_SSL_REQURED:
+        conn_args["ssl"] = "require"
+    engine = create_async_engine(
+        db_url,
+        connect_args=conn_args,
+        isolation_level="AUTOCOMMIT",
+    )
+    return engine
 
 
 async def create_database(engine=None) -> None:
@@ -15,10 +31,7 @@ async def create_database(engine=None) -> None:
     )
 
     if not engine:
-        db_url = make_url(
-            str(f"postgresql+asyncpg://auo_project:auo_project@auo_project-db:5432"),
-        )
-        engine = create_async_engine(db_url, isolation_level="AUTOCOMMIT")
+        engine = get_engine()
 
     async with engine.connect() as conn:
         database_existance = await conn.execute(
@@ -38,12 +51,7 @@ async def create_database(engine=None) -> None:
             ),
         )
 
-    db_url = make_url(
-        str(
-            f"postgresql+asyncpg://auo_project:auo_project@auo_project-db:5432/{dbname}",
-        ),
-    )
-    engine = create_async_engine(db_url, isolation_level="AUTOCOMMIT")
+    engine = get_engine()
     async with engine.connect() as conn:  # noqa: WPS440
         await conn.execute(
             text(
@@ -60,10 +68,7 @@ async def drop_database(engine=None) -> None:
         else settings.DATABASE_NAME
     )
     if not engine:
-        db_url = make_url(
-            str(f"postgresql+asyncpg://auo_project:auo_project@auo_project-db:5432"),
-        )
-        engine = create_async_engine(db_url, isolation_level="AUTOCOMMIT")
+        engine = get_engine()
     async with engine.connect() as conn:
         disc_users = (
             "SELECT pg_terminate_backend(pg_stat_activity.pid) "  # noqa: S608
@@ -72,4 +77,4 @@ async def drop_database(engine=None) -> None:
             "AND pid <> pg_backend_pid();"
         )
         await conn.execute(text(disc_users))
-        await conn.execute(text(f'DROP DATABASE "{dbname}" WITH (FORCE)'))
+        await conn.execute(text(f'DROP DATABASE "{dbname}"'))

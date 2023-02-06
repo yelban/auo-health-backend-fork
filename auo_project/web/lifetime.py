@@ -38,6 +38,7 @@ from auo_project.db.init_db import init_db
 from auo_project.db.meta import meta
 from auo_project.db.models import load_all_models
 from auo_project.db.session import SessionLocal
+from auo_project.web.middleware import ProcessTimeMiddleware
 
 
 def _setup_db(app: FastAPI) -> None:  # pragma: no cover
@@ -179,6 +180,10 @@ def _setup_gzip_middleware(app: FastAPI) -> None:
     app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
+def _setup_process_time_middleware(app: FastAPI) -> None:
+    app.add_middleware(ProcessTimeMiddleware)
+
+
 def _setup_exception_handler(app: FastAPI) -> None:
     """
     Handle custom errors
@@ -305,9 +310,11 @@ def register_startup_event(
         _setup_exception_handler(app)
         _setup_cors_middleware(app)
         _setup_gzip_middleware(app)
+        _setup_process_time_middleware(app)
         _setup_custom_openapi(app)
         _setup_db(app)
-        await _initial_data()
+        if settings.NEED_INIT_DATA:
+            await _initial_data()
         # await _create_tables()
         # setup_opentelemetry(app)
         # init_redis(app)

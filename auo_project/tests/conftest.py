@@ -8,13 +8,13 @@ from fakeredis.aioredis import FakeConnection
 from fastapi import FastAPI
 from httpx import AsyncClient
 from redis.asyncio import ConnectionPool
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from auo_project.core.config import settings
 from auo_project.db.dependencies import get_db_session
 from auo_project.db.init_db import init_db
-from auo_project.db.utils import create_database
+from auo_project.db.utils import create_database, drop_database
 from auo_project.services.redis.dependency import get_redis_pool
 from auo_project.tests.utils import AuthTestClient
 from auo_project.web.api.deps import get_db
@@ -69,21 +69,19 @@ async def _engine() -> AsyncGenerator[AsyncEngine, None]:
         if settings.ENVIRONMENT == "testing"
         else settings.DATABASE_NAME
     )
-    engine = create_async_engine(
-        f"postgresql+asyncpg://auo_project:auo_project@auo_project-db:5432/{dbname}",
-    )
+    from auo_project.db.session import engine
 
-    # await create_database()
-
-    # engine = create_async_engine(str(settings.ASYNC_DATABASE_URI))
-    # async with engine.begin() as conn:
-    #     await conn.run_sync(meta.create_all)
+    # engine = create_async_engine(
+    #     f"postgresql+asyncpg://auo_project:auo_project@auo_project-db:5432/{dbname}",
+    #     echo=True,
+    #     future=True,
+    # )
 
     try:
         yield engine
     finally:
         await engine.dispose()
-        # await drop_database()
+        await drop_database()
 
 
 @pytest.fixture
@@ -103,7 +101,10 @@ async def db_session(
     trans = await connection.begin()
 
     session_maker = sessionmaker(
-        connection,
+        bind=connection,
+        # bind=engine,
+        autocommit=False,
+        autoflush=False,
         expire_on_commit=False,
         class_=AsyncSession,
     )
@@ -144,9 +145,11 @@ def fastapi_app(
     :return: fastapi app with mocked dependencies.
     """
     application = get_app()
+    print("application start", application)
     application.dependency_overrides[get_db] = lambda: db_session
     application.dependency_overrides[get_db_session] = lambda: db_session
     application.dependency_overrides[get_redis_pool] = lambda: fake_redis_pool
+    print("application end", application)
     return application  # noqa: WPS331
 
 
@@ -161,8 +164,6 @@ async def client(
     :param fastapi_app: the application.
     :yield: client for the app.
     """
-    # async with AsyncClient(app=fastapi_app, base_url="http://test") as ac:
-    #     yield ac
     async with AuthTestClient(app=fastapi_app, base_url="http://test") as ac:
         yield ac
 
@@ -178,10 +179,12 @@ async def initialize_db(
     from auo_project.db.meta import meta  # noqa: WPS433
     from auo_project.db.models import load_all_models  # noqa: WPS433
 
+    # from auo_project.models import Action
     load_all_models()
 
-    # print('settings', settings)
     await create_database()
+
+    # print("settings", settings)
 
     dbname = (
         f"{settings.DATABASE_NAME}_testing"
@@ -189,16 +192,22 @@ async def initialize_db(
         else settings.DATABASE_NAME
     )
     print("dbname", dbname)
-    engine = create_async_engine(
-        f"postgresql+asyncpg://auo_project:auo_project@auo_project-db:5432/{dbname}",
-    )
+    # engine = create_async_engine(
+    #     f"postgresql+asyncpg://auo_project:auo_project@auo_project-db:5432/{dbname}",
+    # )
+    from auo_project.db.session import engine
 
+    # engine = create_async_engine(
+    #     f"postgresql+asyncpg://{settings.DATABASE_USER}:{settings.DATABASE_PASSWORD}@{settings.DATABASE_HOST}:{settings.DATABASE_PORT}/{dbname}",
+    # )
+    # print("engine", engine)
     async with engine.begin() as conn:
         await conn.run_sync(meta.create_all)
+    print("created all")
     await init_db(db_session=db_session)
     await db_session.commit()
-
+    print("commit before yield")
     yield
 
     await engine.dispose()
-    # await drop_database()
+    await drop_database()

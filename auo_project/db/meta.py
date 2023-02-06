@@ -1,7 +1,5 @@
 from sqlmodel import SQLModel
 
-# meta = sa.MetaData()
-
 meta = SQLModel.metadata
 # postgresql naming convention
 meta.naming_convention = {

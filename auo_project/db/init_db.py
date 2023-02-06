@@ -12,6 +12,8 @@ from auo_project.schemas.user_schema import UserCreate
 
 
 async def init_db(db_session: AsyncSession) -> None:
+    print("init db start")
+
     file_create = "file:create"
     file_read = "file:read"
     file_update = "file:update"
@@ -264,12 +266,6 @@ async def init_db(db_session: AsyncSession) -> None:
                 db_obj=user,
                 obj_in=user_in["data"],
             )
-
-    # current_users = [
-    #     await crud.user.get_by_email(email=user_in["data"].email, db_session=db_session)
-    #      for user_in in users
-    # ]
-
     for user_in in users:
         current_user = await crud.user.get_by_email(
             email=user_in["data"].email,
@@ -285,3 +281,4 @@ async def init_db(db_session: AsyncSession) -> None:
                 group_id=current_group.id,
                 db_session=db_session,
             )
+    print("init db end")

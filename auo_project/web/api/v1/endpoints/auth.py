@@ -20,6 +20,7 @@ async def login_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
     Authorize: AuthJWT = Depends(),
+    allowed_header: bool = Depends(deps.check_allowed_headers),
 ) -> Any:
     """
     OAuth2 compatible token login, get an access token for future requests
@@ -40,7 +41,7 @@ async def login_access_token(
 
     access_token = Authorize.create_access_token(
         subject=sub,
-        expires_delta=timedelta(settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     csrf_access_token = Authorize.csrf_token
     Authorize.set_access_cookies(
@@ -50,7 +51,7 @@ async def login_access_token(
 
     refresh_token = Authorize.create_refresh_token(
         subject=sub,
-        expires_delta=timedelta(settings.REFRESH_TOKEN_EXPIRE_MINUTES),
+        expires_delta=timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES),
     )
     csrf_refresh_token = Authorize.csrf_token
     Authorize.set_refresh_cookies(

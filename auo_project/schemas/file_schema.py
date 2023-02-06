@@ -33,6 +33,7 @@ class FileUpdate(BaseModel):
     file_status: Optional[int] = None
     location: Optional[str] = None
     size: Optional[float] = None
+    is_valid: Optional[bool] = None
 
 
 class FileReadWithSimple(BaseModel):

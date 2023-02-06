@@ -47,7 +47,7 @@ async def handle_tusd_hook(
 
         file = await crud.file.get(db_session=db_session, id=file_id)
         if not file:
-            raise HTTPException(status_code=400, detail=f"Not found file id: {file_id}")
+            raise HTTPException(status_code=404, detail=f"Not found file id: {file_id}")
         elif str(file.id) != file_id:
             raise HTTPException(
                 status_code=400,

@@ -10,3 +10,4 @@ def health_check() -> None:
 
     It returns 200 if the project is healthy.
     """
+    return "ok"

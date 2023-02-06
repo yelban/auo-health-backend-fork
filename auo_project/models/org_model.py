@@ -25,5 +25,9 @@ class Org(BaseUUIDModel, BaseTimestampModel, OrgBase, table=True):
     __table_args__ = {"schema": "app"}
     users: List["User"] = Relationship(
         back_populates="org",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "select"},
+    )
+    measure_info: List["MeasureInfo"] = Relationship(
+        back_populates="org",
+        sa_relationship_kwargs={"lazy": "select"},
     )

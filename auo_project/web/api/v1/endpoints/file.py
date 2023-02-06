@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.param_functions import Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -24,7 +24,7 @@ async def cancel_upload_file(
     """
     file = await crud.file.get(db_session=db_session, id=file_id)
     if not file:
-        pass
+        raise HTTPException(status_code=404, detail=f"Not found file id: {file_id}")
     file.file_status = FileStatusType.canceled.value
     db_session.add(file)
     await db_session.commit()

@@ -2,15 +2,15 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import UniqueConstraint
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship
 
 from auo_project.core.constants import FileStatusType
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 # from sqlalchemy_utils import ChoiceType
 
 
-class FileBase(SQLModel):
+class FileBase(BaseModel):
     # TODO: composite unique key
     name: str = Field(
         max_length=128,

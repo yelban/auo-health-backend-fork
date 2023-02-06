@@ -182,10 +182,24 @@ def get_current_user_with_perm(
 
 
 def get_ip_allowed(cf_ipcountry: Optional[str] = Header("")):
-    # print("cf_ipcountry:", cf_ipcountry)
-    # if "TW" in cf_ipcountry
-    # Cf-Ipcountry
+    # if not "TW" in cf_ipcountry:
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail=f"The IP is not allowed.",
+    #     )
     return True
+
+
+# check referer and origin header as a CSRF protection
+# ref: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#identifying-source-origin-via-originreferer-header
+def check_allowed_headers(
+    origin: Optional[str] = Header(""),
+    referer: Optional[str] = Header(""),
+):
+    # if not origin:
+    #     raise HTTPException()
+    #     if origin
+    print(origin, referer)
 
 
 def require_jwt_token_refresh(Authorize: AuthJWT = Depends()):

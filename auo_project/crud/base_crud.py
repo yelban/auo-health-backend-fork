@@ -7,6 +7,7 @@ from fastapi_async_sqlalchemy import db
 from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.async_sqlalchemy import paginate
 from pydantic import BaseModel
+from sqlalchemy.orm import selectinload
 from sqlmodel import SQLModel, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import Select
@@ -32,9 +33,16 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self,
         *,
         id: Union[UUID, str],
+        relations: List[Any] = [],
         db_session: Optional[AsyncSession],
     ) -> Optional[ModelType]:
-        query = select(self.model).where(self.model.id == id)
+        options = []
+        for relation in relations:
+            if isinstance(relation, str):
+                options.append(selectinload(getattr(self.model, relation)))
+            else:
+                options.append(selectinload(relation))
+        query = select(self.model).where(self.model.id == id).options(*options)
         response = await db_session.execute(query)
         return response.scalar_one_or_none()
 
@@ -76,6 +84,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db_session: AsyncSession,
         query: Optional[Union[T, Select[T]]] = None,
         order_expr=None,
+        relations: List[Any] = [],
         skip: int = 0,
         limit: int = 100,
         unique: bool = False,
@@ -83,8 +92,14 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if query is None:
             query = select(self.model)
         if not order_expr:
-            order_expr = self.model.created_at.desc
-        query = query.order_by(order_expr()).offset(skip).limit(limit)
+            order_expr = (self.model.created_at.desc(),)
+        options = []
+        for relation in relations:
+            if isinstance(relation, str):
+                options.append(selectinload(getattr(self.model, relation)))
+            else:
+                options.append(selectinload(relation))
+        query = query.options(*options).order_by(*order_expr).offset(skip).limit(limit)
         response = await db_session.execute(query)
         # TODO: CHECK
         if unique:

@@ -8,6 +8,9 @@ from sqlalchemy.future import Connection
 from auo_project.core.config import settings
 from auo_project.db.meta import meta
 
+# import any model to make "alembic revision --autogenerate" work
+from auo_project.models import *  # necessarily to import something from file where your models are stored
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -17,19 +20,6 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-
-# add your model's MetaData object here
-# for 'autogenerate' support
-# target_metadata = mymodel.Base.metadata
-# metadata = SQLModel.metadata
-# # postgresql naming convention
-# metadata.naming_convention = {
-#     "ix": "%(column_0_label)s_idx",
-#     "uq": "%(table_name)s_%(column_0_name)s_key",
-#     "ck": "%(table_name)s_%(constraint_name)s_check",
-#     "fk": "%(table_name)s_%(column_0_name)s_%(referred_table_name)s_fkey",
-#     "pk": "%(table_name)s_pkey",
-# }
 
 target_metadata = meta
 

@@ -32,7 +32,12 @@ class CRUDUpload(CRUDBase[Upload, UploadCreate, UploadUpdate]):
         upload = await super().get(db_session=db_session, id=upload_id)
         if not upload:
             return
+        for file in upload.all_files:
+            if file.file_status == FileStatusType.uploading.value:
+                file.file_status = FileStatusType.canceled.value
+                db_session.add(file)
         upload.upload_status = UploadStatusType.failed.value
+        db_session.add(upload)
         await db_session.commit()
         await db_session.refresh(upload)
         return upload

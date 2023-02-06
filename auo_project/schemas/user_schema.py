@@ -24,7 +24,10 @@ class UserRead(UserBase):
         default=settings.MAX_SIZE_PER_UPLOAD,
         title="每次上傳最大檔案數。",
     )
-    max_upload_concurrency: int = Field(default=100, title="最大同時上傳檔案數。")
+    max_upload_concurrency: int = Field(
+        default=settings.MAX_UPLOAD_CONCURRENCY,
+        title="最大同時上傳檔案數。",
+    )
 
 
 class UserReadWithUploads(UserRead):

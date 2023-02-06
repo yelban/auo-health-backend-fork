@@ -44,10 +44,12 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: LogLevel = LogLevel.INFO
 
+    NEED_INIT_DATA: bool = False
+
     API_VERSION: str = "v1"
     API_V1_STR: str = f"/api/{API_VERSION}"
     PROJECT_NAME: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
 
     # Variables for the database
@@ -56,6 +58,7 @@ class Settings(BaseSettings):
     DATABASE_HOST: str
     DATABASE_PORT: Union[int, str]
     DATABASE_NAME: str
+    DATABASE_SSL_REQURED: bool
     DATABASE_ECHO: bool = False
 
     # Variables for Redis
@@ -110,13 +113,35 @@ class Settings(BaseSettings):
     MAX_SIZE_PER_FILE: int = 100
     ROWS_PER_PAGE: int = 500
     MAX_ROWS_PER_PAGE: int = 500
+    MAX_UPLOAD_CONCURRENCY: int = 100
 
     AZURE_STORAGE_ACCOUNT: str
     AZURE_STORAGE_KEY: str
     AZURE_STORAGE_CONTAINER: str
+    AZURE_STORAGE_CONTAINER_RAW_ZIP: str
+
+    AZURE_STORAGE_ACCOUNT_INTERNET: str
+    AZURE_STORAGE_KEY_INTERNET: str
+    AZURE_STORAGE_CONTAINER_INTERNET_IMAGE: str
 
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ENCRYPT_KEY: str = Fernet.generate_key()
+    TXT_FILE_AES_KEY: bytes
+
+    @validator("TXT_FILE_AES_KEY", pre=True)
+    def convert_aes_key_bytes(cls, v: str) -> bytes:
+        if isinstance(v, str):
+            return bytes.fromhex(v)
+        return v
+
+    TXT_FILE_AES_IV: bytes
+
+    @validator("TXT_FILE_AES_IV", pre=True)
+    def convert_aes_iv_bytes(cls, v: str) -> bytes:
+        if isinstance(v, str):
+            return bytes.fromhex(v)
+        return v
+
     BACKEND_CORS_ORIGINS: Union[List[str], List[AnyHttpUrl]]
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
@@ -149,8 +174,10 @@ class Settings(BaseSettings):
 
     class Config:
         case_sensitive = True
-        env_file = ".env"
+        env_file = ".env", "/mnt/secrets-store/.env"
+        # `/mnt/secrets-store/.env` takes priority over `.env`
         env_file_encoding = "utf-8"
+        # secrets_dir = '/mnt/secrets-store'
 
 
 class AuthConfig:
@@ -163,7 +190,7 @@ class AuthConfig:
     _header_type = "Bearer"
     # _access_token_expires = timedelta(minutes=15)
     # _refresh_token_expires = timedelta(days=30)
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 15
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
 
     # option for create cookies
@@ -203,8 +230,11 @@ class AuthConfig:
 
     class Config:
         case_sensitive = True
-        env_file = ".env"
+        # `/mnt/secrets-store/.env` takes priority over `.env`
+        env_file = ".env", "/mnt/secrets-store/.env"
+        # env_file = ".env"
         env_file_encoding = "utf-8"
+        # secrets_dir = '/mnt/secrets-store'
 
 
 settings = Settings()

@@ -5,6 +5,8 @@ from enum import Enum
 from functools import cached_property
 from typing import Any, Dict, Optional, Union
 
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 from cryptography.fernet import Fernet
 from fastapi import Request, Response
 from jose import jwt
@@ -636,3 +638,13 @@ class AuthJWT(AuthConfig):
         encoded_token = encoded_token or self._token
 
         return jwt.get_unverified_header(encoded_token)
+
+
+def decrypt(key, iv, data):
+    # 以金鑰搭配 CBC 模式與初始向量建立 cipher 物件
+    cipher = AES.new(key, AES.MODE_CBC, iv=iv)
+
+    # 解密後進行 unpadding
+    original_data = unpad(cipher.decrypt(data), AES.block_size, style="pkcs7")
+
+    return original_data

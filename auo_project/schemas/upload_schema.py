@@ -3,17 +3,13 @@ from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
+from sqlmodel import Field
 
 from auo_project.models.upload_model import UploadBase
 
 
 class UploadCreateReqBody(BaseModel):
     filename_list: List[str]
-
-
-from typing import List, Optional
-
-from sqlmodel import Field
 
 
 # cannot replace with Upload

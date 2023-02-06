@@ -6,6 +6,7 @@ from auo_project import crud
 from auo_project.core.azure import blob_service
 from auo_project.core.config import settings
 from auo_project.core.constants import FileStatusType, UploadStatusType
+from auo_project.core.file import get_and_write
 from auo_project.schemas.file_schema import FileUpdate
 from auo_project.schemas.upload_schema import UploadUpdate
 from auo_project.web.api import deps
@@ -26,7 +27,7 @@ async def post_finish(arbitrary_json):
         source_file_info_path = f"{source_file_path}.info"
         source_blob = f"https://{settings.AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/{source_container_name}/{source_file_path}"
 
-        target_container_name = "raw-backup"
+        target_container_name = settings.AZURE_STORAGE_CONTAINER_RAW_ZIP
         upload_id = meta_data.get("upload_id")
         file_id = meta_data.get("file_id")
         file_name = meta_data.get("file_name")
@@ -98,6 +99,8 @@ async def post_finish(arbitrary_json):
                     obj_current=file.upload,
                     obj_new=upload_in,
                 )
+
+            await get_and_write(db_session=db_session, file_id=file.id)
 
             return {"msg": "ok"}
         except Exception as e:

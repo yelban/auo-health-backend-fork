@@ -1,7 +1,7 @@
 from typing import Any, List, Optional, Sequence
 from uuid import UUID
 
-import pydash as py_
+import dateutil.parser
 import sqlmodel
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.param_functions import Depends
@@ -13,8 +13,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
 from auo_project.core.config import settings
-from auo_project.core.constants import UploadStatusType
+from auo_project.core.constants import FileStatusType, UploadStatusType
 from auo_project.core.pagination import Pagination
+from auo_project.core.query import OPERATOR_SPLITTER, OPERATORS
 from auo_project.models import File, Upload, User
 from auo_project.web.api import deps
 
@@ -43,9 +44,15 @@ async def create_upload(
         if ".zip" not in filename:
             raise HTTPException(status_code=400, detail=f"Invalid filename {filename}")
 
+    all_files = await crud.file.get_all_by_owner_id(
+        db_session=db_session,
+        owner_id=current_user.id,
+    )
     owned_file_list = [
         schemas.FileRead.parse_obj({**file.dict(), "is_dup": True})
-        for file in current_user.all_files
+        for file in all_files
+        if file.file_status
+        in (FileStatusType.uploading, FileStatusType.success, FileStatusType.failed)
     ]
     owned_filename_list = [file.name for file in owned_file_list]
     matched_filename_set = set(owned_filename_list) & set(filename_list)
@@ -88,18 +95,8 @@ async def get_upload(
     """
     upload = await crud.upload.get(db_session=db_session, id=upload_id)
     if not upload:
-        raise HTTPException(status_code=400, detail=f"Not found upload id: {upload_id}")
+        raise HTTPException(status_code=404, detail=f"Not found upload id: {upload_id}")
     return upload
-
-
-def parse_filter_expr(filter_list):
-    return (
-        py_.chain(filter_list)
-        .filter_(lambda x: x[1])
-        .map(lambda x: (x[0], *x[1].split(":", 1)))
-        .map(lambda x: (f"{x[0]}__{x[1]}", x[2]) if len(x) == 3 else (x[0], x[1]))
-        .value()
-    )
 
 
 from typing import Any, TypeVar
@@ -170,31 +167,9 @@ async def get_upload_list(
         }
         sort_model = d.get(base_sort_expr, Upload.created_at)
     if sort_model:
-        order_expr = getattr(sort_model, order_by)
+        order_expr = (getattr(sort_model, order_by)(),)
 
-    _operators = {
-        "isnull": lambda c, v: (c == None) if v else (c != None),
-        "exact": operators.eq,
-        "ne": operators.ne,  # not equal or is not (for None)
-        "gt": operators.gt,  # greater than , >
-        "ge": operators.ge,  # greater than or equal, >=
-        "lt": operators.lt,  # lower than, <
-        "le": operators.le,  # lower than or equal, <=
-        "in": operators.in_op,
-        "notin": operators.notin_op,
-        "between": lambda c, v: c.between(v[0], v[1]),
-        "like": operators.like_op,
-        "ilike": operators.ilike_op,
-        "startswith": operators.startswith_op,
-        "istartswith": lambda c, v: c.ilike(v + "%"),
-        "endswith": operators.endswith_op,
-        "iendswith": lambda c, v: c.ilike("%" + v),
-        "contains": lambda c, v: c.ilike("%{v}%".format(v=v)),
-    }
-
-    OPERATOR_SPLITTER = "__"
     expressions = []
-
     filter_list = [
         (Upload.id, upload_id),
         (File.name, filename),
@@ -203,7 +178,6 @@ async def get_upload_list(
         *[(Upload.file_number, exp) for exp in file_number],
         (Upload.upload_status, upload_status),
     ]
-    import dateutil.parser
 
     expressions = []
     for filter in filter_list:
@@ -236,7 +210,7 @@ async def get_upload_list(
                     int(x) if isinstance(col.expression.type, sa.Integer) else x
                     for x in value.split(",")
                 ]
-            op = _operators.get(op_name)
+            op = OPERATORS.get(op_name)
             if not op:
                 raise Exception(f"cannot handle op {op}")
         else:
@@ -296,7 +270,9 @@ async def cancel_upload(
     """
     Cancel upload.
     """
-    upload = await crud.upload.cancel(db_session=db_session, upload_id=upload_id)
+    # TODO: cancel uploading status file
+    upload = await crud.upload.get(db_session=db_session, id=upload_id)
     if not upload:
-        raise HTTPException(status_code=400, detail=f"Not found upload id: {upload_id}")
+        raise HTTPException(status_code=404, detail=f"Not found upload id: {upload_id}")
+    upload = await crud.upload.cancel(db_session=db_session, upload_id=upload_id)
     return upload

@@ -3,9 +3,13 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import text
+
+# from sqlmodel import Field
+from sqlalchemy_mixins import AllFeaturesMixin
 from sqlmodel import Field, SQLModel
 
 from auo_project.core.translation import i18n as _
+from auo_project.db.session import mixins_session
 
 
 class BaseUUIDModel(SQLModel):
@@ -51,3 +55,10 @@ class BaseTimestampModel(SQLModel):
             "onupdate": text("current_timestamp(0)"),
         },
     )
+
+
+class BaseModel(SQLModel, AllFeaturesMixin):
+    __abstract__ = True
+
+
+BaseModel.set_session(mixins_session)
