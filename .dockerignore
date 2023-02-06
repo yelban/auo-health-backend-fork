@@ -118,6 +118,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.env*
 
 # Spyder project settings
 .spyderproject
@@ -142,3 +143,8 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# OSX
+.DS_Store
+
+*.zip
