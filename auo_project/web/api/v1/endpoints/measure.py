@@ -14,7 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
 from auo_project.core.config import settings
-from auo_project.core.utils import safe_divide
+from auo_project.core.utils import compare_cn_diff, get_hr_type
 from auo_project.web.api import deps
 
 router = APIRouter()
@@ -81,20 +81,10 @@ class CNChart(BaseModel):
     r_ch: ColumnChart = Field(title="右尺")
 
 
-def get_hr_type(n):
-    if not n:
-        return n
-    if n >= 85:
-        return 2
-    elif n < 60:
-        return 0
-    return 1
-
-
 def get_poly_points(x, y, degree):
     p = Polynomial.fit(x, y, deg=degree)
     points = [
-        [round(i, 1), round(p(i), 1)] for i in range(int(x[0]) - 10, int(x[-1]) + 10)
+        [round(i, 1), round(p(i), 1)] for i in range(int(x[0]) - 3, int(x[-1]) + 3, 2)
     ]
     return points
 
@@ -248,29 +238,6 @@ async def get_measure_summary(
         },
     }
 
-    def compare_cn_diff(a, b):
-        """compare a and b based on b"""
-        data = []
-        cols = [f"c{i}" for i in range(1, 11)]
-        for c in cols:
-            ac = getattr(a, c, 0)
-            bc = getattr(b, c, 0)
-            if ac is not None and bc is not None:
-                diff_type = "pos" if ac > bc else "neg"
-                data.append(
-                    {
-                        "x": c.upper(),
-                        "pct": int(safe_divide(abs(ac - bc), bc) * 100),
-                        "type": diff_type,
-                    },
-                )
-
-        return {
-            "data": data,
-            "x_field": "x",
-            "y_field": "pct",
-        }
-
     cn_dict = await crud.measure_statistic.get_means_dict(
         db_session=db_session,
         measure_id=measure_id,
@@ -283,9 +250,9 @@ async def get_measure_summary(
     if subject.standard_measure_id:
         standard_cn_dict = await crud.measure_statistic.get_means_dict(
             db_session=db_session,
-            measure_id=measure_id,
+            measure_id=subject.standard_measure_id,
         )
-    # print("standard_cn_dict", standard_cn_dict)
+
     cn = {
         "overall": {
             "l_cu": compare_cn_diff(cn_dict["l_cu"], cn_means_dict["l_cu"]),

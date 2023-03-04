@@ -78,3 +78,7 @@ async def drop_database(engine=None) -> None:
         )
         await conn.execute(text(disc_users))
         await conn.execute(text(f'DROP DATABASE "{dbname}"'))
+
+
+def load_all_models():
+    pass

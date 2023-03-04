@@ -131,6 +131,16 @@ async def get_upload_list(
         regex="in__",
         title="上傳狀態。請以,隔開值，例如: in__0,1,2",
     ),
+    file_status: Optional[str] = Query(
+        None,
+        regex="in__",
+        title="檔案狀態。請以,隔開值，例如: in__0,1,2",
+    ),
+    is_valid: Optional[str] = Query(
+        None,
+        regex="in__",
+        title="檔案驗證是否成功。請以,隔開值，例如: in__true,false",
+    ),
     pagniation: Pagination = Depends(),
     sort_expr: Optional[str] = Query(
         "-start_from",
@@ -164,6 +174,8 @@ async def get_upload_list(
             "start_from": Upload.start_from,
             "file_number": Upload.file_number,
             "upload_status": Upload.upload_status,
+            "file_status": File.file_status,
+            "is_valid": File.is_valid,
         }
         sort_model = d.get(base_sort_expr, Upload.created_at)
     if sort_model:
@@ -177,6 +189,8 @@ async def get_upload_list(
         *[(Upload.start_from, exp) for exp in start_from],
         *[(Upload.file_number, exp) for exp in file_number],
         (Upload.upload_status, upload_status),
+        (File.file_status, file_status),
+        (File.is_valid, is_valid),
     ]
 
     expressions = []
@@ -210,6 +224,13 @@ async def get_upload_list(
                     int(x) if isinstance(col.expression.type, sa.Integer) else x
                     for x in value.split(",")
                 ]
+            elif col.expression.name in ("is_valid"):
+                new_value = []
+                if "true" in value:
+                    new_value += [True]
+                if "false" in value:
+                    new_value += [False]
+                value = new_value
             op = OPERATORS.get(op_name)
             if not op:
                 raise Exception(f"cannot handle op {op}")

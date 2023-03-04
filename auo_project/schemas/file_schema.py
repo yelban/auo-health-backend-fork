@@ -39,3 +39,4 @@ class FileUpdate(BaseModel):
 class FileReadWithSimple(BaseModel):
     name: str
     file_status: int
+    is_valid: bool

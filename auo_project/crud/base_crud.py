@@ -46,6 +46,19 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         response = await db_session.execute(query)
         return response.scalar_one_or_none()
 
+    async def get_all(
+        self, *, relations: List[Any] = [], db_session: Optional[AsyncSession]
+    ) -> Optional[List[ModelType]]:
+        options = []
+        for relation in relations:
+            if isinstance(relation, str):
+                options.append(selectinload(getattr(self.model, relation)))
+            else:
+                options.append(selectinload(relation))
+        query = select(self.model).options(*options)
+        response = await db_session.execute(query)
+        return response.scalars.all()
+
     async def get_by_name(
         self,
         *,
@@ -62,10 +75,17 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self,
         *,
         list_ids: List[Union[UUID, str]],
+        relations: List[Any] = [],
         db_session: AsyncSession,
     ) -> Optional[List[ModelType]]:
+        options = []
+        for relation in relations:
+            if isinstance(relation, str):
+                options.append(selectinload(getattr(self.model, relation)))
+            else:
+                options.append(selectinload(relation))
         response = await db_session.execute(
-            select(self.model).where(self.model.id.in_(list_ids)),
+            select(self.model).where(self.model.id.in_(list_ids)).options(*options),
         )
         return response.scalars().all()
 

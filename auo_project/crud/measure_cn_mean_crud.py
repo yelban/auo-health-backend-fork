@@ -37,7 +37,10 @@ class CRUDMeasureCNMean(
     async def get_dict_by_sex(
         self, db_session: AsyncSession, *, sex: int
     ) -> Dict[str, Any]:
-        cn_means = await self.get_by_sex(db_session=db_session, sex=sex)
+        if sex is None:
+            cn_means = await self.get_all(db_session=db_session)
+        else:
+            cn_means = await self.get_by_sex(db_session=db_session, sex=sex)
         return dict(
             [
                 (

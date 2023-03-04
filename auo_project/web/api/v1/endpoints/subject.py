@@ -1,10 +1,13 @@
+import random
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+import pydash as py_
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.encoders import jsonable_encoder
 from fastapi.param_functions import Depends
 from pydantic import BaseModel
-from sqlalchemy.orm import lazyload, selectinload
+from sqlalchemy.orm import selectinload
 from sqlmodel import extract, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -12,7 +15,11 @@ from auo_project import crud, models, schemas
 from auo_project.core.constants import MEASURE_TIMES
 from auo_project.core.dateutils import DateUtils
 from auo_project.core.pagination import Pagination
-from auo_project.core.utils import get_filters
+from auo_project.core.utils import (
+    get_filters,
+    get_hr_type,
+    get_pct_cmp_overall_and_standard,
+)
 from auo_project.models import MeasureInfo, Org
 from auo_project.web.api import deps
 
@@ -37,6 +44,10 @@ class SubjectPage(BaseModel):
 class SubjectListResponse(BaseModel):
     subject: SubjectPage
     measure_times: List[Dict[str, Any]]
+
+
+class MultiMeasuresBody(BaseModel):
+    measure_ids: List[UUID]
 
 
 @router.get("/", response_model=SubjectListResponse)
@@ -97,7 +108,6 @@ async def get_subject(
         .join(subquery, models.Subject.id == subquery.c.id)
         .where(*models.Subject.filter_expr(**filters))
         .options(
-            lazyload(models.Subject.measure_infos),
             selectinload(models.Subject.standard_measure_info),
         )
     )
@@ -363,3 +373,258 @@ async def reset_standard_value(
     await db_session.commit()
     await db_session.refresh(subject)
     return subject
+
+
+@router.get(
+    "/{subject_id}/multi_measures",
+    response_model=schemas.MultiMeasureDetailResponse,
+)
+async def get_multi_measure_summary(
+    subject_id: UUID,
+    measure_ids: List[UUID] = Query([], alias="measure_ids[]", title="受測編號清單"),
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    if len(measure_ids) > 20:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The number of ids cannot be more than 20.",
+        )
+    # TODO: add current_user permission filter
+    subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    standard_measure_info = None
+    standard_cn_dict = {}
+    if subject.standard_measure_id:
+        standard_measure_info = await crud.measure_info.get(
+            db_session=db_session,
+            id=subject.standard_measure_id,
+        )
+        standard_cn_dict = await crud.measure_statistic.get_means_dict(
+            db_session=db_session,
+            measure_id=subject.standard_measure_id,
+        )
+    # TODO: check all measure ids are valid: owned by the subject
+    measures_infos = await crud.measure_info.get_by_ids(
+        db_session=db_session,
+        list_ids=measure_ids,
+        relations=["bcq"],
+    )
+
+    measures_infos = py_.sort(
+        measures_infos,
+        key=lambda item: item.measure_time,
+        reverse=True,
+    )
+
+    mean_statistic_dict = (
+        await crud.measure_statistic.get_flat_dict_by_ids_and_statistics(
+            db_session=db_session,
+            measure_ids=measure_ids,
+            statistic_name="MEAN",
+        )
+    )
+    # TODO: optimize because only used by pw, CNCV
+    cv_statistic_dict = (
+        await crud.measure_statistic.get_flat_dict_by_ids_and_statistics(
+            db_session=db_session,
+            measure_ids=measure_ids,
+            statistic_name="CV",
+        )
+    )
+    # TODO: optimize because only used by PNSD
+    std_statistic_dict = (
+        await crud.measure_statistic.get_flat_dict_by_ids_and_statistics(
+            db_session=db_session,
+            measure_ids=measure_ids,
+            statistic_name="STD",
+        )
+    )
+
+    mean_statistic_model_dict = {}
+    for key, val in mean_statistic_dict.items():
+        mean_statistic_model_dict[
+            key
+        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+
+    cv_statistic_model_dict = {}
+    for key, val in cv_statistic_dict.items():
+        cv_statistic_model_dict[key] = crud.measure_statistic.get_flat_statistic_model2(
+            val,
+        )
+
+    std_statistic_model_dict = {}
+    for key, val in std_statistic_dict.items():
+        std_statistic_model_dict[
+            key
+        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+
+    # TODO: add CV and STD
+    cn_means_dict = await crud.measure_cn_mean.get_dict_by_sex(
+        db_session=db_session,
+        sex=subject.sex,
+    )
+
+    measures = [
+        schemas.MultiMeasureDetailRead(
+            id=measure.id,
+            tn=f"T{idx+1}",
+            measure_time=measure.measure_time,
+            hr_l=measure.hr_l,
+            hr_l_type=get_hr_type(measure.hr_l),
+            hr_r=measure.hr_r,
+            hr_r_type=get_hr_type(measure.hr_r),
+            mean_prop_range_max_l_cu=measure.mean_prop_range_max_l_cu,
+            mean_prop_range_max_l_qu=measure.mean_prop_range_max_l_qu,
+            mean_prop_range_max_l_ch=measure.mean_prop_range_max_l_ch,
+            mean_prop_range_max_r_cu=measure.mean_prop_range_max_r_cu,
+            mean_prop_range_max_r_qu=measure.mean_prop_range_max_r_qu,
+            mean_prop_range_max_r_ch=measure.mean_prop_range_max_r_ch,
+            max_amp_depth_of_range_l_cu=measure.max_amp_depth_of_range_l_cu,
+            max_amp_depth_of_range_l_qu=measure.max_amp_depth_of_range_l_qu,
+            max_amp_depth_of_range_l_ch=measure.max_amp_depth_of_range_l_ch,
+            max_amp_depth_of_range_r_cu=measure.max_amp_depth_of_range_r_cu,
+            max_amp_depth_of_range_r_qu=measure.max_amp_depth_of_range_r_qu,
+            max_amp_depth_of_range_r_ch=measure.max_amp_depth_of_range_r_ch,
+            max_empt_value_l_cu=measure.max_empt_value_l_cu,
+            max_empt_value_l_qu=measure.max_empt_value_l_qu,
+            max_empt_value_l_ch=measure.max_empt_value_l_ch,
+            max_empt_value_r_cu=measure.max_empt_value_r_cu,
+            max_empt_value_r_qu=measure.max_empt_value_r_qu,
+            max_empt_value_r_ch=measure.max_empt_value_r_ch,
+            max_slope_value_l_cu=measure.max_slope_value_l_cu,
+            max_slope_value_l_qu=measure.max_slope_value_l_qu,
+            max_slope_value_l_ch=measure.max_slope_value_l_ch,
+            max_slope_value_r_cu=measure.max_slope_value_r_cu,
+            max_slope_value_r_qu=measure.max_slope_value_r_qu,
+            max_slope_value_r_ch=measure.max_slope_value_r_ch,
+            xingcheng_l_cu=random.randrange(0, 10),
+            xingcheng_l_qu=random.randrange(0, 10),
+            xingcheng_l_ch=random.randrange(0, 10),
+            xingcheng_r_cu=random.randrange(0, 10),
+            xingcheng_r_qu=random.randrange(0, 10),
+            xingcheng_r_ch=random.randrange(0, 10),
+            h1_l_cu=mean_statistic_model_dict[measure.id].h1_l_cu,
+            h1_l_qu=mean_statistic_model_dict[measure.id].h1_l_qu,
+            h1_l_ch=mean_statistic_model_dict[measure.id].h1_l_ch,
+            h1_r_cu=mean_statistic_model_dict[measure.id].h1_r_cu,
+            h1_r_qu=mean_statistic_model_dict[measure.id].h1_r_qu,
+            h1_r_ch=mean_statistic_model_dict[measure.id].h1_r_ch,
+            h1_div_t1_l_cu=mean_statistic_model_dict[measure.id].h1_div_t1_l_cu,
+            h1_div_t1_l_qu=mean_statistic_model_dict[measure.id].h1_div_t1_l_qu,
+            h1_div_t1_l_ch=mean_statistic_model_dict[measure.id].h1_div_t1_l_ch,
+            h1_div_t1_r_cu=mean_statistic_model_dict[measure.id].h1_div_t1_r_cu,
+            h1_div_t1_r_qu=mean_statistic_model_dict[measure.id].h1_div_t1_r_qu,
+            h1_div_t1_r_ch=mean_statistic_model_dict[measure.id].h1_div_t1_r_ch,
+            # TODO: changeme
+            # pr_l_cu=measure.pr_l_cu,
+            # pr_l_qu=measure.pr_l_qu,
+            # pr_l_ch=measure.pr_l_ch,
+            # pr_r_cu=measure.pr_r_cu,
+            # pr_r_qu=measure.pr_r_qu,
+            # pr_r_ch=measure.pr_r_ch,
+            pr_l_cu=random.randrange(20, 100),
+            pr_l_qu=random.randrange(20, 100),
+            pr_l_ch=random.randrange(20, 100),
+            pr_r_cu=random.randrange(20, 100),
+            pr_r_qu=random.randrange(20, 100),
+            pr_r_ch=random.randrange(20, 100),
+            w1_l_cu=mean_statistic_model_dict[measure.id].w1_l_cu,
+            w1_l_qu=mean_statistic_model_dict[measure.id].w1_l_qu,
+            w1_l_ch=mean_statistic_model_dict[measure.id].w1_l_ch,
+            w1_r_cu=mean_statistic_model_dict[measure.id].w1_r_cu,
+            w1_r_qu=mean_statistic_model_dict[measure.id].w1_r_qu,
+            w1_r_ch=mean_statistic_model_dict[measure.id].w1_r_ch,
+            w1_div_t1_l_cu=mean_statistic_model_dict[measure.id].w1_div_t_l_cu,
+            w1_div_t1_l_qu=mean_statistic_model_dict[measure.id].w1_div_t_l_qu,
+            w1_div_t1_l_ch=mean_statistic_model_dict[measure.id].w1_div_t_l_ch,
+            w1_div_t1_r_cu=mean_statistic_model_dict[measure.id].w1_div_t_r_cu,
+            w1_div_t1_r_qu=mean_statistic_model_dict[measure.id].w1_div_t_r_qu,
+            w1_div_t1_r_ch=mean_statistic_model_dict[measure.id].w1_div_t_r_ch,
+            t1_div_t_l_cu=mean_statistic_model_dict[measure.id].t1_div_t_l_cu,
+            t1_div_t_l_qu=mean_statistic_model_dict[measure.id].t1_div_t_l_qu,
+            t1_div_t_l_ch=mean_statistic_model_dict[measure.id].t1_div_t_l_ch,
+            t1_div_t_r_cu=mean_statistic_model_dict[measure.id].t1_div_t_r_cu,
+            t1_div_t_r_qu=mean_statistic_model_dict[measure.id].t1_div_t_r_qu,
+            t1_div_t_r_ch=mean_statistic_model_dict[measure.id].t1_div_t_r_ch,
+            pw_l_cu=mean_statistic_model_dict[measure.id].pw_l_cu,
+            pw_l_qu=mean_statistic_model_dict[measure.id].pw_l_qu,
+            pw_l_ch=mean_statistic_model_dict[measure.id].pw_l_ch,
+            pw_r_cu=mean_statistic_model_dict[measure.id].pw_r_cu,
+            pw_r_qu=mean_statistic_model_dict[measure.id].pw_r_qu,
+            pw_r_ch=mean_statistic_model_dict[measure.id].pw_r_ch,
+            pwcv_l_cu=cv_statistic_model_dict[measure.id].pw_l_cu,
+            pwcv_l_qu=cv_statistic_model_dict[measure.id].pw_l_qu,
+            pwcv_l_ch=cv_statistic_model_dict[measure.id].pw_l_ch,
+            pwcv_r_cu=cv_statistic_model_dict[measure.id].pw_r_cu,
+            pwcv_r_qu=cv_statistic_model_dict[measure.id].pw_r_qu,
+            pwcv_r_ch=cv_statistic_model_dict[measure.id].pw_r_ch,
+            a0_l_cu=mean_statistic_model_dict[measure.id].a0_l_cu,
+            a0_l_qu=mean_statistic_model_dict[measure.id].a0_l_qu,
+            a0_l_ch=mean_statistic_model_dict[measure.id].a0_l_ch,
+            a0_r_cu=mean_statistic_model_dict[measure.id].a0_r_cu,
+            a0_r_qu=mean_statistic_model_dict[measure.id].a0_r_qu,
+            a0_r_ch=mean_statistic_model_dict[measure.id].a0_r_ch,
+            cn=get_pct_cmp_overall_and_standard(
+                mean_statistic_dict.get(measure.id),
+                cn_means_dict,
+                standard_cn_dict,
+                "c",
+            ),
+            # TODO: changeme
+            cncv=get_pct_cmp_overall_and_standard(
+                cv_statistic_dict.get(measure.id),
+                cn_means_dict,
+                standard_cn_dict,
+                "c",
+            ),
+            # TODO: changeme
+            pn=get_pct_cmp_overall_and_standard(
+                mean_statistic_dict.get(measure.id),
+                cn_means_dict,
+                standard_cn_dict,
+                "p",
+            ),
+            # TODO: changeme
+            pnsd=get_pct_cmp_overall_and_standard(
+                std_statistic_dict.get(measure.id),
+                cn_means_dict,
+                standard_cn_dict,
+                "p",
+            ),
+            bcq=measure.bcq or {},
+        )
+        for idx, measure in enumerate(measures_infos)
+    ]
+
+    normal_spec = schemas.MeasureNormalRange(
+        hr=schemas.NormalRange(lower=50, upper=80),
+        mean_prop_range_max=schemas.NormalRange(lower=1, upper=2),
+        max_amp_depth_of_range=schemas.NormalRange(lower=1, upper=2),
+        max_empt_value=schemas.NormalRange(lower=15, upper=25),
+        max_slope_value=schemas.NormalRange(lower=100, upper=200),
+        xingcheng=schemas.NormalRange(lower=2, upper=8),
+        h1=schemas.NormalRange(lower=10, upper=50),
+        h1_div_t1=schemas.NormalRange(lower=0, upper=2),
+        pr=schemas.NormalRange(lower=60, upper=80),
+        w1=schemas.NormalRange(lower=0.3, upper=0.6),
+        w1_div_t=schemas.NormalRange(lower=0.4, upper=0.8),
+        t1_div_t=schemas.NormalRange(lower=0.1, upper=0.3),
+        pw=schemas.NormalRange(lower=0.1, upper=0.2),
+        pwcv=schemas.NormalRange(lower=None, upper=None),
+        a0=schemas.NormalRange(lower=None, upper=None),
+        cn=schemas.NormalRange(lower=None, upper=None),
+        cncv=schemas.NormalRange(lower=None, upper=None),
+        pn=schemas.NormalRange(lower=None, upper=None),
+        pnsd=schemas.NormalRange(lower=None, upper=None),
+    )
+
+    return schemas.MultiMeasureDetailResponse(
+        subject=schemas.SubjectRead(
+            **jsonable_encoder(subject),
+            standard_measure_info=standard_measure_info,
+        ),
+        measures=measures,
+        normal_spec=normal_spec,
+    )

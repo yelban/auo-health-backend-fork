@@ -23,3 +23,72 @@ def safe_divide(a, b):
 
 def get_filters(f):
     return dict([(k, v) for k, v in f.items() if v is not None and v != []])
+
+
+def get_hr_type(n):
+    if not n:
+        return n
+    if n >= 85:
+        return 2
+    elif n < 60:
+        return 0
+    return 1
+
+
+def compare_x_diff(a, b, x):
+    """compare a and b based on b"""
+    data = []
+    cols = [f"{x}{i}" for i in range(1, 11)]
+    for c in cols:
+        ac = getattr(a, c, 0)
+        bc = getattr(b, c, 0)
+        if ac is not None and bc is not None:
+            diff_type = "pos" if ac > bc else "neg"
+            data.append(
+                {
+                    "x": c.upper(),
+                    "pct": int(safe_divide(abs(ac - bc), bc) * 100),
+                    "type": diff_type,
+                },
+            )
+
+    return {
+        "data": data,
+        "x_field": "x",
+        "y_field": "pct",
+    }
+
+
+def compare_cn_diff(a, b):
+    return compare_x_diff(a, b, "c")
+
+
+def compare_pn_diff(a, b):
+    return compare_x_diff(a, b, "p")
+
+
+def get_pct_cmp_overall_and_standard(
+    cn_dict,
+    cn_means_dict,
+    standard_cn_dict,
+    c_or_p,
+):
+    cmp_diff_func = compare_cn_diff if c_or_p == "c" else compare_pn_diff
+    return {
+        "overall": {
+            "l_cu": cmp_diff_func(cn_dict["l_cu"], cn_means_dict["l_cu"]),
+            "l_qu": cmp_diff_func(cn_dict["l_qu"], cn_means_dict["l_qu"]),
+            "l_ch": cmp_diff_func(cn_dict["l_ch"], cn_means_dict["l_ch"]),
+            "r_cu": cmp_diff_func(cn_dict["r_cu"], cn_means_dict["r_cu"]),
+            "r_qu": cmp_diff_func(cn_dict["r_qu"], cn_means_dict["r_qu"]),
+            "r_ch": cmp_diff_func(cn_dict["r_ch"], cn_means_dict["r_ch"]),
+        },
+        "standard_value": {
+            "l_cu": cmp_diff_func(cn_dict["l_cu"], standard_cn_dict.get("l_cu", {})),
+            "l_qu": cmp_diff_func(cn_dict["l_qu"], standard_cn_dict.get("l_qu", {})),
+            "l_ch": cmp_diff_func(cn_dict["l_ch"], standard_cn_dict.get("l_ch", {})),
+            "r_cu": cmp_diff_func(cn_dict["r_cu"], standard_cn_dict.get("r_cu", {})),
+            "r_qu": cmp_diff_func(cn_dict["r_qu"], standard_cn_dict.get("r_qu", {})),
+            "r_ch": cmp_diff_func(cn_dict["r_ch"], standard_cn_dict.get("r_ch", {})),
+        },
+    }

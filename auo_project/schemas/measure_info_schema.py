@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
@@ -344,6 +344,159 @@ class MeasureDetailRead(BaseModel):
     )
 
 
+class MultiMeasureDetailRead(BaseModel):
+    id: UUID = Field(default=None, title="檢測編號")
+    tn: str = Field(default=None, title="T1-T20")
+    measure_time: datetime = Field(default=None, title="檢測時間")
+    hr_l: int = Field(None, title="左手脈率數值")
+    hr_l_type: int = Field(None, title="左手脈率類型; 無:null/遲:0/正常:1/數:2")  # TODO 確認遲/正常/數區間
+    hr_r: int = Field(None, title="右手脈率數值")
+    hr_r_type: int = Field(None, title="右手脈率類型; 無:null/遲:0/正常:1/數:2")  # TODO 確認遲/正常/數區間
+
+    # TODO: check
+    mean_prop_range_max_l_cu: int = Field(None, title="左寸浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2")
+    mean_prop_range_max_l_qu: int = Field(None, title="左關浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2")
+    mean_prop_range_max_l_ch: int = Field(None, title="左尺浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2")
+    mean_prop_range_max_r_cu: int = Field(None, title="右寸浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2")
+    mean_prop_range_max_r_qu: int = Field(None, title="右關浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2")
+    mean_prop_range_max_r_ch: int = Field(None, title="右尺浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2")
+
+    # TODO: check
+
+    # TODO: check 最大值落點怎麼算：是不是看 max_amp_depth_L_qu 落在哪一區 range_start_index_L_qu/range_1_3_index_L_qu/range_2_3_index_L_qu/range_end_index_L_qu::
+    max_amp_depth_of_range_l_cu: int = Field(None, title="左寸浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2")
+    max_amp_depth_of_range_l_qu: int = Field(None, title="左關浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2")
+    max_amp_depth_of_range_l_ch: int = Field(None, title="左尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2")
+    max_amp_depth_of_range_r_cu: int = Field(None, title="右寸浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2")
+    max_amp_depth_of_range_r_qu: int = Field(None, title="右關浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2")
+    max_amp_depth_of_range_r_ch: int = Field(None, title="右尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2")
+
+    # TODO: check
+    max_empt_value_l_cu: float = Field(None, title="左寸-有效範圍內最大振幅值")
+    max_empt_value_l_qu: float = Field(None, title="左關-有效範圍內最大振幅值")
+    max_empt_value_l_ch: float = Field(None, title="左尺-有效範圍內最大振幅值")
+    max_empt_value_r_cu: float = Field(None, title="右寸-有效範圍內最大振幅值")
+    max_empt_value_r_qu: float = Field(None, title="右關-有效範圍內最大振幅值")
+    max_empt_value_r_ch: float = Field(None, title="右尺-有效範圍內最大振幅值")
+
+    # TODO: check
+    max_slope_value_l_cu: float = Field(None, title="左寸斜率最大值")
+    max_slope_value_l_qu: float = Field(None, title="左關斜率最大值")
+    max_slope_value_l_ch: float = Field(None, title="左尺斜率最大值")
+    max_slope_value_r_cu: float = Field(None, title="右寸斜率最大值")
+    max_slope_value_r_qu: float = Field(None, title="右關斜率最大值")
+    max_slope_value_r_ch: float = Field(None, title="右尺斜率最大值")
+
+    # TODO 行程
+    xingcheng_l_cu: float = Field(None, title="左寸行程")
+    xingcheng_l_qu: float = Field(None, title="左關行程")
+    xingcheng_l_ch: float = Field(None, title="左尺行程")
+    xingcheng_r_cu: float = Field(None, title="右寸行程")
+    xingcheng_r_qu: float = Field(None, title="右關行程")
+    xingcheng_r_ch: float = Field(None, title="右尺行程")
+
+    # statistics
+    h1_l_cu: float = Field(None, title="左寸 h1")
+    h1_l_qu: float = Field(None, title="左關 h1")
+    h1_l_ch: float = Field(None, title="左尺 h1")
+    h1_r_cu: float = Field(None, title="右寸 h1")
+    h1_r_qu: float = Field(None, title="右關 h1")
+    h1_r_ch: float = Field(None, title="右尺 h1")
+
+    h1_div_t1_l_cu: float = Field(None, title="左寸 h1/t1")
+    h1_div_t1_l_qu: float = Field(None, title="左關 h1/t1")
+    h1_div_t1_l_ch: float = Field(None, title="左尺 h1/t1")
+    h1_div_t1_r_cu: float = Field(None, title="右寸 h1/t1")
+    h1_div_t1_r_qu: float = Field(None, title="右關 h1/t1")
+    h1_div_t1_r_ch: float = Field(None, title="右尺 h1/t1")
+
+    pr_l_cu: float = Field(None, title="左寸 pr")
+    pr_l_qu: float = Field(None, title="左關 pr")
+    pr_l_ch: float = Field(None, title="左尺 pr")
+    pr_r_cu: float = Field(None, title="右寸 pr")
+    pr_r_qu: float = Field(None, title="右關 pr")
+    pr_r_ch: float = Field(None, title="右尺 pr")
+
+    w1_l_cu: float = Field(None, title="左寸 w1")
+    w1_l_qu: float = Field(None, title="左關 w1")
+    w1_l_ch: float = Field(None, title="左尺 w1")
+    w1_r_cu: float = Field(None, title="右寸 w1")
+    w1_r_qu: float = Field(None, title="右關 w1")
+    w1_r_ch: float = Field(None, title="右尺 w1")
+
+    w1_div_t_l_cu: float = Field(None, title="左寸 w1/t")
+    w1_div_t_l_qu: float = Field(None, title="左關 w1/t")
+    w1_div_t_l_ch: float = Field(None, title="左尺 w1/t")
+    w1_div_t_r_cu: float = Field(None, title="右寸 w1/t")
+    w1_div_t_r_qu: float = Field(None, title="右關 w1/t")
+    w1_div_t_r_ch: float = Field(None, title="右尺 w1/t")
+
+    t1_div_t_l_cu: float = Field(None, title="左寸 t1/t")
+    t1_div_t_l_qu: float = Field(None, title="左關 t1/t")
+    t1_div_t_l_ch: float = Field(None, title="左尺 t1/t")
+    t1_div_t_r_cu: float = Field(None, title="右寸 t1/t")
+    t1_div_t_r_qu: float = Field(None, title="右關 t1/t")
+    t1_div_t_r_ch: float = Field(None, title="右尺 t1/t")
+
+    pw_l_cu: float = Field(None, title="左寸 pw")
+    pw_l_qu: float = Field(None, title="左關 pw")
+    pw_l_ch: float = Field(None, title="左尺 pw")
+    pw_r_cu: float = Field(None, title="右寸 pw")
+    pw_r_qu: float = Field(None, title="右關 pw")
+    pw_r_ch: float = Field(None, title="右尺 pw")
+
+    pwcv_l_cu: float = Field(None, title="左寸 pwcv")
+    pwcv_l_qu: float = Field(None, title="左關 pwcv")
+    pwcv_l_ch: float = Field(None, title="左尺 pwcv")
+    pwcv_r_cu: float = Field(None, title="右寸 pwcv")
+    pwcv_r_qu: float = Field(None, title="右關 pwcv")
+    pwcv_r_ch: float = Field(None, title="右尺 pwcv")
+
+    a0_l_cu: float = Field(None, title="左寸 a0")
+    a0_l_qu: float = Field(None, title="左關 a0")
+    a0_l_ch: float = Field(None, title="左尺 a0")
+    a0_r_cu: float = Field(None, title="右寸 a0")
+    a0_r_qu: float = Field(None, title="右關 a0")
+    a0_r_ch: float = Field(None, title="右尺 a0")
+
+    # CN
+    cn: Dict[str, Any] = Field({}, title="CN: C1-C11; 如果 standard_value 為空畫面不可選")
+    # TODO: cncv, pn, pnsd 對應資料
+    cncv: Dict[str, Any] = Field({}, title="CNCV: C1-C11; 如果 standard_value 為空畫面不可選")
+    pn: Dict[str, Any] = Field({}, title="PN: C1-C11; 如果 standard_value 為空畫面不可選")
+    pnsd: Dict[str, Any] = Field({}, title="PNSD: C1-C11; 如果 standard_value 為空畫面不可選")
+
+    ### bcq.txt
+    bcq: BCQ = Field({}, title="BCQ 資訊")
+
+
+class NormalRange(BaseModel):
+    lower: Union[int, float] = Field(None, title="下界(包含)")
+    upper: Union[int, float] = Field(None, title="上界(不包含)")
+
+
+class MeasureNormalRange(BaseModel):
+    hr: NormalRange = Field(title="脈率")
+    mean_prop_range_max: NormalRange = Field(title="浮沉振幅平均佔比最大值區塊")
+    max_amp_depth_of_range: NormalRange = Field(title="浮沉振幅最大值落點區塊")
+    max_empt_value: NormalRange = Field(title="有效範圍內最大振幅值")
+    max_slope_value: NormalRange = Field(title="斜率最大值")
+    xingcheng: NormalRange = Field(title="行程")
+    h1: NormalRange = Field(title="h1")
+    h1_div_t1: NormalRange = Field(title="h1/t1")
+    pr: NormalRange = Field(title="pr")
+    w1: NormalRange = Field(title="w1")
+    w1_div_t: NormalRange = Field(title="w1/t")
+    t1_div_t: NormalRange = Field(title="t1/t")
+    pw: NormalRange = Field(title="pw")
+    pwcv: NormalRange = Field(title="pwcv")
+    a0: NormalRange = Field(title="a0")
+    cn: NormalRange = Field(title="cn")
+    cncv: NormalRange = Field(title="cncv")
+    pn: NormalRange = Field(title="pn")
+    pnsd: NormalRange = Field(title="pnsd")
+
+
 class MeasureInfoExtraInfo(BaseModel):
     mean_prop_range_1_l_cu: float = Field(None)
     mean_prop_range_2_l_cu: float = Field(None)
@@ -380,3 +533,9 @@ class MeasureInfoExtraInfo(BaseModel):
 class MeasureDetailResponse(BaseModel):
     subject: SubjectRead
     measure: MeasureDetailRead
+
+
+class MultiMeasureDetailResponse(BaseModel):
+    subject: SubjectRead
+    measures: List[MultiMeasureDetailRead]
+    normal_spec: MeasureNormalRange
