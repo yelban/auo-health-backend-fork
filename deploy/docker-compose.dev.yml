@@ -10,4 +10,13 @@ services:
     - .:/app/src/
     environment:
       # Enables autoreload.
-      AUO_PROJECT_RELOAD: "True"
+      RELOAD: "True"
+
+  db:
+    ports:
+    - 5432:5432
+
+  celeryworker:
+    volumes:
+      # Adds current directory as volume.
+    - .:/app/src/

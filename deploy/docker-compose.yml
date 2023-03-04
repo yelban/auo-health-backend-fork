@@ -24,13 +24,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      AUO_PROJECT_HOST: 0.0.0.0
-      AUO_PROJECT_DB_HOST: auo_project-db
-      AUO_PROJECT_DB_PORT: 5432
-      AUO_PROJECT_DB_USER: auo_project
-      AUO_PROJECT_DB_PASS: auo_project
-      AUO_PROJECT_DB_BASE: auo_project
+    logging:
+      options:
+        max-size: "1000m"
+        max-file: "5"
 
   db:
     image: postgres:13.6-bullseye
@@ -60,11 +57,70 @@ services:
       timeout: 3s
       retries: 50
 
+  tusd:
+    image: tusproject/tusd:v1.10.0
+    restart: always
+    ports:
+    - "1080:1080"
+    command: -base-path /files/ -behind-proxy -azure-blob-access-tier hot -azure-storage upload -azure-object-prefix tusd -hooks-enabled-events post-create,post-finish,post-terminate --hooks-http http://${BACKEND_HOST}:${BACKEND_PORT}/api/v1/hooks/tusd --hooks-http-retry 5 --hooks-http-backoff 2
+    env_file:
+    - .env
 
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    hostname: example.com # set to fqdn of host
+    ports:
+    - 19999:19999
+    restart: unless-stopped
+    cap_add:
+    - SYS_PTRACE
+    security_opt:
+    - apparmor:unconfined
+    volumes:
+    - netdataconfig:/etc/netdata
+    - netdatalib:/var/lib/netdata
+    - netdatacache:/var/cache/netdata
+    - /etc/passwd:/host/etc/passwd:ro
+    - /etc/group:/host/etc/group:ro
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /etc/os-release:/host/etc/os-release:ro
+
+  rmq:
+    image: rabbitmq:3.9.16-alpine
+    hostname: "auo-rmq"
+    restart: always
+    env_file:
+    - .env
+    healthcheck:
+      test: rabbitmq-diagnostics check_running -q
+      interval: 3s
+      timeout: 3s
+      retries: 50
+
+  celeryworker:
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    image: auo_project:${AUO_PROJECT_VERSION:-latest}
+    depends_on:
+    - db
+    - rmq
+    env_file:
+    - .env
+    command: /app/src/auo_project/worker-start.sh
+    logging:
+      options:
+        max-size: "1000m"
+        max-file: "5"
 
 volumes:
   auo_project-db-data:
     name: auo_project-db-data
+  netdataconfig:
+  netdatalib:
+  netdatacache:
 
 networks:
   # Network for traefik.

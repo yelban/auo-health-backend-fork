@@ -15,10 +15,6 @@ RUN poetry install --no-dev
 
 # Copying actuall application
 COPY . /app/src/
-
-# Ref: https://github.com/tiangolo/sqlmodel/pull/256
-RUN poetry run python -m auo_project.patch_sqlmodel
-
 RUN chmod +x /app/src/auo_project/worker-start.sh
 
-CMD ["/usr/local/bin/python", "-m", "auo_project"]
+CMD ["/app/src/auo_project/worker-start.sh"]
