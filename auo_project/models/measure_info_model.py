@@ -241,10 +241,10 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
         {"schema": "measure"},
     )
     subject: "Subject" = Relationship(
-        back_populates="measure_infos",
         sa_relationship_kwargs={
             "lazy": "selectin",
             "uselist": False,
+            "foreign_keys": "MeasureInfo.subject_id",
         },
     )
     bcq: "BCQ" = Relationship(

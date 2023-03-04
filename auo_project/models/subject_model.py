@@ -1,5 +1,4 @@
 from datetime import date
-from typing import List
 from uuid import UUID
 
 from sqlmodel import Field, Relationship
@@ -30,15 +29,11 @@ class SubjectBase(BaseModel):
 class Subject(BaseUUIDModel, BaseTimestampModel, SubjectBase, table=True):
     __tablename__ = "subjects"
     __table_args__ = {"schema": "measure"}
-    measure_infos: List["MeasureInfo"] = Relationship(
-        back_populates="subject",
-        sa_relationship_kwargs={"lazy": "select"},
-    )
     standard_measure_info: "MeasureInfo" = Relationship(
-        back_populates="subject",
         sa_relationship_kwargs={
             "lazy": "select",
-            "primaryjoin": f"foreign(Subject.standard_measure_id) == MeasureInfo.id",
+            "primaryjoin": "Subject.standard_measure_id == MeasureInfo.id",
             "uselist": False,
+            "foreign_keys": "[Subject.standard_measure_id]",
         },
     )
