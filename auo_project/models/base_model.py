@@ -3,8 +3,6 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import text
-
-# from sqlmodel import Field
 from sqlalchemy_mixins import AllFeaturesMixin
 from sqlmodel import Field, SQLModel
 

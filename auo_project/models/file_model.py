@@ -7,8 +7,6 @@ from sqlmodel import Field, Relationship
 from auo_project.core.constants import FileStatusType
 from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
-# from sqlalchemy_utils import ChoiceType
-
 
 class FileBase(BaseModel):
     # TODO: composite unique key
