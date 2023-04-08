@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, validator
 from sqlmodel import Field
 
+from auo_project.core.config import settings
 from auo_project.models.upload_model import UploadBase
 
 
@@ -35,7 +36,7 @@ class UploadRead(UploadBase):
 
 class UploadReadWithEndpoint(UploadRead):
     endpoint: str = Field(
-        default="https://auo-api.deepinsight.tw/files/",
+        default=f"https://{settings.DOMAIN}/files/",
         title="TUS 伺服器上傳端點",
     )
 

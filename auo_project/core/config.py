@@ -31,6 +31,7 @@ class LogLevel(str, enum.Enum):  # noqa: WPS600
 
 
 class Settings(BaseSettings):
+    DOMAIN: str = ""
     HOST: str = "127.0.0.1"
     PORT: int = 8000
 
