@@ -533,32 +533,44 @@ async def process_file(file: models.File, zip_file: BinaryIO):
             max_amp_depth_of_range_r_cu=extra_info.max_amp_depth_of_range_r_cu,
             max_amp_depth_of_range_r_qu=extra_info.max_amp_depth_of_range_r_qu,
             max_amp_depth_of_range_r_ch=extra_info.max_amp_depth_of_range_r_ch,
-            max_empt_value_l_cu=infos.max_empt_value_l_cu,
-            max_empt_value_l_qu=infos.max_empt_value_l_qu,
-            max_empt_value_l_ch=infos.max_empt_value_l_ch,
-            max_empt_value_r_cu=infos.max_empt_value_r_cu,
-            max_empt_value_r_qu=infos.max_empt_value_r_qu,
-            max_empt_value_r_ch=infos.max_empt_value_r_ch,
+            max_ampt_value_l_cu=infos.max_ampt_value_l_cu,
+            max_ampt_value_l_qu=infos.max_ampt_value_l_qu,
+            max_ampt_value_l_ch=infos.max_ampt_value_l_ch,
+            max_ampt_value_r_cu=infos.max_ampt_value_r_cu,
+            max_ampt_value_r_qu=infos.max_ampt_value_r_qu,
+            max_ampt_value_r_ch=infos.max_ampt_value_r_ch,
             irregular_hr_l_cu=infos.irregular_hr_l_cu,
             irregular_hr_l_qu=infos.irregular_hr_l_qu,
             irregular_hr_l_ch=infos.irregular_hr_l_ch,
             irregular_hr_r_cu=infos.irregular_hr_r_cu,
             irregular_hr_r_qu=infos.irregular_hr_r_qu,
             irregular_hr_r_ch=infos.irregular_hr_r_ch,
-            irregular_hr_l=infos.irregular_hr_l_cu
-            or infos.irregular_hr_l_qu
-            or infos.irregular_hr_l_ch,
+            irregular_hr_l=any(
+                [
+                    infos.irregular_hr_l_cu,
+                    infos.irregular_hr_l_qu,
+                    infos.irregular_hr_l_ch,
+                ],
+            ),
             irregular_hr_type_l=None,
-            irregular_hr_r=infos.irregular_hr_r_cu
-            or infos.irregular_hr_r_qu
-            or infos.irregular_hr_r_ch,
+            irregular_hr_r=any(
+                [
+                    infos.irregular_hr_r_cu,
+                    infos.irregular_hr_r_qu,
+                    infos.irregular_hr_r_ch,
+                ],
+            ),
             irregular_hr_type_r=None,
-            irregular_hr=infos.irregular_hr_l_cu
-            or infos.irregular_hr_l_qu
-            or infos.irregular_hr_l_ch
-            or infos.irregular_hr_r_cu
-            or infos.irregular_hr_r_qu
-            or infos.irregular_hr_r_ch,
+            irregular_hr=any(
+                [
+                    infos.irregular_hr_l_cu,
+                    infos.irregular_hr_l_qu,
+                    infos.irregular_hr_l_ch,
+                    infos.irregular_hr_r_cu,
+                    infos.irregular_hr_r_qu,
+                    infos.irregular_hr_r_ch,
+                ],
+            ),
             max_slope_value_l_cu=infos_analyze.max_slop_l_cu,
             max_slope_value_l_qu=infos_analyze.max_slop_l_qu,
             max_slope_value_l_ch=infos_analyze.max_slop_l_ch,
@@ -577,6 +589,48 @@ async def process_file(file: models.File, zip_file: BinaryIO):
             width_r_cu=None,
             width_r_qu=None,
             width_r_ch=None,
+            static_max_amp_l_cu=infos_analyze.static_max_amp_l_cu,
+            static_max_amp_l_qu=infos_analyze.static_max_amp_l_qu,
+            static_max_amp_l_ch=infos_analyze.static_max_amp_l_ch,
+            static_max_amp_r_cu=infos_analyze.static_max_amp_r_cu,
+            static_max_amp_r_qu=infos_analyze.static_max_amp_r_qu,
+            static_max_amp_r_ch=infos_analyze.static_max_amp_r_ch,
+            static_range_start_l_cu=infos_analyze.static_range_start_l_cu,
+            static_range_start_l_qu=infos_analyze.static_range_start_l_qu,
+            static_range_start_l_ch=infos_analyze.static_range_start_l_ch,
+            static_range_start_r_cu=infos_analyze.static_range_start_r_cu,
+            static_range_start_r_qu=infos_analyze.static_range_start_r_qu,
+            static_range_start_r_ch=infos_analyze.static_range_start_r_ch,
+            static_range_end_l_cu=infos_analyze.static_range_end_l_cu,
+            static_range_end_l_qu=infos_analyze.static_range_end_l_qu,
+            static_range_end_l_ch=infos_analyze.static_range_end_l_ch,
+            static_range_end_r_cu=infos_analyze.static_range_end_r_cu,
+            static_range_end_r_qu=infos_analyze.static_range_end_r_qu,
+            static_range_end_r_ch=infos_analyze.static_range_end_r_ch,
+            xingcheng_l_cu=safe_substract(
+                infos_analyze.range_end_index_l_cu,
+                infos_analyze.range_start_index_l_cu,
+            ),
+            xingcheng_l_qu=safe_substract(
+                infos_analyze.range_end_index_l_qu,
+                infos_analyze.range_start_index_l_qu,
+            ),
+            xingcheng_l_ch=safe_substract(
+                infos_analyze.range_end_index_l_ch,
+                infos_analyze.range_start_index_l_ch,
+            ),
+            xingcheng_r_cu=safe_substract(
+                infos_analyze.range_end_index_r_cu,
+                infos_analyze.range_start_index_r_cu,
+            ),
+            xingcheng_r_qu=safe_substract(
+                infos_analyze.range_end_index_r_qu,
+                infos_analyze.range_start_index_r_qu,
+            ),
+            xingcheng_r_ch=safe_substract(
+                infos_analyze.range_end_index_r_ch,
+                infos_analyze.range_start_index_r_ch,
+            ),
             sex=infos.sex,
             age=age,
             height=infos.height,
