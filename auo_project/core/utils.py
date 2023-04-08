@@ -73,12 +73,7 @@ def compare_pn_diff(a, b):
     return compare_x_diff(a, b, "p")
 
 
-def get_pct_cmp_overall_and_standard(
-    cn_dict,
-    cn_means_dict,
-    standard_cn_dict,
-    c_or_p,
-):
+def get_pct_cmp_overall_and_standard(cn_dict, cn_means_dict, standard_cn_dict, c_or_p):
     cmp_diff_func = compare_cn_diff if c_or_p == "c" else compare_pn_diff
     return {
         "overall": {
