@@ -20,3 +20,16 @@ services:
     volumes:
       # Adds current directory as volume.
     - .:/app/src/
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    restart: always
+    env_file:
+    - .env
+    environment:
+    - PYTHONPATH=/app/src
+    ports:
+    - 8501:8501
+    command: poetry run streamlit run auo_project/streamlit/web_app.py --server.enableWebsocketCompression=false --global.developmentMode=false --server.headless=true --server.maxUploadSize=100 --browser.serverAddress=tool.auohealth.com --browser.gatherUsageStats=false

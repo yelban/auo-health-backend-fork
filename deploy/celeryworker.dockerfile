@@ -11,7 +11,7 @@ COPY pyproject.toml poetry.lock /app/src/
 WORKDIR /app/src
 
 # Installing requirements
-RUN poetry install --no-dev
+RUN poetry install --only main
 
 # Copying actuall application
 COPY . /app/src/
