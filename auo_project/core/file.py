@@ -23,9 +23,9 @@ from auo_project.core.azure import (
     upload_internet_file,
 )
 from auo_project.core.config import settings
-from auo_project.core.constants import LOW_PASS_RATE_THRESHOLD
+from auo_project.core.constants import LOW_PASS_RATE_THRESHOLD, FileStatusType
 from auo_project.core.security import decrypt
-from auo_project.core.utils import safe_divide
+from auo_project.core.utils import safe_divide, safe_substract
 from auo_project.db.session import SessionLocal
 
 conn_args = {}
@@ -395,9 +395,12 @@ def read_file(zip_file: Union[BytesIO, str]):
                     decoded_data = decrypted_data.decode("utf8")
                     schema_in = txt_filename_list_format_dict.get(file_name)
                     if schema_in:
-                        dict_obj = parse_content(decoded_data)
-                        # TODO: check provided columns
-                        result_dict[file_name] = schema_in(**dict_obj)
+                        try:
+                            dict_obj = parse_content(decoded_data)
+                            # TODO: check provided columns
+                            result_dict[file_name] = schema_in(**dict_obj)
+                        except Exception as e:
+                            raise Exception(f"{file_name}: {e}")
                     elif file_name in validates_6s or file_name in validates_all_s:
                         df = pd.read_csv(StringIO(decoded_data), header=None, sep="\t")
                         side = None
@@ -429,12 +432,10 @@ def read_file(zip_file: Union[BytesIO, str]):
         return result_dict
 
 
-async def process_file(file: models.File, zip_file: BinaryIO):
+async def process_file(file: models.File, zip_file: BinaryIO, overwrite: bool):
     result_dict = None
     try:
         result_dict = read_file(zip_file)
-    except Exception as e:
-        print("file value error: ", e)
     except Exception as e:
         print("file error: ", e)
 
@@ -496,7 +497,7 @@ async def process_file(file: models.File, zip_file: BinaryIO):
         age = relativedelta(infos.measure_time, infos.birth_date).years
 
     bmi = None
-    if isinstance(infos.height, float) and isinstance(infos.weight, float):
+    if isinstance(infos.height, int) and isinstance(infos.weight, int):
         bmi = safe_divide(infos.weight, (infos.height / 100) ** 2)
 
     if measure_info:
@@ -782,6 +783,8 @@ async def process_file(file: models.File, zip_file: BinaryIO):
             obj_in=measure_raw_in,
         )
 
+    return True
+
 
 async def get_and_write(
     db_session: AsyncSession,
@@ -799,7 +802,7 @@ async def get_and_write(
     # TODO: design error log table
     print("result:", result)
     if result:
-        file_in = schemas.FileUpdate(is_valid=True)
+        file_in = schemas.FileUpdate(file_status=FileStatusType.success, is_valid=True)
         await crud.file.update(db_session=db_session, obj_current=file, obj_new=file_in)
 
 
