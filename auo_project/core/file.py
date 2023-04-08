@@ -182,20 +182,36 @@ def get_range_idx(v, values):
     return
 
 
-# TODO: check
 def get_max_amp_depth_of_range(infos_analyze, hand, position):
-    keys = [
-        f"range_start_index_{hand}_{position}",
-        f"range_1_3_index_{hand}_{position}",
-        f"range_2_3_index_{hand}_{position}",
-        f"range_end_index_{hand}_{position}",
-    ]
-    values = [
-        hasattr(infos_analyze, key) and getattr(infos_analyze, key) for key in keys
-    ]
-    max_value = getattr(infos_analyze, f"max_amp_depth_{hand}_{position}")
-
     default_value = {f"max_amp_depth_of_range_{hand}_{position}": None}
+    # 未來可能調整算法，目前為 3:4:3
+    start_end_keys = [
+        f"static_range_start_{hand}_{position}",
+        f"static_range_end_{hand}_{position}",
+    ]
+    start_end_values = [
+        hasattr(infos_analyze, key) and getattr(infos_analyze, key)
+        for key in start_end_keys
+    ]
+
+    static_range_1_3_adjust = (
+        (start_end_values[1] - start_end_values[0]) * 3 / 10
+        if all([x is not None for x in start_end_values])
+        else None
+    )
+    static_range_2_3_adjust = (
+        (start_end_values[1] - start_end_values[0]) * 7 / 10
+        if all([x is not None for x in start_end_values])
+        else None
+    )
+    values = [
+        start_end_values[0],
+        static_range_1_3_adjust,
+        static_range_2_3_adjust,
+        start_end_values[1],
+    ]
+    max_value = getattr(infos_analyze, f"static_max_amp_{hand}_{position}")
+
     if not all([v is not None for v in values]) or max_value is None:
         return default_value
 
