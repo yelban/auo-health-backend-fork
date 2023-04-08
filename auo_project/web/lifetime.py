@@ -37,7 +37,7 @@ from auo_project.core.exceptions import AUOException
 from auo_project.db.init_db import init_db
 from auo_project.db.meta import meta
 from auo_project.db.session import SessionLocal
-from auo_project.db.utils import load_all_models
+from auo_project.models import load_all_models
 from auo_project.web.middleware import ProcessTimeMiddleware
 
 
