@@ -6,7 +6,6 @@ from sqlmodel import Field, Relationship, UniqueConstraint
 from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 
-# TODO: 脈波通過率過低項目定義為何 pass_rate
 class MeasureInfoBase(BaseModel):
     subject_id: UUID = Field(
         index=True,
@@ -119,32 +118,32 @@ class MeasureInfoBase(BaseModel):
         default=None,
         title="右尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
     )
-    max_empt_value_l_cu: float = Field(
+    max_ampt_value_l_cu: float = Field(
         default=None,
         nullable=True,
         title="左寸-有效範圍內最大振幅值",
     )
-    max_empt_value_l_qu: float = Field(
+    max_ampt_value_l_qu: float = Field(
         default=None,
         nullable=True,
         title="左關-有效範圍內最大振幅值",
     )
-    max_empt_value_l_ch: float = Field(
+    max_ampt_value_l_ch: float = Field(
         default=None,
         nullable=True,
         title="左尺-有效範圍內最大振幅值",
     )
-    max_empt_value_r_cu: float = Field(
+    max_ampt_value_r_cu: float = Field(
         default=None,
         nullable=True,
         title="右寸-有效範圍內最大振幅值",
     )
-    max_empt_value_r_qu: float = Field(
+    max_ampt_value_r_qu: float = Field(
         default=None,
         nullable=True,
         title="右關-有效範圍內最大振幅值",
     )
-    max_empt_value_r_ch: float = Field(
+    max_ampt_value_r_ch: float = Field(
         default=None,
         nullable=True,
         title="右尺-有效範圍內最大振幅值",
@@ -190,6 +189,85 @@ class MeasureInfoBase(BaseModel):
     width_r_cu: int = Field(default=None, title="右寸粗細; 無:null/細:0/正常:1/粗:2")
     width_r_qu: int = Field(default=None, title="右關粗細; 無:null/細:0/正常:1/粗:2")
     width_r_ch: int = Field(default=None, title="右尺粗細; 無:null/細:0/正常:1/粗:2")
+
+    static_max_amp_l_cu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左寸-最大振幅靜態壓值(單位:mmHg)",
+    )
+    static_max_amp_l_qu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左關-最大振幅靜態壓值(單位:mmHg)",
+    )
+    static_max_amp_l_ch: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左尺-最大振幅靜態壓值(單位:mmHg)",
+    )
+    static_max_amp_r_cu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右寸-最大振幅靜態壓值(單位:mmHg)",
+    )
+    static_max_amp_r_qu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右關-最大振幅靜態壓值(單位:mmHg)",
+    )
+    static_max_amp_r_ch: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右尺-最大振幅靜態壓值(單位:mmHg)",
+    )
+    static_range_start_l_cu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左寸-起點靜態壓值(單位:mmHg)",
+    )
+    static_range_start_l_qu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左關-起點靜態壓值(單位:mmHg)",
+    )
+    static_range_start_l_ch: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左尺-起點靜態壓值(單位:mmHg)",
+    )
+    static_range_start_r_cu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右寸-起點靜態壓值(單位:mmHg)",
+    )
+    static_range_start_r_qu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右關-起點靜態壓值(單位:mmHg)",
+    )
+    static_range_start_r_ch: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右尺-起點靜態壓值(單位:mmHg)",
+    )
+    static_range_end_l_cu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左寸-終點靜態壓值(單位:mmHg)",
+    )
+    static_range_end_l_qu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左關-終點靜態壓值(單位:mmHg)",
+    )
+    static_range_end_l_ch: float = Field(
+        default=None,
+        title="靜態壓有效範圍-左尺-終點靜態壓值(單位:mmHg)",
+    )
+    static_range_end_r_cu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右寸-終點靜態壓值(單位:mmHg)",
+    )
+    static_range_end_r_qu: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右關-終點靜態壓值(單位:mmHg)",
+    )
+    static_range_end_r_ch: float = Field(
+        default=None,
+        title="靜態壓有效範圍-右尺-終點靜態壓值(單位:mmHg)",
+    )
+    xingcheng_l_cu: float = Field(default=None, title="行程-左寸-起點終點相差深度(單位:mm)")
+    xingcheng_l_qu: float = Field(default=None, title="行程-左關-起點終點相差深度(單位:mm)")
+    xingcheng_l_ch: float = Field(default=None, title="行程-左尺-起點終點相差深度(單位:mm)")
+    xingcheng_r_cu: float = Field(default=None, title="行程-右寸-起點終點相差深度(單位:mm)")
+    xingcheng_r_qu: float = Field(default=None, title="行程-右關-起點終點相差深度(單位:mm)")
+    xingcheng_r_ch: float = Field(default=None, title="行程-右尺-起點終點相差深度(單位:mm)")
 
     sex: int = Field(default=None, nullable=True, title="性別")
     age: int = Field(default=None, nullable=True, title="檢測時年齡")
