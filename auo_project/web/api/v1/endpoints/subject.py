@@ -1,4 +1,4 @@
-import random
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -8,11 +8,11 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.param_functions import Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
-from sqlmodel import extract, func, select
+from sqlmodel import String, cast, extract, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
-from auo_project.core.constants import MEASURE_TIMES
+from auo_project.core.constants import MEASURE_TIMES, SexType
 from auo_project.core.dateutils import DateUtils
 from auo_project.core.pagination import Pagination
 from auo_project.core.utils import (
@@ -52,9 +52,12 @@ class MultiMeasuresBody(BaseModel):
 
 @router.get("/", response_model=SubjectListResponse)
 async def get_subject(
-    name: Optional[str] = Query(None, regex="contains__", title="姓名"),
+    id: Optional[str] = Query(None, regex="contains__", title="受測者編號"),
     sid: Optional[str] = Query(None, regex="contains__", title="ID"),
-    birth_date: Optional[List[str]] = Query(None, regex="(ge|le)__", title="出生年月日"),
+    name: Optional[str] = Query(None, regex="contains__", title="姓名"),
+    sex: Optional[SexType] = Query(None, title="性別：男=0, 女=1）"),
+    memo: Optional[str] = Query(None, regex="contains__", title="受測者標記"),
+    birth_date: Optional[str] = Query(None, regex="[0-9\-]+", title="出生年月日"),
     sort_expr: Optional[str] = Query(
         None,
         title="updated_at 代表由小到大排。-updated_at 代表由大到小排。",
@@ -74,12 +77,20 @@ async def get_subject(
     start_date, end_date = dateutils.get_dates()
 
     filters = {
-        "name__contains": name,
-        "sid__contains": sid,
-        "birth_date__ge": birth_date[0] if birth_date else None,
-        "birth_date__le": birth_date[1] if birth_date else None,
+        "name__contains": name.replace("contains__", "") if name else None,
+        "sid__contains": sid.replace("contains__", "") if sid else None,
+        "birth_date": datetime.strptime(birth_date.replace("-", ""), "%Y%m%d")
+        if birth_date
+        else None,
+        "sex": sex,
+        "memo__contains": memo.replace("contains__", "") if memo else None,
     }
-    filters = dict([(k, v) for k, v in filters.items() if v])
+    filters = dict([(k, v) for k, v in filters.items() if v is not None and v != []])
+    filter_expr = models.Subject.filter_expr(**filters)
+    if id:
+        filter_expr.append(
+            cast(models.Subject.id, String).ilike(f'%{id.replace("contains__", "")}%'),
+        )
     sort_expr = sort_expr.split(",") if sort_expr else ["-updated_at"]
     sort_expr = [e.replace("+", "") for e in sort_expr]
     order_expr = models.Subject.order_expr(*sort_expr)
@@ -106,7 +117,7 @@ async def get_subject(
     query = (
         select(models.Subject)
         .join(subquery, models.Subject.id == subquery.c.id)
-        .where(*models.Subject.filter_expr(**filters))
+        .where(*filter_expr)
         .options(
             selectinload(models.Subject.standard_measure_info),
         )
@@ -136,19 +147,27 @@ async def get_subject_measures(
         alias="specific_months[]",
         title="指定月份",
     ),
-    org_name: Optional[List[str]] = Query(
+    org_id: Optional[List[str]] = Query(
         [],
         title="檢測單位",
     ),
     measure_operator: Optional[List[str]] = Query([], title="檢測人員"),
+    consult_dr: Optional[List[str]] = Query([], title="諮詢醫師"),  # judge_dr
     irregular_hr: Optional[List[bool]] = Query(
-        None,
+        [],
         title="節律標記",
         alias="irregular_hr[]",
     ),
     proj_num: Optional[str] = Query(None, title="計畫編號"),
     has_memos: Optional[str] = Query(None, title="檢測標記"),
-    not_include_low_pass_rates: Optional[List[bool]] = Query(None, title="排除通過率低項目"),
+    has_bcqs: Optional[str] = Query(None, title="BCQ 檢測"),
+    age: Optional[List[str]] = Query([], regex="(ge|le)__", title="年齡"),
+    bmi: Optional[List[str]] = Query([], regex="(ge|le)__", title="BMI"),
+    not_include_low_pass_rates: Optional[List[bool]] = Query(
+        [],
+        title="排除通過率低項目",
+        alias="not_include_low_pass_rates[]",
+    ),
     sort_expr: Optional[str] = Query(
         "-measure_time",
         title="measure_time 代表由小到大排。-measure_time 代表由大到小排。",
@@ -173,7 +192,14 @@ async def get_subject_measures(
 
     # TODO: make frontend remove +
     sort_expr = sort_expr.split(",") if sort_expr else ["-updated_at"]
-    order_expr = models.MeasureInfo.order_expr(*[e.replace("+", "") for e in sort_expr])
+    order_expr = models.MeasureInfo.order_expr(
+        *[e.replace("+", "") for e in sort_expr if "org_name" not in e]
+    )
+    org_order_expr = []
+    org_sort_expr = [e.replace("org_id", "name") for e in sort_expr if "org_id" in e]
+    if org_sort_expr:
+        org_order_expr = models.Org.order_expr(*org_sort_expr)
+    order_expr += org_order_expr
     # TODO: implement
     # TODO: add division constraint
     has_memos = (
@@ -181,37 +207,53 @@ async def get_subject_measures(
         if has_memos
         else []
     )
+    has_bcqs = (
+        [True if e == "true" else False for e in has_bcqs.split(",")]
+        if has_bcqs
+        else []
+    )
     start_date, end_date = dateutils.get_dates()
-
-    # TODO: check
+    age_start = py_.head(list(filter(lambda x: x.startswith("ge"), age)))
+    age_end = py_.head(list(filter(lambda x: x.startswith("le"), age)))
+    bmi_start = py_.head(list(filter(lambda x: x.startswith("ge"), bmi)))
+    bmi_end = py_.head(list(filter(lambda x: x.startswith("le"), bmi)))
     irregular_hr = (
         [1 if e == False else 0 for e in irregular_hr] if irregular_hr else []
     )
-    # TODO: check not_include_low_pass_rates
+    has_low_pass_rate = [not x for x in not_include_low_pass_rates]
     expressions = []
     filters = get_filters(
         {
             "subject_id": subject_id,
-            "org_id": current_user.org_id,
             "measure_time__ge": start_date,
             "measure_time__le": end_date,
-            # "org___name__in": org_name, # TODO: KeyError: 'Expression `org___name__in` has incorrect attribute `org___name`'
+            "age__ge": age_start,
+            "age__le": age_end,
+            "bmi__ge": bmi_start,
+            "bmi__le": bmi_end,
+            # TODO: filter org_id by user permission
+            "org_id__in": org_id,
             "measure_operator__in": measure_operator,
+            "judge_dr__in": consult_dr,
             "irregular_hr__in": irregular_hr,
             "proj_num": proj_num,
-            "has_memos__in": has_memos,
-            "not_include_low_pass_rates__not_in": not_include_low_pass_rates,
+            "has_memo__in": has_memos,
+            "has_bcq__in": has_bcqs,
+            "has_low_pass_rate__in": has_low_pass_rate,
         },
     )
-    # print("filters", filters)
-    # filters = dict([(k, v) for k, v in filters.items() if v is not None and v != []])
-    # print("filters", filters)
+    print("filters", filters)
     expressions = models.MeasureInfo.filter_expr(**filters)
+    org_expressions = []
+    print("expressions", expressions)
     if specific_months:
         expressions.append(
             extract("month", models.MeasureInfo.measure_time).in_(specific_months),
         )
-    query = select(MeasureInfo).join(Org).where(*expressions).distinct()
+    base_query = select(MeasureInfo).where(MeasureInfo.subject_id == subject_id)
+    query = (
+        select(MeasureInfo).join(Org).where(*expressions, *org_expressions).distinct()
+    )
     measures = await crud.measure_info.get_multi(
         db_session=db_session,
         query=query,
@@ -236,20 +278,11 @@ async def get_subject_measures(
     page_result = await pagniation.paginate2(total_count, measures)
 
     # TODO: user, division mapping
-    org_names = [
-        {"value": "center1", "key": "某某醫學中心"},
-        {"value": "center2", "key": "某Ｂ醫學中心"},
-    ]
     org_names = [{"value": current_user.org.id, "key": current_user.org.name}]
-    # print("org", current_user.org)
 
-    measure_operators = [
-        {"value": "operator_id_1", "key": "某某Ａ"},
-        {"value": "operator_id_2", "key": "某某B"},
-    ]
     measure_operators_query = select(
         func.distinct(MeasureInfo.measure_operator),
-    ).select_from(query.subquery())
+    ).select_from(base_query.subquery())
     measure_operators_result = await db_session.execute(measure_operators_query)
     measure_operators = [
         {"value": operator[0], "key": operator[0]}
@@ -257,13 +290,18 @@ async def get_subject_measures(
         if operator[0]
     ]
 
-    proj_nums = [
-        {"value": "0000000001", "key": "0000000001"},
-        {"value": "0000000002", "key": "0000000002"},
-        {"value": "0000000003", "key": "0000000003"},
+    consult_dr_query = select(func.distinct(MeasureInfo.judge_dr)).select_from(
+        base_query.subquery(),
+    )
+    consult_drs_result = await db_session.execute(consult_dr_query)
+    consult_drs = [
+        {"value": consult_dr[0], "key": consult_dr[0]}
+        for consult_dr in consult_drs_result.fetchall()
+        if consult_dr[0]
     ]
+
     proj_nums_query = select(func.distinct(MeasureInfo.proj_num)).select_from(
-        query.subquery(),
+        base_query.subquery(),
     )
     proj_nums_result = await db_session.execute(proj_nums_query)
     proj_nums = [
@@ -278,6 +316,7 @@ async def get_subject_measures(
         measure_times=MEASURE_TIMES,
         org_names=org_names,
         measure_operators=measure_operators,
+        consult_drs=consult_drs,
         irregular_hrs=[{"value": True, "key": "規律"}, {"value": False, "key": "不規律"}],
         proj_nums=proj_nums,
         has_memos=[{"value": True, "key": "有"}, {"value": False, "key": "無"}],
@@ -314,7 +353,7 @@ async def update_subject_memo(
 
 @router.patch(
     "/{subject_id}/measure/{measure_id}/standard_value",
-    response_model=schemas.SubjectRead,
+    # response_model=schemas.SubjectRead, # TODO: fixme
 )
 async def set_standard_value(
     subject_id: UUID,
@@ -487,24 +526,25 @@ async def get_multi_measure_summary(
             max_amp_depth_of_range_r_cu=measure.max_amp_depth_of_range_r_cu,
             max_amp_depth_of_range_r_qu=measure.max_amp_depth_of_range_r_qu,
             max_amp_depth_of_range_r_ch=measure.max_amp_depth_of_range_r_ch,
-            max_empt_value_l_cu=measure.max_empt_value_l_cu,
-            max_empt_value_l_qu=measure.max_empt_value_l_qu,
-            max_empt_value_l_ch=measure.max_empt_value_l_ch,
-            max_empt_value_r_cu=measure.max_empt_value_r_cu,
-            max_empt_value_r_qu=measure.max_empt_value_r_qu,
-            max_empt_value_r_ch=measure.max_empt_value_r_ch,
+            max_empt_value_l_cu=measure.max_ampt_value_l_cu,
+            max_empt_value_l_qu=measure.max_ampt_value_l_qu,
+            max_empt_value_l_ch=measure.max_ampt_value_l_ch,
+            max_empt_value_r_cu=measure.max_ampt_value_r_cu,
+            max_empt_value_r_qu=measure.max_ampt_value_r_qu,
+            max_empt_value_r_ch=measure.max_ampt_value_r_ch,
             max_slope_value_l_cu=measure.max_slope_value_l_cu,
             max_slope_value_l_qu=measure.max_slope_value_l_qu,
             max_slope_value_l_ch=measure.max_slope_value_l_ch,
             max_slope_value_r_cu=measure.max_slope_value_r_cu,
             max_slope_value_r_qu=measure.max_slope_value_r_qu,
             max_slope_value_r_ch=measure.max_slope_value_r_ch,
-            xingcheng_l_cu=random.randrange(0, 10),
-            xingcheng_l_qu=random.randrange(0, 10),
-            xingcheng_l_ch=random.randrange(0, 10),
-            xingcheng_r_cu=random.randrange(0, 10),
-            xingcheng_r_qu=random.randrange(0, 10),
-            xingcheng_r_ch=random.randrange(0, 10),
+            xingcheng_l_cu=measure.xingcheng_l_cu,
+            xingcheng_l_qu=measure.xingcheng_l_qu,
+            xingcheng_l_ch=measure.xingcheng_l_ch,
+            xingcheng_r_cu=measure.xingcheng_r_cu,
+            xingcheng_r_qu=measure.xingcheng_r_qu,
+            xingcheng_r_ch=measure.xingcheng_r_ch,
+            # TODO: add these extra cols to measure.infos
             h1_l_cu=mean_statistic_model_dict[measure.id].h1_l_cu,
             h1_l_qu=mean_statistic_model_dict[measure.id].h1_l_qu,
             h1_l_ch=mean_statistic_model_dict[measure.id].h1_l_ch,
@@ -517,31 +557,24 @@ async def get_multi_measure_summary(
             h1_div_t1_r_cu=mean_statistic_model_dict[measure.id].h1_div_t1_r_cu,
             h1_div_t1_r_qu=mean_statistic_model_dict[measure.id].h1_div_t1_r_qu,
             h1_div_t1_r_ch=mean_statistic_model_dict[measure.id].h1_div_t1_r_ch,
-            # TODO: changeme
-            # pr_l_cu=measure.pr_l_cu,
-            # pr_l_qu=measure.pr_l_qu,
-            # pr_l_ch=measure.pr_l_ch,
-            # pr_r_cu=measure.pr_r_cu,
-            # pr_r_qu=measure.pr_r_qu,
-            # pr_r_ch=measure.pr_r_ch,
-            pr_l_cu=random.randrange(20, 100),
-            pr_l_qu=random.randrange(20, 100),
-            pr_l_ch=random.randrange(20, 100),
-            pr_r_cu=random.randrange(20, 100),
-            pr_r_qu=random.randrange(20, 100),
-            pr_r_ch=random.randrange(20, 100),
+            pr_l_cu=mean_statistic_model_dict[measure.id].pr_l_cu,
+            pr_l_qu=mean_statistic_model_dict[measure.id].pr_l_qu,
+            pr_l_ch=mean_statistic_model_dict[measure.id].pr_l_ch,
+            pr_r_cu=mean_statistic_model_dict[measure.id].pr_r_cu,
+            pr_r_qu=mean_statistic_model_dict[measure.id].pr_r_qu,
+            pr_r_ch=mean_statistic_model_dict[measure.id].pr_r_ch,
             w1_l_cu=mean_statistic_model_dict[measure.id].w1_l_cu,
             w1_l_qu=mean_statistic_model_dict[measure.id].w1_l_qu,
             w1_l_ch=mean_statistic_model_dict[measure.id].w1_l_ch,
             w1_r_cu=mean_statistic_model_dict[measure.id].w1_r_cu,
             w1_r_qu=mean_statistic_model_dict[measure.id].w1_r_qu,
             w1_r_ch=mean_statistic_model_dict[measure.id].w1_r_ch,
-            w1_div_t1_l_cu=mean_statistic_model_dict[measure.id].w1_div_t_l_cu,
-            w1_div_t1_l_qu=mean_statistic_model_dict[measure.id].w1_div_t_l_qu,
-            w1_div_t1_l_ch=mean_statistic_model_dict[measure.id].w1_div_t_l_ch,
-            w1_div_t1_r_cu=mean_statistic_model_dict[measure.id].w1_div_t_r_cu,
-            w1_div_t1_r_qu=mean_statistic_model_dict[measure.id].w1_div_t_r_qu,
-            w1_div_t1_r_ch=mean_statistic_model_dict[measure.id].w1_div_t_r_ch,
+            w1_div_t_l_cu=mean_statistic_model_dict[measure.id].w1_div_t_l_cu,
+            w1_div_t_l_qu=mean_statistic_model_dict[measure.id].w1_div_t_l_qu,
+            w1_div_t_l_ch=mean_statistic_model_dict[measure.id].w1_div_t_l_ch,
+            w1_div_t_r_cu=mean_statistic_model_dict[measure.id].w1_div_t_r_cu,
+            w1_div_t_r_qu=mean_statistic_model_dict[measure.id].w1_div_t_r_qu,
+            w1_div_t_r_ch=mean_statistic_model_dict[measure.id].w1_div_t_r_ch,
             t1_div_t_l_cu=mean_statistic_model_dict[measure.id].t1_div_t_l_cu,
             t1_div_t_l_qu=mean_statistic_model_dict[measure.id].t1_div_t_l_qu,
             t1_div_t_l_ch=mean_statistic_model_dict[measure.id].t1_div_t_l_ch,
