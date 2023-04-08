@@ -1,13 +1,13 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship
 
 from auo_project.core.translation import i18n as _
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 
-class SubscriptionBase(SQLModel):
+class SubscriptionBase(BaseModel):
     name: str = Field(
         max_length=64,
         unique=True,

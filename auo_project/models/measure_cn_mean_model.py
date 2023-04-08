@@ -1,9 +1,9 @@
-from sqlmodel import Field, SQLModel, UniqueConstraint
+from sqlmodel import Field, UniqueConstraint
 
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 
-class MeasureCNMeanBase(SQLModel):
+class MeasureCNMeanBase(BaseModel):
     hand: str = Field(
         index=True,
         nullable=False,

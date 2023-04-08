@@ -1,12 +1,12 @@
 from typing import List
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship
 
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 from auo_project.models.links_model import LinkGroupRole, LinkRoleAction, LinkUserRole
 
 
-class RoleBase(SQLModel):
+class RoleBase(BaseModel):
     name: str = Field(
         max_length=64,
         unique=True,

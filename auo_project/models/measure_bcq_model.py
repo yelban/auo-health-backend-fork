@@ -1,11 +1,11 @@
 from uuid import UUID
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship
 
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 
-class BCQBase(SQLModel):
+class BCQBase(BaseModel):
     measure_id: UUID = Field(
         index=True,
         unique=True,

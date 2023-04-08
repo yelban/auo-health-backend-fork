@@ -1,12 +1,12 @@
 from typing import List
 from uuid import UUID
 
-from sqlmodel import ARRAY, INTEGER, Column, Field, Relationship, SQLModel
+from sqlmodel import ARRAY, INTEGER, Column, Field, Relationship
 
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 
-class MeasureTongueBase(SQLModel):
+class MeasureTongueBase(BaseModel):
     measure_id: UUID = Field(
         index=True,
         unique=True,

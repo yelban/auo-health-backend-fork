@@ -2,13 +2,13 @@ from typing import List, Optional
 from uuid import UUID
 
 from pydantic import EmailStr
-from sqlmodel import Column, Field, Relationship, SQLModel, String
+from sqlmodel import Column, Field, Relationship, String
 
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 from auo_project.models.links_model import LinkGroupUser, LinkUserAction, LinkUserRole
 
 
-class UserBase(SQLModel):
+class UserBase(BaseModel):
     org_id: Optional[UUID] = Field(
         index=True,
         nullable=False,

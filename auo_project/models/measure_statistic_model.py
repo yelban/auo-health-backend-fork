@@ -1,11 +1,11 @@
 from uuid import UUID
 
-from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
+from sqlmodel import Field, Relationship, UniqueConstraint
 
-from auo_project.models.base_model import BaseTimestampModel, BaseUUIDModel
+from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 
-class MeasureStatisticBase(SQLModel):
+class MeasureStatisticBase(BaseModel):
     measure_id: UUID = Field(index=True, nullable=False, foreign_key="measure.infos.id")
     statistic: str = Field(
         index=True,
