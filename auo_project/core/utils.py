@@ -21,6 +21,12 @@ def safe_divide(a, b):
     return a / b
 
 
+def safe_substract(a, b):
+    if a is None or b is None:
+        return None
+    return a - b
+
+
 def get_filters(f):
     return dict([(k, v) for k, v in f.items() if v is not None and v != []])
 
