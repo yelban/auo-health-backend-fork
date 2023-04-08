@@ -60,6 +60,7 @@ class SubjectReadWithMeasures(BaseModel):
     measure_times: List[Dict[str, Any]] = Field([], title="選項：檢測時間")
     org_names: List[Dict[str, Any]] = Field([], title="選項：檢測單位")
     measure_operators: List[Dict[str, Any]] = Field(title="選項：檢測人員")
+    consult_drs: List[Dict[str, Any]] = Field(title="選項：諮詢醫生")
     irregular_hrs: List[Dict[str, Any]] = Field(title="選項：節律標記")
     proj_nums: List[Dict[str, Any]] = Field(title="選項：計畫編號")
     has_memos: List[Dict[str, Any]] = Field(title="選項：檢測標記")
