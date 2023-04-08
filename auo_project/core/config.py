@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     MAX_SIZE_PER_FILE: int = 100
     ROWS_PER_PAGE: int = 500
     MAX_ROWS_PER_PAGE: int = 500
-    MAX_UPLOAD_CONCURRENCY: int = 100
+    MAX_UPLOAD_CONCURRENCY: int = 20
 
     AZURE_STORAGE_ACCOUNT: str
     AZURE_STORAGE_KEY: str
