@@ -330,6 +330,7 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
         sa_relationship_kwargs={
             "lazy": "select",
             "uselist": False,
+            "cascade": "all, delete",
         },
     )
     raw: "MeasureRaw" = Relationship(
@@ -337,6 +338,7 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
         sa_relationship_kwargs={
             "lazy": "select",
             "uselist": False,
+            "cascade": "all, delete",
         },
     )
     statistics: "MeasureStatistic" = Relationship(
@@ -344,6 +346,7 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
         sa_relationship_kwargs={
             "lazy": "select",
             "uselist": True,
+            "cascade": "all, delete",
         },
     )
     tongue: "MeasureTongue" = Relationship(
@@ -351,6 +354,7 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
         sa_relationship_kwargs={
             "lazy": "select",
             "uselist": False,
+            "cascade": "all, delete",
         },
     )
     org: "Org" = Relationship(
