@@ -106,7 +106,10 @@ async def post_finish(arbitrary_json):
         except Exception as e:
             print("error:", e)
             if file:
-                file_in = FileUpdate(file_status=FileStatusType.failed.value)
+                file_in = FileUpdate(
+                    file_status=FileStatusType.failed.value,
+                    memo=str(e),
+                )
                 await crud.file.update(
                     db_session=db_session,
                     obj_current=file,
