@@ -44,7 +44,7 @@ def get_hr_type(n):
 def compare_x_diff(a, b, x):
     """compare a and b based on b"""
     data = []
-    cols = [f"{x}{i}" for i in range(1, 11)]
+    cols = [f"{x}{i}" for i in range(1, 12)]
     for c in cols:
         ac = getattr(a, c, 0)
         bc = getattr(b, c, 0)
