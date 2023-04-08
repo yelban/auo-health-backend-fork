@@ -200,5 +200,10 @@ pytest --cov-report term --cov=auo_project auo_project/tests/
 
 ## Shell
 ```bash
-python -m auo_project.cli shell
+poetry run python -m auo_project.cli shell
+```
+
+## Streamlit
+```bash
+PYTHONPATH=$PWD poetry run streamlit run -m auo_project/streamlit/web_app.py
 ```
