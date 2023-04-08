@@ -57,7 +57,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 options.append(selectinload(relation))
         query = select(self.model).options(*options)
         response = await db_session.execute(query)
-        return response.scalars.all()
+        return response.scalars().all()
 
     async def get_by_name(
         self,
