@@ -99,7 +99,10 @@ class CRUDMeasureStatistic(
         result = {}
         for hand_pos, statistic in statistic_dict.items():
             for col in cols:
-                result[f"{col}_{hand_pos}"] = getattr(statistic, col)
+                if col == "hr":
+                    result[f"pr_{hand_pos}"] = getattr(statistic, col)
+                else:
+                    result[f"{col}_{hand_pos}"] = getattr(statistic, col)
         return MeasureStatisticFlat(**result)
 
     async def get_means_dict(
