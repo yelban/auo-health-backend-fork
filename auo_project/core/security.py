@@ -6,7 +6,7 @@ from functools import cached_property
 from typing import Any, Dict, Optional, Union
 
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
+from Crypto.Util.Padding import pad, unpad
 from cryptography.fernet import Fernet
 from fastapi import Request, Response
 from jose import jwt
@@ -648,3 +648,12 @@ def decrypt(key, iv, data):
     original_data = unpad(cipher.decrypt(data), AES.block_size, style="pkcs7")
 
     return original_data
+
+
+def encrypt(key, iv, data):
+    ## new 一個 AES CBC cipher
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+
+    ## 將要加密的 data encode 成 utf-8
+    ## 然後使用 pad function 將明文 padding 到 block size
+    return cipher.encrypt(pad(data, AES.block_size))
