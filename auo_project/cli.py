@@ -1,6 +1,7 @@
 # file: root/__init__.py
 from asyncio import run
 from functools import wraps
+from uuid import UUID
 
 import typer
 
@@ -39,6 +40,7 @@ def async_command(app, *args, **kwargs):
 typer.Typer.async_command = async_command
 
 from auo_project import core, crud, db, models, schemas
+from auo_project.core.file import get_and_write
 from auo_project.db.session import AsyncSession, SessionLocal, engine
 
 cli = typer.Typer(name="project_name API")
@@ -76,6 +78,17 @@ async def create_user(
     return user
 
 
+@cli.async_command()
+async def rewrite_file(
+    file_id: UUID,
+):
+    """Rewrite file to Database"""
+    db_session = SessionLocal()
+    file = await crud.file.get(db_session=db_session, id=file_id)
+    await get_and_write(db_session=db_session, file_id=file.id, overwrite=True)
+    typer.echo(f"rewrite file id {file_id}")
+
+
 @cli.command()
 def shell():  # pragma: no cover
     """Opens an interactive shell with objects auto imported"""
@@ -91,6 +104,7 @@ def shell():  # pragma: no cover
         "AsyncSession": AsyncSession,
         "SessionLocal": SessionLocal,
         "create_user": create_user,
+        "rewrite_file": rewrite_file,
     }
     typer.echo(f"Auto imports: {list(_vars.keys())}")
     try:

@@ -485,7 +485,11 @@ async def process_file(file: models.File, zip_file: BinaryIO):
 
     if measure_info:
         print(f"measure exist: {measure_info.id}")
-    else:
+    if overwrite and measure_info:
+        print("start deleting...")
+        await crud.measure_info.remove(db_session=db_session, id=measure_info.id)
+        print("deleted")
+    if not measure_info or overwrite:
         measure_info_in = schemas.MeasureInfoCreate(
             subject_id=subject.id,
             file_id=file.id,
@@ -709,7 +713,11 @@ async def process_file(file: models.File, zip_file: BinaryIO):
         )
 
 
-async def get_and_write(db_session: AsyncSession, file_id: UUID):
+async def get_and_write(
+    db_session: AsyncSession,
+    file_id: UUID,
+    overwrite: bool = False,
+):
     file = await crud.file.get(db_session=db_session, id=file_id)
     if not file:
         raise Exception(f"not found file id: {file_id}")
@@ -717,7 +725,7 @@ async def get_and_write(db_session: AsyncSession, file_id: UUID):
     # download blob
     downloader = download_zip_file(blob_service, file.location)
     zip_file = BytesIO(downloader.readall())
-    result = await process_file(file, zip_file)
+    result = await process_file(file, zip_file, overwrite)
     # TODO: design error log table
     print("result:", result)
     if result:
@@ -728,4 +736,4 @@ async def get_and_write(db_session: AsyncSession, file_id: UUID):
 async def process_dir(dir: str):
     zip_folder = Path(dir)
     for zip_file in zip_folder.glob("*.zip"):
-        await process_file(zip_file)
+        await process_file(zip_file, overwrite=False)
