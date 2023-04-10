@@ -102,6 +102,8 @@ async def db_session(
         await session.close()
         await trans.rollback()
         await connection.close()
+        # close and clean-up pooled connections
+        await _engine.dispose()
 
 
 @pytest.fixture
