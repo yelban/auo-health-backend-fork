@@ -28,7 +28,6 @@ class UploadRead(UploadBase):
     class Config:
         fields = {
             "owner": {"exclude": True},
-            "file_number": {"exclude": True},
             "all_files": "files",
         }
         allow_population_by_field_name = True
