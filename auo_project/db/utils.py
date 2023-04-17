@@ -69,12 +69,6 @@ async def create_database(dbname, engine=None) -> None:
             ),
         )
         await conn.commit()
-        schemas = await conn.execute(
-            text(
-                "select schema_name from information_schema.schemata;",
-            ),
-        )
-        print(schemas.fetchall())
 
 
 async def drop_database(dbname, engine=None) -> None:
