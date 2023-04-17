@@ -266,8 +266,14 @@ async def get_subject_measures(
 
     measures = [
         schemas.MeasureInfoReadByList(
-            **measure.dict(),
+            id=measure.id,
             org_name=measure.org.name,
+            measure_time=measure.measure_time,
+            measure_operator=measure.measure_operator,
+            proj_num=measure.proj_num,
+            memo=measure.memo,
+            age=measure.age,
+            bcq=measure.has_bcq,
             is_standard_measure=(subject.standard_measure_id == measure.id),
         )
         for measure in measures
