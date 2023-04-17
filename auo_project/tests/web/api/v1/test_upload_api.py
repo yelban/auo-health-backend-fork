@@ -1,6 +1,9 @@
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
+from starlette import status
+
+from auo_project.core.constants import UploadStatusType
 
 
 @pytest.mark.anyio
@@ -11,22 +14,23 @@ async def test_create_upload_ok(client: AsyncClient, fastapi_app: FastAPI) -> No
     :param client: client for the app.
     :param fastapi_app: current FastAPI application.
     """
-    # url = fastapi_app.url_path_for("create_upload")
-    # expected_files = ["testfile1.zip", "testfile2.zip"]
-    # payload = {"filename_list": expected_files}
-    # response = await client.post(url, json=payload)
-    # assert response.status_code == 200
-    # result = response.json()
+    url = fastapi_app.url_path_for("create_upload")
+    expected_files = ["testfile1.zip", "testfile2.zip"]
+    payload = {"filename_list": expected_files}
+    response = await client.post(url, json=payload)
+    assert response.status_code == 200
+    result = response.json()
 
-    # assert result["upload_status"] == UploadStatusType.uploading.value
-    # assert result["file_number"] == len(expected_files)
+    print("result", result)
 
-    # actual_files = result["files"]
-    # actual_filenames = [file["name"] for file in actual_files]
-    # assert len(expected_files) == len(actual_files)
-    # for expected_file in expected_files:
-    #     assert expected_file in actual_filenames
-    return True
+    assert result["upload_status"] == UploadStatusType.uploading.value
+    assert result["file_number"] == len(expected_files)
+
+    actual_files = result["files"]
+    actual_filenames = [file["name"] for file in actual_files]
+    assert len(expected_files) == len(actual_files)
+    for expected_file in expected_files:
+        assert expected_file in actual_filenames
 
 
 @pytest.mark.anyio
@@ -37,21 +41,20 @@ async def test_get_upload_ok(client: AsyncClient, fastapi_app: FastAPI) -> None:
     :param client: client for the app.
     :param fastapi_app: current FastAPI application.
     """
-    # url = fastapi_app.url_path_for("create_upload")
-    # expected_files = ["testfile1.zip", "testfile2.zip"]
-    # payload = {"filename_list": expected_files}
-    # response = await client.post(url, json=payload)
-    # assert response.status_code == status.HTTP_200_OK
-    # result1 = response.json()
-    # del result1["endpoint"]
+    url = fastapi_app.url_path_for("create_upload")
+    expected_files = ["testfile1.zip", "testfile2.zip"]
+    payload = {"filename_list": expected_files}
+    response = await client.post(url, json=payload)
+    assert response.status_code == status.HTTP_200_OK
+    result1 = response.json()
+    del result1["endpoint"]
 
-    # url = fastapi_app.url_path_for("get_upload", upload_id=result1["id"])
-    # response = await client.get(url)
-    # assert response.status_code == status.HTTP_200_OK
-    # result2 = response.json()
+    url = fastapi_app.url_path_for("get_upload", upload_id=result1["id"])
+    response = await client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    result2 = response.json()
 
-    # assert result1 == result2
-    return True
+    assert result1 == result2
 
 
 @pytest.mark.anyio
