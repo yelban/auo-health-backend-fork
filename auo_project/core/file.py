@@ -1,5 +1,4 @@
 from collections import Counter
-from datetime import datetime
 from io import BytesIO, StringIO
 from os.path import abspath, dirname
 from os.path import join as joinpath
@@ -10,7 +9,6 @@ from uuid import UUID
 from zipfile import ZipFile
 
 import pandas as pd
-from dateutil.relativedelta import relativedelta
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -25,7 +23,7 @@ from auo_project.core.azure import (
 from auo_project.core.config import settings
 from auo_project.core.constants import LOW_PASS_RATE_THRESHOLD, FileStatusType
 from auo_project.core.security import decrypt
-from auo_project.core.utils import safe_divide, safe_substract
+from auo_project.core.utils import get_age, safe_divide, safe_substract
 from auo_project.db.session import SessionLocal
 
 conn_args = {}
@@ -489,12 +487,10 @@ async def process_file(file: models.File, zip_file: BinaryIO, overwrite: bool):
             ):
                 has_low_pass_rate = True
 
-    age = None
-    if isinstance(infos.birth_date, datetime) and isinstance(
+    age = get_age(infos.measure_time, infos.birth_date) or get_age(
         infos.measure_time,
-        datetime,
-    ):
-        age = relativedelta(infos.measure_time, infos.birth_date).years
+        subject.birth_date,
+    )
 
     bmi = None
     if isinstance(infos.height, int) and isinstance(infos.weight, int):

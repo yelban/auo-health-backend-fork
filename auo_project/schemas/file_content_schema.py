@@ -3,6 +3,8 @@ from typing import List
 
 from pydantic import BaseModel, Field, validator
 
+from auo_project.core.utils import switch_strength_value
+
 
 class FileInfos(BaseModel):
     """infos.txt"""
@@ -103,6 +105,18 @@ class FileInfos(BaseModel):
             dt = datetime.strptime(v, "%Y/%m/%d\u3000%H:%M")
             return dt
         return v
+
+    @validator(
+        "strength_l_cu",
+        "strength_l_qu",
+        "strength_l_ch",
+        "strength_r_cu",
+        "strength_r_qu",
+        "strength_r_ch",
+        pre=True,
+    )
+    def switch_value(cls, v):
+        return switch_strength_value(v)
 
 
 class FileInfosAnalyze(BaseModel):
@@ -484,18 +498,10 @@ class FileReport(BaseModel):
         "strength_r_cu",
         "strength_r_qu",
         "strength_r_ch",
+        pre=True,
     )
     def switch_value(cls, v):
-        if v:
-            if v == 0:
-                return 2
-            elif v == 1:
-                return v
-            elif v == 2:
-                return 0
-            else:
-                raise ValueError("must be null/0/1/2")
-        return v
+        return switch_strength_value(v)
 
     class Config:
         allow_population_by_field_name = True

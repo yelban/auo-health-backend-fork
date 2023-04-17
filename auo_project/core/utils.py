@@ -1,3 +1,8 @@
+from datetime import date, datetime
+
+from dateutil.relativedelta import relativedelta
+
+
 def mask_credential_name(s: str):
     wildcard = "*"
     if len(s) == 1:
@@ -93,3 +98,22 @@ def get_pct_cmp_overall_and_standard(cn_dict, cn_means_dict, standard_cn_dict, c
             "r_ch": cmp_diff_func(cn_dict["r_ch"], standard_cn_dict.get("r_ch", {})),
         },
     }
+
+
+def get_age(measure_time, birth_date):
+    if (isinstance(measure_time, datetime) or isinstance(measure_time, date)) and (
+        isinstance(birth_date, datetime) or isinstance(birth_date, date)
+    ):
+        return relativedelta(measure_time, birth_date).years
+
+
+def switch_strength_value(v):
+    if v:
+        if str(v) == "0":
+            return 2
+        elif str(v) == "1":
+            return v
+        elif str(v) == "2":
+            return 0
+        else:
+            raise ValueError(f"must be null/0/1/2 but got {v}")

@@ -3,7 +3,6 @@ from enum import IntEnum
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel, Field, validator
 
 from auo_project.models.measure_info_model import MeasureInfoBase
@@ -181,12 +180,6 @@ class MeasureInfoReadByList(BaseModel):
     def check_has_memo(cls, v, values):
         if values.get("memo"):
             return isinstance(values["memo"], str) and len(values["memo"]) > 0
-        return v
-
-    @validator("age", always=True)
-    def cal_age(cls, v, values):
-        if isinstance(values.get("birth_date"), datetime):
-            return relativedelta(datetime.now(), values["birth_date"]).years
         return v
 
     @validator("bmi", always=True)
