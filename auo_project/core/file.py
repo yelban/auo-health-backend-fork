@@ -133,8 +133,9 @@ def data_integrity_check(result_dict):
     return result_dict
 
 
+# TODO: rename mean_prop_range prefix to static_mean_prop_range
 def get_mean_prop_range_123(infos_analyze, hand, position):
-    keys = [f"mean_range_{i}_{hand}_{position}" for i in (1, 2, 3)]
+    keys = [f"static_mean_range_{i}_{hand}_{position}" for i in (1, 2, 3)]
     values = [
         hasattr(infos_analyze, key) and getattr(infos_analyze, key) for key in keys
     ]
@@ -191,14 +192,13 @@ def get_max_amp_depth_of_range(infos_analyze, hand, position):
         hasattr(infos_analyze, key) and getattr(infos_analyze, key)
         for key in start_end_keys
     ]
-
     static_range_1_3_adjust = (
-        (start_end_values[1] - start_end_values[0]) * 3 / 10
+        start_end_values[0] + (start_end_values[1] - start_end_values[0]) * 3 / 10
         if all([x is not None for x in start_end_values])
         else None
     )
     static_range_2_3_adjust = (
-        (start_end_values[1] - start_end_values[0]) * 7 / 10
+        start_end_values[0] + (start_end_values[1] - start_end_values[0]) * 7 / 10
         if all([x is not None for x in start_end_values])
         else None
     )
