@@ -81,10 +81,12 @@ class CNChart(BaseModel):
     r_ch: ColumnChart = Field(title="右尺")
 
 
-def get_poly_points(x, y, degree):
+def get_poly_points(x, y, degree, step):
     p = Polynomial.fit(x, y, deg=degree)
     points = [
-        [round(i, 1), round(p(i), 1)] for i in range(int(x[0]) - 3, int(x[-1]) + 3, 2)
+        [round(i, 1), round(p(i), 1)]
+        for i in range(int(x[0]), int(x[-1]) + 1, step)
+        if round(i, 1) >= 0
     ]
     return points
 
@@ -121,7 +123,8 @@ def get_scatter_chart(data):
             regression_points=get_poly_points(
                 x=df.static.values,
                 y=df.amp.values,
-                degree=7,
+                degree=6,
+                step=2,
             ),
         ),
         "depth_amp": ScatterChart(
@@ -131,7 +134,8 @@ def get_scatter_chart(data):
             regression_points=get_poly_points(
                 x=df.depth.values,
                 y=df.amp.values,
-                degree=7,
+                degree=5,
+                step=1,
             ),
         ),
     }
