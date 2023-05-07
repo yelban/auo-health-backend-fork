@@ -785,7 +785,7 @@ async def process_file(file: models.File, zip_file: BinaryIO, overwrite: bool):
 async def get_and_write(
     db_session: AsyncSession,
     file_id: UUID,
-    overwrite: bool = False,
+    overwrite: bool = True,
 ):
     file = await crud.file.get(db_session=db_session, id=file_id)
     if not file:
