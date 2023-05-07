@@ -13,11 +13,6 @@ from auo_project.schemas.file_schema import (
 )
 from auo_project.schemas.group_schema import GroupCreate, GroupRead, GroupUpdate
 from auo_project.schemas.measure_bcq_schema import BCQCreate, BCQRead, BCQUpdate
-from auo_project.schemas.measure_cn_mean_schema import (
-    MeasureCNMeanCreate,
-    MeasureCNMeanRead,
-    MeasureCNMeanUpdate,
-)
 from auo_project.schemas.measure_info_schema import (
     BCQ,
     IrregularHR,
@@ -37,6 +32,11 @@ from auo_project.schemas.measure_info_schema import (
     Tongue,
     TongueImage,
     TongueInfo,
+)
+from auo_project.schemas.measure_mean_schema import (
+    MeasureMeanCreate,
+    MeasureMeanRead,
+    MeasureMeanUpdate,
 )
 from auo_project.schemas.measure_raw_schema import (
     MeasureRawCreate,

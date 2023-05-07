@@ -506,7 +506,7 @@ async def get_multi_measure_summary(
         ] = crud.measure_statistic.get_flat_statistic_model2(val)
 
     # TODO: add CV and STD
-    cn_means_dict = await crud.measure_cn_mean.get_dict_by_sex(
+    means_dict = await crud.measure_cn_mean.get_dict_by_sex(
         db_session=db_session,
         sex=subject.sex,
     )

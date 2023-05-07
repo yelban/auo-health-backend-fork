@@ -4,33 +4,30 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project.crud.base_crud import CRUDBase
-from auo_project.models.measure_cn_mean_model import MeasureCNMean
-from auo_project.schemas.measure_cn_mean_schema import (
-    MeasureCNMeanCreate,
-    MeasureCNMeanUpdate,
-)
+from auo_project.models.measure_mean_model import MeasureMean
+from auo_project.schemas.measure_mean_schema import MeasureMeanCreate, MeasureMeanUpdate
 
 
-class CRUDMeasureCNMean(
-    CRUDBase[MeasureCNMean, MeasureCNMeanCreate, MeasureCNMeanUpdate],
+class CRUDMeasureMean(
+    CRUDBase[MeasureMean, MeasureMeanCreate, MeasureMeanUpdate],
 ):
     async def get_by_uniq_keys(
         self, db_session: AsyncSession, *, hand: str, position: str, sex: int
-    ) -> Optional[MeasureCNMean]:
+    ) -> Optional[MeasureMean]:
         cn_mean = await db_session.execute(
-            select(MeasureCNMean).where(
-                MeasureCNMean.hand == hand,
-                MeasureCNMean.position == position,
-                MeasureCNMean.sex == sex,
+            select(MeasureMean).where(
+                MeasureMean.hand == hand,
+                MeasureMean.position == position,
+                MeasureMean.sex == sex,
             ),
         )
         return cn_mean.scalar_one_or_none()
 
     async def get_by_sex(
         self, db_session: AsyncSession, *, sex: int
-    ) -> List[MeasureCNMean]:
+    ) -> List[MeasureMean]:
         cn_means = await db_session.execute(
-            select(MeasureCNMean).where(MeasureCNMean.sex == sex),
+            select(MeasureMean).where(MeasureMean.sex == sex),
         )
         return cn_means.scalars().all()
 
@@ -52,4 +49,4 @@ class CRUDMeasureCNMean(
         )
 
 
-measure_cn_mean = CRUDMeasureCNMean(MeasureCNMean)
+measure_cn_mean = CRUDMeasureMean(MeasureMean)

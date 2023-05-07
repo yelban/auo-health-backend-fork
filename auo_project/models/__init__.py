@@ -9,8 +9,8 @@ from auo_project.models.links_model import (
     LinkUserRole,
 )
 from auo_project.models.measure_bcq_model import BCQ
-from auo_project.models.measure_cn_mean_model import MeasureCNMean
 from auo_project.models.measure_info_model import MeasureInfo
+from auo_project.models.measure_mean_model import MeasureMean
 from auo_project.models.measure_raw_model import MeasureRaw
 from auo_project.models.measure_statistic_model import MeasureStatistic
 from auo_project.models.measure_tongue_model import MeasureTongue

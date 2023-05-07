@@ -2,8 +2,8 @@ from auo_project.crud.action_crud import action
 from auo_project.crud.file_crud import file
 from auo_project.crud.group_crud import group
 from auo_project.crud.measure_bcq_crud import measure_bcq
-from auo_project.crud.measure_cn_mean_crud import measure_cn_mean
 from auo_project.crud.measure_info_crud import measure_info
+from auo_project.crud.measure_mean_crud import measure_cn_mean
 from auo_project.crud.measure_raw_crud import measure_raw
 from auo_project.crud.measure_statistic_crud import measure_statistic
 from auo_project.crud.measure_tongue_crud import measure_tongue

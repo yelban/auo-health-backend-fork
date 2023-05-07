@@ -78,6 +78,18 @@ class BCQ(BaseModel):
         {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
         title="嚴重程度; 良好 good 0-17/普通 fair 18-30/嚴重 serious 31-100",
     )
+    yang_second_state_spec: Dict[str, Any] = Field(
+        {"good": [87, 100], "fair": [71, 86], "serious": [0, 70]},
+        title="嚴重程度; 良好 good 85-100/普通 fair 70-84/嚴重 serious 0-69",
+    )
+    yin_second_state_spec: Dict[str, Any] = Field(
+        {"good": [87, 100], "fair": [71, 86], "serious": [0, 70]},
+        title="嚴重程度; 良好 good 85-100/普通 fair 70-84/嚴重 serious 0-69",
+    )
+    phlegm_second_state_spec: Dict[str, Any] = Field(
+        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
+        title="嚴重程度; 良好 good 0-17/普通 fair 18-30/嚴重 serious 31-100",
+    )
     score_yang: int = Field(None, title="總分-陽(int)")
     score_yin: int = Field(None, title="總分-陰(int)")
     score_phlegm: int = Field(None, title="總分-痰瘀(int)")
@@ -472,6 +484,7 @@ class MeasureNormalRange(BaseModel):
     hr: NormalRange = Field(title="脈率")
     mean_prop_range_max: NormalRange = Field(title="浮沉振幅平均佔比最大值區塊")
     max_amp_depth_of_range: NormalRange = Field(title="浮沉振幅最大值落點區塊")
+    # TODO: rename
     max_empt_value: NormalRange = Field(title="有效範圍內最大振幅值")
     max_slope_value: NormalRange = Field(title="斜率最大值")
     xingcheng: NormalRange = Field(title="行程")

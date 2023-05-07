@@ -3,7 +3,7 @@ from sqlmodel import Field, UniqueConstraint
 from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 
-class MeasureCNMeanBase(BaseModel):
+class MeasureMeanBase(BaseModel):
     hand: str = Field(
         index=True,
         nullable=False,
@@ -24,21 +24,32 @@ class MeasureCNMeanBase(BaseModel):
     c9: float = Field(default=None, nullable=True)
     c10: float = Field(default=None, nullable=True)
     c11: float = Field(default=None, nullable=True)
+    p1: float = Field(default=None, nullable=True)
+    p2: float = Field(default=None, nullable=True)
+    p3: float = Field(default=None, nullable=True)
+    p4: float = Field(default=None, nullable=True)
+    p5: float = Field(default=None, nullable=True)
+    p6: float = Field(default=None, nullable=True)
+    p7: float = Field(default=None, nullable=True)
+    p8: float = Field(default=None, nullable=True)
+    p9: float = Field(default=None, nullable=True)
+    p10: float = Field(default=None, nullable=True)
+    p11: float = Field(default=None, nullable=True)
 
 
-class MeasureCNMean(
+class MeasureMean(
     BaseUUIDModel,
     BaseTimestampModel,
-    MeasureCNMeanBase,
+    MeasureMeanBase,
     table=True,
 ):
-    __tablename__ = "cn_means"
+    __tablename__ = "overall_means"
     __table_args__ = (
         UniqueConstraint(
             "hand",
             "position",
             "sex",
-            name="measure_cn_means_hand_position_sex_key",
+            name="measure_overall_means_hand_position_sex_key",
         ),
         {"schema": "measure"},
     )
