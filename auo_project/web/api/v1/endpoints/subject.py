@@ -352,7 +352,11 @@ async def update_subject_memo(
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
-    subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    subject = await crud.subject.get(
+        db_session=db_session,
+        id=subject_id,
+        relations=[models.Subject.standard_measure_info],
+    )
     if not subject:
         raise HTTPException(
             status_code=400,
