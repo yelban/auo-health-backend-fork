@@ -176,7 +176,7 @@ async def init_db(db_session: AsyncSession) -> None:
         {
             "data": UserCreate(
                 username="auo_health_admin_user",
-                password="***REMOVED***",
+                password=settings.USER_DEFAULT_PASSWORD,
                 org_id=current_orgs[0].id,
                 full_name="最高管理員",
                 mobile="",
@@ -189,7 +189,7 @@ async def init_db(db_session: AsyncSession) -> None:
         {
             "data": UserCreate(
                 username="manager_user",
-                password="***REMOVED***",
+                password=settings.USER_DEFAULT_PASSWORD,
                 org_id=current_orgs[1].id,
                 full_name="X醫療中心管理員",
                 mobile="",
@@ -202,7 +202,7 @@ async def init_db(db_session: AsyncSession) -> None:
         {
             "data": UserCreate(
                 username="sample_user",
-                password="***REMOVED***",
+                password=settings.USER_DEFAULT_PASSWORD,
                 org_id=current_orgs[1].id,
                 full_name="X先生1號",
                 mobile="",
@@ -215,7 +215,7 @@ async def init_db(db_session: AsyncSession) -> None:
         {
             "data": UserCreate(
                 username="sample_subject",
-                password="***REMOVED***",
+                password=settings.USER_DEFAULT_PASSWORD,
                 org_id=current_orgs[1].id,
                 full_name="受測者1號",
                 mobile="",
@@ -228,7 +228,7 @@ async def init_db(db_session: AsyncSession) -> None:
         {
             "data": UserCreate(
                 username="manager_user@ymedicalcenter.com.tw",
-                password="***REMOVED***",
+                password=settings.USER_PASSWORD1,
                 org_id=current_orgs[3].id,
                 full_name="Y醫療中心管理員",
                 mobile="",
@@ -240,12 +240,12 @@ async def init_db(db_session: AsyncSession) -> None:
         },
         {
             "data": UserCreate(
-                username="hellen.hua@auo.com",
-                password="***REMOVED***",
+                username="helen.hua@auo.com",
+                password=settings.USER_PASSWORD2,
                 org_id=current_orgs[0].id,
                 full_name="Helen",
                 mobile="",
-                email="hellen.hua@auo.com",
+                email="helen.hua@auo.com",
                 is_active=True,
                 is_superuser=False,
             ),
