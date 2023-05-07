@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from io import StringIO
+from random import randrange
 from typing import Any, Dict, List
 from uuid import UUID
 
@@ -355,7 +356,46 @@ async def get_measure_summary(
             width_r_qu=measure.width_r_qu,
             width_r_ch=measure.width_r_ch,
             comment=measure.comment,
-            bcq=measure.bcq or {},
+            # TODO: changme
+            bcq=measure.bcq
+            or schemas.BCQ(
+                exist=randrange(0, 1),
+                score_yang=randrange(0, 100),
+                score_yin=randrange(0, 100),
+                score_phlegm=randrange(0, 100),
+                score_yang_head=randrange(0, 100),
+                score_yang_chest=randrange(0, 100),
+                score_yang_limbs=randrange(0, 100),
+                score_yang_abdomen=randrange(0, 100),
+                score_yang_surface=randrange(0, 100),
+                score_yin_head=randrange(0, 100),
+                score_yin_limbs=randrange(0, 100),
+                score_yin_gt=randrange(0, 100),
+                score_yin_surface=randrange(0, 100),
+                score_yin_abdomen=randrange(0, 100),
+                score_phlegm_trunk=randrange(0, 100),
+                score_phlegm_surface=randrange(0, 100),
+                score_phlegm_head=randrange(0, 100),
+                score_phlegm_gt=randrange(0, 100),
+                percentage_yang=randrange(0, 100),
+                percentage_yin=randrange(0, 100),
+                percentage_phlegm=randrange(0, 100),
+                percentage_yang_head=randrange(0, 100),
+                percentage_yang_chest=randrange(0, 100),
+                percentage_yang_limbs=randrange(0, 100),
+                percentage_yang_abdomen=randrange(0, 100),
+                percentage_yang_surface=randrange(0, 100),
+                percentage_yin_head=randrange(0, 100),
+                percentage_yin_limbs=randrange(0, 100),
+                percentage_yin_gt=randrange(0, 100),
+                percentage_yin_surface=randrange(0, 100),
+                percentage_yin_abdomen=randrange(0, 100),
+                percentage_phlegm_trunk=randrange(0, 100),
+                percentage_phlegm_surface=randrange(0, 100),
+                percentage_phlegm_head=randrange(0, 100),
+                percentage_phlegm_gt=randrange(0, 100),
+            ),
+            # bcq=measure.bcq or {},
             all_sec=all_sec,
             cn=cn,
             tongue=schemas.Tongue(
