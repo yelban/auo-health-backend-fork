@@ -46,6 +46,29 @@ def get_hr_type(n):
     return 1
 
 
+def compare_x_diff2(a, x):
+    """compare a of 1. it's a compatibable function for compare_x_diff"""
+    data = []
+    cols = [f"{x}{i}" for i in range(1, 12)]
+    for c in cols:
+        ac = getattr(a, c, 0)
+        if ac is not None:
+            diff_type = "pos"
+            data.append(
+                {
+                    "x": c.upper(),
+                    "pct": ac,
+                    "type": diff_type,
+                },
+            )
+
+    return {
+        "data": data,
+        "x_field": "x",
+        "y_field": "pct",
+    }
+
+
 def compare_x_diff(a, b, x):
     """compare a and b based on b"""
     data = []
@@ -58,7 +81,7 @@ def compare_x_diff(a, b, x):
             data.append(
                 {
                     "x": c.upper(),
-                    "pct": int(safe_divide(abs(ac - bc), bc) * 100),
+                    "pct": round(safe_divide(abs(ac - bc), bc) * 100),
                     "type": diff_type,
                 },
             )
@@ -96,6 +119,36 @@ def get_pct_cmp_overall_and_standard(cn_dict, cn_means_dict, standard_cn_dict, c
             "r_cu": cmp_diff_func(cn_dict["r_cu"], standard_cn_dict.get("r_cu", {})),
             "r_qu": cmp_diff_func(cn_dict["r_qu"], standard_cn_dict.get("r_qu", {})),
             "r_ch": cmp_diff_func(cn_dict["r_ch"], standard_cn_dict.get("r_ch", {})),
+        },
+    }
+
+
+def compare_cn_diff2(a):
+    return compare_x_diff2(a, "c")
+
+
+def compare_pn_diff2(a):
+    return compare_x_diff2(a, "p")
+
+
+def get_pct_cmp_base(cn_dict, c_or_p):
+    cmp_diff_func = compare_cn_diff2 if c_or_p == "c" else compare_pn_diff2
+    return {
+        "overall": {
+            "l_cu": cmp_diff_func(cn_dict["l_cu"]),
+            "l_qu": cmp_diff_func(cn_dict["l_qu"]),
+            "l_ch": cmp_diff_func(cn_dict["l_ch"]),
+            "r_cu": cmp_diff_func(cn_dict["r_cu"]),
+            "r_qu": cmp_diff_func(cn_dict["r_qu"]),
+            "r_ch": cmp_diff_func(cn_dict["r_ch"]),
+        },
+        "standard_value": {
+            "l_cu": cmp_diff_func(cn_dict["l_cu"]),
+            "l_qu": cmp_diff_func(cn_dict["l_qu"]),
+            "l_ch": cmp_diff_func(cn_dict["l_ch"]),
+            "r_cu": cmp_diff_func(cn_dict["r_cu"]),
+            "r_qu": cmp_diff_func(cn_dict["r_qu"]),
+            "r_ch": cmp_diff_func(cn_dict["r_ch"]),
         },
     }
 
