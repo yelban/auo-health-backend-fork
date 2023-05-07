@@ -35,7 +35,18 @@ with t as (
 		avg(stat.c8) as c8,
 		avg(stat.c9) as c9,
 		avg(stat.c10) as c10,
-		avg(stat.c11) as c11
+		avg(stat.c11) as c11,
+		avg(stat.p1) as p1,
+		avg(stat.p2) as p2,
+		avg(stat.p3) as p3,
+		avg(stat.p4) as p4,
+		avg(stat.p5) as p5,
+		avg(stat.p6) as p6,
+		avg(stat.p7) as p7,
+		avg(stat.p8) as p8,
+		avg(stat.p9) as p9,
+		avg(stat.p10) as p10,
+		avg(stat.p11) as p11
 	from measure.statistics as stat
 	inner join measure.infos as info on info.id = stat.measure_id
 	inner join measure.subjects as sub on sub.id = info.subject_id
@@ -44,7 +55,7 @@ with t as (
 		stat.position,
 		sub.sex
 )
-insert into measure.cn_means as m
+insert into measure.overall_means as m (hand, position, sex, cnt, a0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11)
 select t.*
 from t
 on conflict (hand, position, sex)
@@ -62,6 +73,17 @@ do update set
 	c9 = excluded.c9,
 	c10 = excluded.c10,
 	c11 = excluded.c11,
+	p1 = excluded.p1,
+	p2 = excluded.p2,
+	p3 = excluded.p3,
+	p4 = excluded.p4,
+	p5 = excluded.p5,
+	p6 = excluded.p6,
+	p7 = excluded.p7,
+	p8 = excluded.p8,
+	p9 = excluded.p9,
+	p10 = excluded.p10,
+	p11 = excluded.p11,
 	updated_at = current_timestamp(0)
 ;
 """
