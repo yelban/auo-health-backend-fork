@@ -19,6 +19,7 @@ from auo_project.core.pagination import Pagination
 from auo_project.core.utils import (
     get_filters,
     get_hr_type,
+    get_pct_cmp_base,
     get_pct_cmp_overall_and_standard,
 )
 from auo_project.models import MeasureInfo, Org
@@ -622,29 +623,25 @@ async def get_multi_measure_summary(
             a0_r_ch=mean_statistic_model_dict[measure.id].a0_r_ch,
             cn=get_pct_cmp_overall_and_standard(
                 mean_statistic_dict.get(measure.id),
-                cn_means_dict,
+                means_dict,
                 standard_cn_dict,
                 "c",
             ),
             # TODO: changeme
-            cncv=get_pct_cmp_overall_and_standard(
+            cncv=get_pct_cmp_base(
                 cv_statistic_dict.get(measure.id),
-                cn_means_dict,
-                standard_cn_dict,
                 "c",
             ),
             # TODO: changeme
             pn=get_pct_cmp_overall_and_standard(
                 mean_statistic_dict.get(measure.id),
-                cn_means_dict,
+                means_dict,
                 standard_cn_dict,
                 "p",
             ),
             # TODO: changeme
-            pnsd=get_pct_cmp_overall_and_standard(
+            pnsd=get_pct_cmp_base(
                 std_statistic_dict.get(measure.id),
-                cn_means_dict,
-                standard_cn_dict,
                 "p",
             ),
             # TODO: remove me
