@@ -124,7 +124,7 @@ def get_scatter_chart(data):
             regression_points=get_poly_points(
                 x=df.static.values,
                 y=df.amp.values,
-                degree=6,
+                degree=7,
                 step=2,
             ),
         ),
@@ -135,7 +135,7 @@ def get_scatter_chart(data):
             regression_points=get_poly_points(
                 x=df.depth.values,
                 y=df.amp.values,
-                degree=5,
+                degree=7,
                 step=1,
             ),
         ),
