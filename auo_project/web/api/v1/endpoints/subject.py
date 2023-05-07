@@ -151,8 +151,16 @@ async def get_subject_measures(
         [],
         title="檢測單位",
     ),
-    measure_operator: Optional[List[str]] = Query([], title="檢測人員"),
-    consult_dr: Optional[List[str]] = Query([], title="諮詢醫師"),  # judge_dr
+    measure_operator: Optional[List[str]] = Query(
+        [],
+        title="檢測人員",
+        alias="measure_operator[]",
+    ),
+    consult_dr: Optional[List[str]] = Query(
+        [],
+        title="諮詢醫師",
+        alias="consult_dr[]",
+    ),  # judge_dr
     irregular_hr: Optional[List[bool]] = Query(
         [],
         title="節律標記",
@@ -161,8 +169,8 @@ async def get_subject_measures(
     proj_num: Optional[str] = Query(None, title="計畫編號"),
     has_memos: Optional[str] = Query(None, title="檢測標記"),
     has_bcqs: Optional[str] = Query(None, title="BCQ 檢測"),
-    age: Optional[List[str]] = Query([], regex="(ge|le)__", title="年齡"),
-    bmi: Optional[List[str]] = Query([], regex="(ge|le)__", title="BMI"),
+    age: Optional[List[str]] = Query([], regex="(ge|le)__", title="年齡", alias="age[]"),
+    bmi: Optional[List[str]] = Query([], regex="(ge|le)__", title="BMI", alias="bmi[]"),
     not_include_low_pass_rates: Optional[List[bool]] = Query(
         [],
         title="排除通過率低項目",
