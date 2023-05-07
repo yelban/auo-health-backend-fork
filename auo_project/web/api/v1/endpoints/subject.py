@@ -226,7 +226,7 @@ async def get_subject_measures(
     bmi_start = py_.head(list(filter(lambda x: x.startswith("ge"), bmi)))
     bmi_end = py_.head(list(filter(lambda x: x.startswith("le"), bmi)))
     irregular_hr = (
-        [1 if e == False else 0 for e in irregular_hr] if irregular_hr else []
+        [0 if e == False else 1 for e in irregular_hr] if irregular_hr else []
     )
     has_low_pass_rate = [not x for x in not_include_low_pass_rates]
     expressions = []
@@ -235,10 +235,10 @@ async def get_subject_measures(
             "subject_id": subject_id,
             "measure_time__ge": start_date,
             "measure_time__le": end_date,
-            "age__ge": age_start,
-            "age__le": age_end,
-            "bmi__ge": bmi_start,
-            "bmi__le": bmi_end,
+            "age__ge": age_start and int(age_start.replace("ge__", "")),
+            "age__le": age_end and int(age_end.replace("le__", "")),
+            "bmi__ge": bmi_start and int(bmi_start.replace("ge__", "")),
+            "bmi__le": bmi_end and int(bmi_end.replace("le__", "")),
             # TODO: filter org_id by user permission
             "org_id__in": org_id,
             "measure_operator__in": measure_operator,
@@ -276,11 +276,13 @@ async def get_subject_measures(
         schemas.MeasureInfoReadByList(
             id=measure.id,
             org_name=measure.org.name,
+            irregular_hr=measure.irregular_hr,
             measure_time=measure.measure_time,
             measure_operator=measure.measure_operator,
             proj_num=measure.proj_num,
             memo=measure.memo,
             age=measure.age,
+            bmi=measure.bmi,
             bcq=measure.has_bcq,
             is_standard_measure=(subject.standard_measure_id == measure.id),
         )
@@ -331,7 +333,7 @@ async def get_subject_measures(
         org_names=org_names,
         measure_operators=measure_operators,
         consult_drs=consult_drs,
-        irregular_hrs=[{"value": True, "key": "規律"}, {"value": False, "key": "不規律"}],
+        irregular_hrs=[{"value": False, "key": "規律"}, {"value": True, "key": "不規律"}],
         proj_nums=proj_nums,
         has_memos=[{"value": True, "key": "有"}, {"value": False, "key": "無"}],
         not_include_low_pass_rates=[
