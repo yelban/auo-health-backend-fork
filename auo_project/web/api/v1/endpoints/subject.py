@@ -688,15 +688,15 @@ async def get_multi_measure_summary(
     ]
 
     normal_spec = schemas.MeasureNormalRange(
-        hr=schemas.NormalRange(lower=50, upper=80),
+        hr=schemas.NormalRange(lower=50, upper=90),
         mean_prop_range_max=schemas.NormalRange(lower=1, upper=2),
         max_amp_depth_of_range=schemas.NormalRange(lower=1, upper=2),
-        max_empt_value=schemas.NormalRange(lower=15, upper=25),
+        max_empt_value=schemas.NormalRange(lower=10, upper=35),
         max_slope_value=schemas.NormalRange(lower=100, upper=200),
         xingcheng=schemas.NormalRange(lower=2, upper=8),
-        h1=schemas.NormalRange(lower=10, upper=50),
-        h1_div_t1=schemas.NormalRange(lower=0, upper=2),
-        pr=schemas.NormalRange(lower=60, upper=80),
+        h1=schemas.NormalRange(lower=10, upper=35),
+        h1_div_t1=schemas.NormalRange(lower=1, upper=2),
+        pr=schemas.NormalRange(lower=30, upper=150),
         w1=schemas.NormalRange(lower=0.3, upper=0.6),
         w1_div_t=schemas.NormalRange(lower=0.4, upper=0.8),
         t1_div_t=schemas.NormalRange(lower=0.1, upper=0.3),
