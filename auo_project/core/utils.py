@@ -21,7 +21,9 @@ def mask_crediential_sid(s: str):
 
 
 def safe_divide(a, b):
-    if b == 0:
+    if a is None or b is None:
+        return None
+    elif b == 0:
         return 0
     return a / b
 
@@ -39,9 +41,9 @@ def get_filters(f):
 def get_hr_type(n):
     if not n:
         return n
-    if n >= 85:
+    if n >= 90:
         return 2
-    elif n < 60:
+    elif n < 50:
         return 0
     return 1
 

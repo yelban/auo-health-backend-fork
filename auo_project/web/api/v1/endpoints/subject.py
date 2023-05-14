@@ -21,6 +21,7 @@ from auo_project.core.utils import (
     get_hr_type,
     get_pct_cmp_base,
     get_pct_cmp_overall_and_standard,
+    safe_divide,
 )
 from auo_project.models import MeasureInfo, Org
 from auo_project.web.api import deps
@@ -573,12 +574,30 @@ async def get_multi_measure_summary(
             h1_r_cu=mean_statistic_model_dict[measure.id].h1_r_cu,
             h1_r_qu=mean_statistic_model_dict[measure.id].h1_r_qu,
             h1_r_ch=mean_statistic_model_dict[measure.id].h1_r_ch,
-            h1_div_t1_l_cu=mean_statistic_model_dict[measure.id].h1_div_t1_l_cu,
-            h1_div_t1_l_qu=mean_statistic_model_dict[measure.id].h1_div_t1_l_qu,
-            h1_div_t1_l_ch=mean_statistic_model_dict[measure.id].h1_div_t1_l_ch,
-            h1_div_t1_r_cu=mean_statistic_model_dict[measure.id].h1_div_t1_r_cu,
-            h1_div_t1_r_qu=mean_statistic_model_dict[measure.id].h1_div_t1_r_qu,
-            h1_div_t1_r_ch=mean_statistic_model_dict[measure.id].h1_div_t1_r_ch,
+            h1_div_t1_l_cu=safe_divide(
+                mean_statistic_model_dict[measure.id].h1_div_t1_l_cu,
+                1000,
+            ),
+            h1_div_t1_l_qu=safe_divide(
+                mean_statistic_model_dict[measure.id].h1_div_t1_l_qu,
+                1000,
+            ),
+            h1_div_t1_l_ch=safe_divide(
+                mean_statistic_model_dict[measure.id].h1_div_t1_l_ch,
+                1000,
+            ),
+            h1_div_t1_r_cu=safe_divide(
+                mean_statistic_model_dict[measure.id].h1_div_t1_r_cu,
+                1000,
+            ),
+            h1_div_t1_r_qu=safe_divide(
+                mean_statistic_model_dict[measure.id].h1_div_t1_r_qu,
+                1000,
+            ),
+            h1_div_t1_r_ch=safe_divide(
+                mean_statistic_model_dict[measure.id].h1_div_t1_r_ch,
+                1000,
+            ),
             pr_l_cu=mean_statistic_model_dict[measure.id].pr_l_cu,
             pr_l_qu=mean_statistic_model_dict[measure.id].pr_l_qu,
             pr_l_ch=mean_statistic_model_dict[measure.id].pr_l_ch,
