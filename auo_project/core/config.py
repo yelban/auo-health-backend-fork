@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_ORG_NAME: str
     FIRST_SUPERUSER_EMAIL: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
+    USER_DEFAULT_PASSWORD: str
+    USER_PASSWORD1: str = ""
+    USER_PASSWORD2: str = ""
 
     MAX_SIZE_PER_UPLOAD: int = 1000
     MAX_SIZE_PER_FILE: int = 100
