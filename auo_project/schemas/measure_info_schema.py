@@ -67,28 +67,28 @@ class Tongue(BaseModel):
 class BCQ(BaseModel):
     exist: bool = Field(False, title="是否有 BCQ 結果")
     yang_state_spec: Dict[str, Any] = Field(
-        {"good": [87, 100], "fair": [71, 86], "serious": [0, 70]},
-        title="嚴重程度; 良好 good 85-100/普通 fair 70-84/嚴重 serious 0-69",
+        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
+        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
     )
     yin_state_spec: Dict[str, Any] = Field(
-        {"good": [87, 100], "fair": [71, 86], "serious": [0, 70]},
-        title="嚴重程度; 良好 good 85-100/普通 fair 70-84/嚴重 serious 0-69",
+        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
+        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
     )
     phlegm_state_spec: Dict[str, Any] = Field(
         {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
-        title="嚴重程度; 良好 good 0-17/普通 fair 18-30/嚴重 serious 31-100",
+        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
     )
     yang_second_state_spec: Dict[str, Any] = Field(
-        {"good": [87, 100], "fair": [71, 86], "serious": [0, 70]},
-        title="嚴重程度; 良好 good 85-100/普通 fair 70-84/嚴重 serious 0-69",
+        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
+        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
     )
     yin_second_state_spec: Dict[str, Any] = Field(
-        {"good": [87, 100], "fair": [71, 86], "serious": [0, 70]},
-        title="嚴重程度; 良好 good 85-100/普通 fair 70-84/嚴重 serious 0-69",
+        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
+        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
     )
     phlegm_second_state_spec: Dict[str, Any] = Field(
         {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
-        title="嚴重程度; 良好 good 0-17/普通 fair 18-30/嚴重 serious 31-100",
+        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
     )
     score_yang: int = Field(None, title="總分-陽(int)")
     score_yin: int = Field(None, title="總分-陰(int)")
