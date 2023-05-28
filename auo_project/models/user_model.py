@@ -79,3 +79,7 @@ class User(BaseUUIDModel, BaseTimestampModel, UserBase, table=True):
         back_populates="owner",
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+    recipes: List["Recipe"] = Relationship(
+        back_populates="owner",
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )

@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 LOW_PASS_RATE_THRESHOLD = 50
 
@@ -72,3 +72,18 @@ MEASURE_TIMES = [
         ],
     },
 ]
+
+
+class ParameterType(Enum):
+    """
+    primary 主要特徵
+    secondary 次要特徵
+    analytical 分析參數
+    """
+
+    primary = "primary"
+    secondary = "secondary"
+    analytical = "analytical"
+
+
+ALLOWED_PTYPES = set([ptype.value for ptype in ParameterType])

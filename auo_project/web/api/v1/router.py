@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from auo_project.web.api.v1.endpoints import (
+    advance,
     auth,
     file,
     hooks,
@@ -20,3 +21,4 @@ api_router.include_router(file.router, prefix="/files", tags=["files"])
 api_router.include_router(subject.router, prefix="/subjects", tags=["subjects"])
 api_router.include_router(measure.router, prefix="/measures", tags=["measures"])
 api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
+api_router.include_router(advance.router, prefix="/advance", tags=["advance"])

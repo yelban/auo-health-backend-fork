@@ -1,3 +1,4 @@
+from auo_project.schemas.chart_schema import Chart
 from auo_project.schemas.file_content_schema import (
     FileBCQ,
     FileInfos,
@@ -55,6 +56,21 @@ from auo_project.schemas.measure_tongue_schema import (
     MeasureTongueUpdate,
 )
 from auo_project.schemas.org_schema import OrgCreate, OrgRead, OrgUpdate
+from auo_project.schemas.recipe_parameter_schema import (
+    RecipeAnalyticalParamsInput,
+    RecipeBasicParameterInput,
+    RecipeParameterCreate,
+    RecipeParameterUpdate,
+)
+from auo_project.schemas.recipe_schema import (
+    RecipeCreate,
+    RecipeListResponse,
+    RecipeRead,
+    RecipeUpdate,
+    RecipeWithAnalyticalParamsResponse,
+    RecipeWithChartsResponse,
+    RecipeWithParamsResponse,
+)
 from auo_project.schemas.role_schema import RoleCreate, RoleRead, RoleUpdate
 from auo_project.schemas.subject_schema import (
     MeasureListPage,
@@ -141,6 +157,7 @@ SubjectRead.update_forward_refs(SimpleMeasureInfo=SimpleMeasureInfo)
 
 SubjectSecretRead.update_forward_refs(SimpleMeasureInfo=SimpleMeasureInfo)
 
-# MeasureDetailResponse.update_forward_refs(
-#     Subject=SubjectRead
-# )
+
+RecipeListResponse.update_forward_refs(
+    RecipeRead=RecipeRead,
+)
