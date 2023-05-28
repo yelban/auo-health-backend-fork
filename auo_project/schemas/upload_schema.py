@@ -82,6 +82,7 @@ class UploadCreate(UploadBase):
 class UploadUpdate(BaseModel):
     upload_status: Optional[int] = None
     file_number: Optional[int] = None
+    display_file_number: Optional[int] = None
     start_from: Optional[datetime] = None
     end_to: Optional[datetime] = None
     is_active: Optional[bool] = None

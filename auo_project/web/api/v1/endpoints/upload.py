@@ -125,7 +125,6 @@ async def get_upload_list(
     filename: Optional[str] = Query(None, regex="contains__", title="檔案名稱"),
     owner_name: Optional[str] = Query(None, regex="contains__", title="上傳者"),
     start_from: Optional[List[str]] = Query([], regex="(ge|le)__", title="上傳時間"),
-    file_number: Optional[List[str]] = Query([], regex="(ge|le)__", title="上傳數量"),
     upload_status: Optional[str] = Query(
         None,
         regex="in__",
@@ -187,7 +186,7 @@ async def get_upload_list(
         (File.name, filename),
         (User.full_name, owner_name),
         *[(Upload.start_from, exp) for exp in start_from],
-        *[(Upload.file_number, exp) for exp in file_number],
+        (Upload.display_file_number, "gt__0"),
         (Upload.upload_status, upload_status),
         (File.file_status, file_status),
         (File.is_valid, is_valid),
@@ -209,7 +208,7 @@ async def get_upload_list(
                     from sqlalchemy.sql.expression import cast
 
                     col = cast(col, sa.String)
-            elif col.expression.name in ("file_number"):
+            elif col.expression.name in ("display_file_number"):
                 value = int(value)
             elif col.expression.name in ("start_from"):
                 try:
@@ -263,7 +262,6 @@ async def get_upload_list(
     )
 
     print("order_expr", order_expr)
-    print("====CHECKPOINT START====")
     items: Sequence[schemas.UploadReadWithFilteredFile] = await crud.upload.get_multi(
         db_session=db_session,
         query=query,
@@ -272,7 +270,6 @@ async def get_upload_list(
         skip=(pagniation.page - 1) * pagniation.per_page,
         limit=pagniation.per_page,
     )
-    print("====CHECKPOINT END====")
     # TODO: FIXME
     resp = await db_session.execute(select(func.count()).select_from(query.subquery()))
     total_count = resp.scalar_one()

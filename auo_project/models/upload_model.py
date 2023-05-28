@@ -18,6 +18,7 @@ class UploadBase(BaseModel):
     )
     upload_status: UploadStatusType = Field(default=0, title="上傳狀態")
     file_number: int = Field(default=0, title="檔案數量")
+    display_file_number: int = Field(default=0, title="顯示檔案數量，僅包含上傳中與成功")
     start_from: Optional[datetime] = Field(
         index=True,
         nullable=False,
