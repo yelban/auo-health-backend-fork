@@ -7,15 +7,25 @@ import pydash as py_
 from fastapi import HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from auo_project import crud
-from auo_project.core.constants import ParameterType
+from auo_project import crud, schemas
+from auo_project.core.constants import AdvanceChartType, ParameterType
 
 disease_value_pattern = re.compile(r"^d[0-9]{3}:[0-9]{3}$")
 
 
+def clean_last_pattern(s, pattern):
+    if s.rfind(pattern) != -1:
+        return s[: s.rfind(pattern)] + "subField"
+    else:
+        return s
+
+
 def is_valid_month(dt_str):
     try:
-        datetime.strptime(dt_str, "%Y-%m")
+        if "-" in dt_str:
+            datetime.strptime(dt_str, "%Y-%m")
+        elif "/" in dt_str:
+            datetime.strptime(dt_str, "%Y/%m")
         return True
     except ValueError:
         return False
@@ -23,7 +33,10 @@ def is_valid_month(dt_str):
 
 def is_valid_date(dt_str):
     try:
-        datetime.strptime(dt_str, "%Y-%m-%d")
+        if "-" in dt_str:
+            datetime.strptime(dt_str, "%Y-%m-%d")
+        elif "/" in dt_str:
+            datetime.strptime(dt_str, "%Y/%m/%d")
         return True
     except ValueError:
         return False
@@ -35,6 +48,24 @@ def is_valid_hour(dt_str):
         return True
     except ValueError:
         return False
+
+
+def get_loaded_value(value):
+    loaded_value = value
+    try:
+        loaded_value = json.loads(value)
+    except:
+        pass
+    return loaded_value
+
+
+def handle_simple_dt_list(loaded_value):
+    if all([is_valid_date(e) for e in loaded_value]):
+        return json.dumps(loaded_value), "measure_date_or_month"
+    elif all([is_valid_month(e) for e in loaded_value]):
+        return json.dumps(loaded_value), "measure_date_or_month"
+    else:
+        raise ValueError("the value is not valid date or month format")
 
 
 def handle_date_related_params(loaded_value, component_names):
@@ -53,7 +84,7 @@ def handle_date_related_params(loaded_value, component_names):
             )
         elif start > end:
             raise ValueError(f"start: {start} is greater than end: {end}")
-        return json.dumps(loaded_value), ""
+        return json.dumps(loaded_value), "calendar_date"
 
     # measure_date_or_month
     if unit in ("day", "month") and "values" in loaded_value:
@@ -68,14 +99,14 @@ def handle_date_related_params(loaded_value, component_names):
                     f"values: {values} is not valid date format (YYYY-MM-DD)",
                 )
             # TODO: check duplicates rows
-            return json.dumps(loaded_value), ""
+            return json.dumps(loaded_value), "measure_date_or_month"
         elif unit == "month":
             if not all([is_valid_month(value) for value in values]):
                 raise ValueError(
                     f"values: {values} is not valid month format (YYYY-MM)",
                 )
             # TODO: check duplicates rows
-            return json.dumps(loaded_value), ""
+            return json.dumps(loaded_value), "measure_date_or_month"
 
     # hour
     if unit == "hour" and "start" in loaded_value and "end" in loaded_value:
@@ -89,30 +120,80 @@ def handle_date_related_params(loaded_value, component_names):
             raise ValueError(f"{start} or {end} is not valid hour format (HH:MM)")
         elif start > end:
             raise ValueError(f"start: {start} is greater than end: {end}")
-        return json.dumps(loaded_value), ""
+        return json.dumps(loaded_value), "calendar_date"
 
 
-# TODO: send path to func
-def deep_search(field, component_names, value, result_list=[]):
+def deep_search(
+    field,
+    component_names,
+    value,
+    result_list=[],
+    path="",
+    parent_component=None,
+):
     if field.get("type") == "group":
         for field in field["subField"]:
-            result_list += deep_search(field, component_names, value, [])
+            result_list += deep_search(
+                field,
+                component_names,
+                value,
+                [],
+                f"{path}.subField",
+                None,
+            )
     else:
         options = py_.get(field, "subField.options", [])
-        for option in options:
-            result_list += deep_search(option, component_names, value, [])
+        for idx, option in enumerate(options):
+            result_list += deep_search(
+                option,
+                component_names,
+                value,
+                [],
+                f"{path}.subField.options.{idx}",
+                py_.get(field, "subField.component"),
+            )
         else:
-            if isinstance(value, str):
-                if field.get("value") == value:
-                    result_list.append(
-                        {"value": field["value"], "path": f"subField.options"},
-                    )
-            elif isinstance(value, list):
-                if field.get("value") in value:
-                    result_list.append(
-                        {"value": field["value"], "path": f"subField.options"},
-                    )
+            if parent_component in component_names:
+                if isinstance(value, str):
+                    if field.get("value") == value:
+                        result_list.append(
+                            {
+                                "value": field["value"],
+                                "path": f"{path}",
+                                "component": parent_component,
+                            },
+                        )
+                elif isinstance(value, list):
+                    if field.get("value") in value:
+                        result_list.append(
+                            {
+                                "value": field["value"],
+                                "path": f"{path}",
+                                "component": parent_component,
+                            },
+                        )
 
+    return result_list
+
+
+def find_component_path(field, component_name, result_list=[], path="") -> List[str]:
+    if field.get("type") == "group":
+        for field in field["subField"]:
+            result_list += deep_search(field, component_name, [], f"{path}.subField")
+    else:
+        if component_name == field.get("subField.component"):
+            result_list.append(f"{path}.subField.component")
+        options = py_.get(field, "subField.options", [])
+        for idx, option in enumerate(options):
+            result_list += find_component_path(
+                option,
+                component_name,
+                [],
+                f"{path}.subField.options.{idx}",
+            )
+        else:
+            if py_.get(field, "subField.component") == component_name:
+                result_list.append(f"{path}.subField.component")
     return result_list
 
 
@@ -149,25 +230,57 @@ async def validate_value(
 
     component_names = find_all_component_names(parameter)
 
-    loaded_value = value
-    try:
-        loaded_value = json.loads(value)
-    except:
-        pass
+    loaded_value = get_loaded_value(value)
 
-    # 單一比對疾病, 交叉比對疾病
-    if parameter_id == "a008":
-        return handle_disease_params(loaded_value, disease_options_dict)
-    # 比較單一脈象, 交叉比對脈象
-    elif parameter_id == "a027":
-        return handle_pulse_condition_params(loaded_value)
-
-    # 每一個問題都有 all
+    # 不是每一個問題都有 all，不允許 all 的：a003, a025, a032
+    # TODO: refactor
+    if value == "all" and parameter_id in ("a003", "a025", "a032"):
+        raise ValueError(f"the value {value} is not found")
     if value == "all":
-        return value, "subField.options"
+        return value, {"path": ".subField.options.0", "component": "radio"}
+
     # value 不可以是 custom，應該是 custom 底下 options 的 value
     if value == "custom":
         raise ValueError("value cannot be custom")
+
+    # TODO: add date or month
+    # if parameter_id == "a001":
+    #     component_paths = find_component_path(parameter, "measure_date_or_month", [])
+    #     if len(component_paths) != 1:
+    #         raise ValueError(f"component_paths length should be 1")
+    #     value, component = handle_simple_dt_list(loaded_value)
+    #     return value, {
+    #         "path": component_paths[0].replace(".component", ""),
+    #         "component": component,
+    #     }
+
+    # 單一比對疾病, 交叉比對疾病
+    if parameter_id == "a008":
+        value, component = handle_disease_params(loaded_value, disease_options_dict)
+        component_paths = find_component_path(parameter, component, [])
+        if len(component_paths) != 1:
+            raise ValueError(f"component_paths length should be 1")
+        return value, {
+            "path": component_paths[0].replace(".component", ""),
+            "component": component,
+        }
+    # 比較單一脈象, 交叉比對脈象
+    elif parameter_id == "a027":
+        pulse_condition_options = py_.get(
+            parameter_options_dict,
+            f"{parameter_id}.subField.options.1.subField.options",
+        )
+        pulse_condition_options_dict = {
+            option["value"]: option for option in pulse_condition_options
+        }
+        value, component = handle_pulse_condition_params(
+            loaded_value,
+            pulse_condition_options_dict,
+        )
+        component_paths = find_component_path(parameter, component, [])
+        if len(component_paths) != 1:
+            raise ValueError(f"component_paths length should be 1")
+        return value, {"path": component_paths[0], "component": component}
 
     # 若 value 是一個字串，應該是 radio 或 dropdown 的 value
     p = re.compile(r"^c[0-9]{3}:[0-9]{3}$")
@@ -177,7 +290,10 @@ async def validate_value(
             raise ValueError(f"the value {value} is not found")
         elif len(result_list) > 1:
             raise ValueError(f"the value {value} is not unique")
-        return str(result_list[0]["value"]), ""
+        return str(result_list[0]["value"]), {
+            "path": result_list[0]["path"],
+            "component": result_list[0]["component"],
+        }
 
     # 若 value 是一個 list，應該是 checkbox 的 value，如果是 checkbox 的 option 底下的 value，應該符合 c001:000 的格式
     multi_choices_components_set = set(
@@ -187,7 +303,12 @@ async def validate_value(
         if isinstance(loaded_value, list) and all(
             [p.search(value) for value in loaded_value],
         ):
-            result_list = deep_search(parameter, ["checkbox"], loaded_value, [])
+            result_list = deep_search(
+                parameter,
+                ["checkbox", "search_dialog", "multi_select_dialog"],
+                loaded_value,
+                [],
+            )
             if len(result_list) == 0:
                 raise ValueError(f"the value {value} is not found")
             elif len(result_list) != len(loaded_value):
@@ -196,7 +317,11 @@ async def validate_value(
                     set(loaded_value).difference(set(result_value_list)),
                 )
                 raise ValueError(f"some value is not found: {diff_str}")
-            return value, "subField.options"
+            return value, {
+                "path": [result["path"] for result in result_list],
+                "component": [result["component"] for result in result_list],
+            }
+        # special options from database
         elif isinstance(loaded_value, list):
             result_list = deep_search(
                 parameter,
@@ -208,17 +333,33 @@ async def validate_value(
                 raise ValueError(
                     f"some elements of {value} are not align with option values",
                 )
-            return value, "subField.options"
+            return value, {
+                "path": [result["path"] for result in result_list],
+                "component": [result["component"] for result in result_list],
+            }
 
     # 若為 dict 且存在 key: unit 則為 date-related 的 value。而參數對應的 component 可能為 measure_date_or_month, calendar_date
     if isinstance(loaded_value, dict) and loaded_value.get("unit"):
-        return handle_date_related_params(loaded_value, component_names)
+        value, component = handle_date_related_params(loaded_value, component_names)
+        component_paths = find_component_path(parameter, component, [])
+        if len(component_paths) != 1:
+            raise ValueError(f"component_paths length should be 1")
+        return value, {
+            "path": component_paths[0].replace(".component", ""),
+            "component": component,
+        }
 
     # 若上面都找不到，可能為 input
     if "input" in component_names:
         if isinstance(loaded_value, int):
             # TODO: check valid range
-            return str(loaded_value), "subField"
+            component_paths = find_component_path(parameter, "input", [])
+            if len(component_paths) != 1:
+                raise ValueError(f"component_paths length should be 1")
+            return str(loaded_value), {
+                "path": component_paths[0].replace(".component", ""),
+                "component": "input",
+            }
 
     raise ValueError(f"the value {value} is not found")
 
@@ -239,7 +380,7 @@ def handle_disease_single_params(loaded_value, disease_options_dict):
                 f"values: {invalid_values} are not belong to disease options",
             )
         else:
-            return loaded_value, "subField.options"
+            return loaded_value
 
 
 def handle_disease_cross_params(loaded_value, disease_options_dict):
@@ -281,7 +422,7 @@ def handle_disease_cross_params(loaded_value, disease_options_dict):
             raise ValueError(
                 f"values: {invalid_values} are not belong to disease options",
             )
-    return loaded_value, "subField.options"
+    return loaded_value
 
 
 def handle_disease_params(loaded_value, disease_options_dict):
@@ -292,26 +433,60 @@ def handle_disease_params(loaded_value, disease_options_dict):
             raise ValueError("disease params should not be empty")
         # single disease
         if all([isinstance(e, str) for e in loaded_value]):
-            result, path = handle_disease_single_params(
+            result = handle_disease_single_params(
                 loaded_value,
                 disease_options_dict,
             )
-            if result and path:
-                return json.dumps(result), path
+            if result:
+                return json.dumps(result), "multi_select_dialog_disease_single"
         # cross disease
         else:
-            result, path = handle_disease_cross_params(
+            result = handle_disease_cross_params(
                 loaded_value,
                 disease_options_dict,
             )
-            if result and path:
-                return json.dumps(result), path
+            if result:
+                return json.dumps(result), "multi_select_dialog_disease_cross"
 
     raise ValueError("disease params should be list of string or list of dictionay")
 
 
-def handle_pulse_condition_params(loaded_value):
-    return loaded_value, ""
+def handle_pulse_condition_params(loaded_value, pulse_condition_options_dict):
+    if all([isinstance(option, str) for option in loaded_value]):
+        invalid_values = [
+            e for e in loaded_value if e not in pulse_condition_options_dict
+        ]
+        if len(invalid_values) > 0:
+            raise ValueError(
+                f"values: {invalid_values} are not belong to disease options",
+            )
+        return json.dumps(loaded_value), "multi_select_dialog_pulse_condition_single"
+
+    if all([isinstance(option, list) for option in loaded_value]):
+        if len(loaded_value) == 0:
+            raise ValueError(
+                "cross pulse condition params length should be more than 0",
+            )
+        elif len(loaded_value) > 3:
+            raise ValueError(
+                "cross pulse condition params length should be less than 4",
+            )
+        for option in loaded_value:
+            result, component = handle_pulse_condition_params(
+                option,
+                pulse_condition_options_dict,
+            )
+            if (
+                result == json.dumps(option)
+                and component == "multi_select_dialog_pulse_condition_single"
+            ):
+                continue
+            else:
+                raise ValueError(f"something error: {option}")
+        return json.dumps(loaded_value), "multi_select_dialog_pulse_condition_cross"
+    raise ValueError(
+        "pulse condition params should be list of string or list of list of string",
+    )
 
 
 def process_option_component(x):
@@ -407,6 +582,7 @@ async def process_child_parents(
                 {
                     "id": parameter.id,
                     "label": parameter.label,
+                    # "hide_label": parameter.hide_label,
                     "subField": {
                         **other_constraint,
                         "type": parameter.option_type,
@@ -424,6 +600,7 @@ async def process_child_parents(
                 {
                     "id": parameter.id,
                     "label": parameter.label,
+                    "hide_label": parameter.hide_label,
                     "subField": {
                         **other_constraint,
                         "type": parameter.option_type,
@@ -536,7 +713,6 @@ async def process_child_parents2(
 def get_time_related_parameters(parameter_options_dict):
     time_related_parameters = []
     for parameter_id, options in parameter_options_dict.items():
-        print(options)
         time_components = set(["calendar_date", "measure_date_or_month"])
         for option in options:
             if option.get("component") in time_components:
@@ -554,7 +730,6 @@ def get_time_related_parameters(parameter_options_dict):
 def get_time_related_parameters_dict(parameter_options_dict):
     time_related_parameters_dict = {}
     for parameter_id, options in parameter_options_dict.items():
-        print(options)
         time_components = set(["calendar_date", "measure_date_or_month"])
         for option in options:
             if option.get("component") in time_components:
@@ -592,7 +767,10 @@ async def get_parameters(
     parameter_options_dict = {}
     parameters = await crud.measure_parameter.get_all(db_session=db_session)
     allowed_p_types = set([p_type.value for p_type in p_types])
-    parameters = [e for e in parameters if e.p_type in allowed_p_types]
+    parameters = sorted(
+        [e for e in parameters if e.p_type in allowed_p_types],
+        key=lambda e: e.id,
+    )
     parameters_dict = dict([(parameter.id, parameter) for parameter in parameters])
 
     parameter_options = await crud.measure_parameter_option.get_all(
@@ -664,27 +842,6 @@ async def get_parameters(
                         db_session=db_session,
                     )
                 )
-                # values = await crud.measure_disease_option.get_all(
-                #     db_session=db_session
-                # )
-                # transformed = (
-                #     py_.chain(values)
-                #     .group_by("category_id")
-                #     .map_(
-                #         lambda value: {
-                #             "category_id": value[0].category_id,
-                #             "category_name": value[0].category_name,
-                #             "diseases": [
-                #                 {
-                #                     "value": f"{value[0].category_id}:{e.value}",
-                #                     "label": e.label,
-                #                 }
-                #                 for e in value
-                #             ],
-                #         }
-                #     )
-                #     .value()
-                # )
                 new_option["subField"]["options"] = transformed
 
             # add title
@@ -725,7 +882,6 @@ def add_default_value_to_parameter(parameter):
             if options and len(options) > 0:
                 field["defaultValue"] = options[0]["value"]
                 field["path"] = "subField.options.0.value"
-                print(field["subField"]["component"])
                 if field["subField"]["component"] in ("radio", "checkbox"):
                     field["subField"]["options"][0] = {
                         **field["subField"]["options"][0],
@@ -776,14 +932,294 @@ def add_selected_key(field, value):
 
 def add_recipe_value_to_parameter(parameter, recipe_params_dict):
     for field in parameter:
+        if field.get("type") == "group":
+            if field.get("subField"):
+                add_recipe_value_to_parameter(field.get("subField"), recipe_params_dict)
+            continue
+
         parameter_id = field.get("id")
         recipe_param = recipe_params_dict.get(parameter_id)
         if not recipe_param:
             continue
-        if field.get("type") == "group":
-            add_recipe_value_to_parameter(field["subField"], recipe_params_dict)
+
         else:
             field["defaultValue"] = recipe_param.value
             # TODO: add path
             field = add_selected_key(field, recipe_param.value)
     return parameter
+
+
+def parse_subfield_options_old(field_path):
+    paths = field_path.split(".subField.options.")
+    result = []
+
+    for i in range(len(paths)):
+        test = ".subField.options.".join(paths[:i]) + ".subField.defaultValue"
+        value = ".subField.options.".join(paths[: i + 1])
+        if value == "":
+            continue
+        if i < len(paths) - 1:
+            result.append((test, f"{value}.value"))
+        else:
+            result.append((test, f"{value}.value"))
+
+    return result
+
+
+def parse_subfield_options(field_path):
+    paths = field_path.split(".subField")
+    result = []
+
+    for i in range(len(paths)):
+        test = ".subField".join(paths[:i]) + ".subField.defaultValue"
+        value = ".subField".join(paths[: i + 1])
+        if value == "":
+            continue
+        if i < len(paths) - 1:
+            result.append((test, f"{value}.value"))
+        else:
+            result.append((test, f"{value}.value"))
+
+    return result
+
+
+def handle_default_value(parameter, info):
+    path = info["path"]
+    if isinstance(path, str):
+        parsed_paths = parse_subfield_options(path)
+        # set deepest value
+        py_.set_(parameter, parsed_paths[-1][0], info["result"])
+        # set upper level value
+        for dest_path, source_path in parsed_paths[:-1]:
+            py_.set_(parameter, dest_path, py_.get(parameter, source_path))
+    elif isinstance(path, list):
+        # take first path and its level should be the same
+        parsed_paths = parse_subfield_options(path[0])
+        # set deepest value
+        py_.set_(parameter, parsed_paths[-1][0], info["result"])
+        # set upper level value
+        parsed_paths = parsed_paths[:-1]
+        for dest_path, source_path in parsed_paths:
+            py_.set_(parameter, dest_path, py_.get(parameter, source_path))
+
+    else:
+        raise TypeError("path type error")
+
+    return parameter
+
+
+def add_parameter_internal_value(parameter, infos_dict):
+    info_dict = infos_dict.get(parameter["id"])
+    if parameter.get("type") != "group":
+        handle_default_value(parameter, info_dict)
+        path = info_dict["path"]
+        if isinstance(path, str):
+            parameter["path"] = clean_last_pattern(path, "subField")
+        elif isinstance(path, list):
+            parameter["path"] = clean_last_pattern(path[0], "subField")
+        else:
+            raise ValueError("path type error")
+
+    else:
+        for sub_parameter in parameter.get("subField"):
+            add_parameter_internal_value(sub_parameter, infos_dict)
+
+
+def get_default_chart_settings():
+    default_chart_settings = [
+        {
+            "chart_type": AdvanceChartType.parameter_six_pulse,
+            "y": {"domain": ["time_domain", "h1"]},
+            "z": "a004",
+        },
+        {
+            "chart_type": AdvanceChartType.parameter_cross,
+            "x": "a007",
+            "y": {"six_pulse": "l_cu", "domain": ["time_domain", "h1"]},
+            "z": "a004",
+        },
+        {
+            "chart_type": AdvanceChartType.six_pulse_cn,
+            "y": {"six_pulse": "l_cu", "statistics": "mean"},
+            "z": "a004",
+        },
+    ]
+    return default_chart_settings
+
+
+def validate_chart_setting(chart_setting: schemas.ChartSetting):
+    if chart_setting.chart_type == AdvanceChartType.parameter_six_pulse:
+        domain = chart_setting.y.get("domain")
+        if not (domain and isinstance(domain, list)):
+            raise HTTPException(
+                status_code=400,
+                detail=f"chart_type {chart_setting.chart_type} input y error",
+            )
+    elif chart_setting.chart_type == AdvanceChartType.parameter_cross:
+        domain = chart_setting.y.get("domain")
+        if not (domain and isinstance(domain, list)):
+            raise HTTPException(
+                status_code=400,
+                detail=f"chart_type {chart_setting.chart_type} input y error",
+            )
+        six_pulse = chart_setting.y.get("six_pulse")
+        if not isinstance(six_pulse, str):
+            raise HTTPException(
+                status_code=400,
+                detail=f"chart_type {chart_setting.chart_type} input y error",
+            )
+
+        if not chart_setting.x:
+            raise HTTPException(
+                status_code=400,
+                detail=f"chart_type {chart_setting.chart_type} need x",
+            )
+
+    elif chart_setting.chart_type == AdvanceChartType.six_pulse_cn:
+        six_pulse = chart_setting.y.get("six_pulse")
+        if not isinstance(six_pulse, str):
+            raise HTTPException(
+                status_code=400,
+                detail=f"chart_type {chart_setting.chart_type} input y error",
+            )
+        statistics = chart_setting.y.get("statistics")
+        if statistics not in ("mean", "std", "cv"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"chart_type {chart_setting.chart_type} input y error",
+            )
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"chart_type {chart_setting.chart_type} not found",
+        )
+
+
+def get_flat_parameter_dict(parameters):
+    """
+    {"primary": [], "secondary": [], "analytical": []}
+    """
+    parameter_list = []
+    if isinstance(parameters, dict):
+        if "primary" in parameters:
+            parameter_list += parameters["primary"]
+        if "secondary" in parameters:
+            parameter_list += parameters["secondary"]
+        if "analytical" in parameters:
+            parameter_list += parameters["analytical"]
+    elif isinstance(parameters, list):
+        parameter_list = parameters
+
+    result = {}
+    for parameter in parameter_list:
+        if parameter.get("type") == "group":
+            result.update(get_flat_parameter_dict(parameter.get("subField")))
+            # for sub_parameter in parameter.get("subField"):
+            #     if sub_parameter.get("id"):
+            #         result[sub_parameter.get("id")] = sub_parameter
+
+        else:
+            result[parameter.get("id")] = parameter
+    return result
+
+
+async def validate_values(
+    db_session: AsyncSession,
+    parameters_input: schemas.RecipeBasicParameterInput,
+):
+
+    p_types = [ParameterType.primary, ParameterType.secondary, ParameterType.analytical]
+    error_msg = ""
+    error_dict = {}
+    infos_dict = {}
+    parameter_dict = await get_parameters(
+        db_session=db_session,
+        p_types=p_types,
+        process_child_parent=False,
+    )
+    disease_options_dict = await crud.measure_disease_option.get_disease_options_dict(
+        db_session=db_session,
+    )
+    for parameter_id, value in parameters_input.dict().items():
+        try:
+            result, path = await validate_value(
+                parameter_id=parameter_id,
+                value=value,
+                parameter_options_dict=parameter_dict,
+                disease_options_dict=disease_options_dict,
+            )
+            infos_dict[parameter_id] = {
+                "result": result,
+                "path": path["path"],
+                "component": path["component"],
+            }
+        except ValueError as e:
+            error_msg += f"Parameter {parameter_id} has invalid value {value}.\n"
+            error_dict[parameter_id] = str(e)
+
+    return error_dict, infos_dict
+
+
+def convert_disease_option_label(
+    option: schemas.MeasureDiseaseOption,
+) -> schemas.MeasureDiseaseOption:
+    if option.label == "全部":
+        option.label = option.label + option.category_name
+        return option
+    return option
+
+
+def get_chart_disease_z_options(loaded_value, disease_options_dict):
+    if isinstance(loaded_value, list):
+        if all([isinstance(e, str) for e in loaded_value]):
+            return [
+                convert_disease_option_label(py_.get(disease_options_dict, e))
+                for e in loaded_value
+            ]
+        elif all([isinstance(e, dict) for e in loaded_value]):
+            labels = []
+            for e in loaded_value:
+                include = e.get("include")
+                excludes = e.get("exclude")
+                include_label = py_.get(disease_options_dict, f"{include[0]}.label")
+                exclude_labels = ", ".join(
+                    [py_.get(disease_options_dict, f"{e}.label") for e in excludes],
+                )
+                labels.append(
+                    {"value": e, "label": f"{include_label}-{exclude_labels}"},
+                )
+            return labels
+    return []
+
+
+def get_chart_pulse_z_options(loaded_value, pulse_options_dict):
+    if isinstance(loaded_value, list):
+        if all([isinstance(e, str) for e in loaded_value]):
+            return [py_.get(pulse_options_dict, e) for e in loaded_value]
+        elif all([isinstance(e, list) for e in loaded_value]):
+            labels = []
+            for pair in loaded_value:
+                labels.append(
+                    {
+                        "value": pair,
+                        "label": "+".join(
+                            [py_.get(pulse_options_dict, f"{e}.label") for e in pair],
+                        ),
+                    },
+                )
+            return labels
+    return []
+
+
+def get_labels(options):
+    labels = []
+    for option in options:
+        if isinstance(option, str):
+            labels.append(option)
+        elif isinstance(option, dict):
+            labels.append(option.get("label"))
+        elif hasattr(option, "label"):
+            labels.append(getattr(option, "label"))
+
+    return labels

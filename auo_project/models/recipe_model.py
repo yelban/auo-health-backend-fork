@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, UniqueConstraint
 
 from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
@@ -19,6 +20,11 @@ class RecipeBase(BaseModel):
     subject_num_snapshot: int = Field(None, nullable=True, title="受試人數快照")
     snapshot_at: datetime = Field(None, nullable=True, title="快照時間")
     is_active: bool = Field(False, title="是否啟用")
+    chart_settings: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        title="圖表設定",
+        sa_column=Column(JSON),
+    )
 
 
 class Recipe(BaseUUIDModel, BaseTimestampModel, RecipeBase, table=True):

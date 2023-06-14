@@ -74,7 +74,7 @@ MEASURE_TIMES = [
 ]
 
 
-class ParameterType(Enum):
+class ParameterType(str, Enum):
     """
     primary 主要特徵
     secondary 次要特徵
@@ -87,3 +87,15 @@ class ParameterType(Enum):
 
 
 ALLOWED_PTYPES = set([ptype.value for ptype in ParameterType])
+
+
+class AdvanceChartType(str, Enum):
+    """
+    parameter_six_pulse 參數與六部比較
+    parameter_cross 參數與篩選特徵比較
+    six_pulse_cn 六部與CN比較
+    """
+
+    parameter_six_pulse = "parameter_six_pulse"
+    parameter_cross = "parameter_cross"
+    six_pulse_cn = "six_pulse_cn"

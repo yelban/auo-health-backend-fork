@@ -37,6 +37,10 @@ class MeasureParameterBase(BaseModel):
         index=True,
         nullable=False,
     )
+    hide_label: bool = Field(
+        index=False,
+        nullable=False,
+    )
 
 
 class MeasureParameter(
