@@ -7,6 +7,7 @@ from uuid import UUID
 import pydash as py_
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.param_functions import Depends
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -617,6 +618,39 @@ async def get_chart_data(
         )
 
     return result
+
+
+@router.post("/export/{recipe_id}/csv")
+async def export_csv(
+    body: ExportCSVInput,
+    recipe_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    recipe = await crud.recipe.get(db_session=db_session, id=recipe_id)
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    parameters_input = body.analytical_params
+    error_dict, _ = await validate_values(
+        db_session=db_session,
+        parameters_input=parameters_input,
+    )
+    if error_dict:
+        raise HTTPException(422, detail=json.dumps(error_dict))
+
+    for chart_setting in body.chart_settings:
+        validate_chart_setting(
+            chart_setting=schemas.ChartSetting(**chart_setting.dict()),
+        )
+
+    chart_settings = [setting for setting in body.chart_settings if setting]
+    return FileResponse(
+        path="/app/src/多人多次下載檔案範例.zip",
+        filename="多人多次下載檔案範例.zip",
+        headers={"Access-Control-Expose-Headers": "Content-Disposition"},
+    )
 
 
 @router.get("/test")
