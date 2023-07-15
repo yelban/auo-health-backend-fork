@@ -183,12 +183,13 @@ class MeasureInfoBase(BaseModel):
     strength_r_cu: int = Field(default=None, title="右寸力量; 無:null/無力:0/正常:1/有力:2")
     strength_r_qu: int = Field(default=None, title="右關力量; 無:null/無力:0/正常:1/有力:2")
     strength_r_ch: int = Field(default=None, title="右尺力量; 無:null/無力:0/正常:1/有力:2")
-    width_l_cu: int = Field(default=None, title="左寸粗細; 無:null/細:0/正常:1/粗:2")
-    width_l_qu: int = Field(default=None, title="左關粗細; 無:null/細:0/正常:1/粗:2")
-    width_l_ch: int = Field(default=None, title="左尺粗細; 無:null/細:0/正常:1/粗:2")
-    width_r_cu: int = Field(default=None, title="右寸粗細; 無:null/細:0/正常:1/粗:2")
-    width_r_qu: int = Field(default=None, title="右關粗細; 無:null/細:0/正常:1/粗:2")
-    width_r_ch: int = Field(default=None, title="右尺粗細; 無:null/細:0/正常:1/粗:2")
+
+    range_length_l_cu: float = Field(default=None, title="左寸有效範圍長度(單位:mm)")
+    range_length_l_qu: float = Field(default=None, title="左關有效範圍長度(單位:mm)")
+    range_length_l_ch: float = Field(default=None, title="左尺有效範圍長度(單位:mm)")
+    range_length_r_cu: float = Field(default=None, title="右寸有效範圍長度(單位:mm)")
+    range_length_r_qu: float = Field(default=None, title="右關有效範圍長度(單位:mm)")
+    range_length_r_ch: float = Field(default=None, title="右尺有效範圍長度(單位:mm)")
 
     static_max_amp_l_cu: float = Field(
         default=None,
