@@ -118,32 +118,32 @@ class MeasureInfoBase(BaseModel):
         default=None,
         title="右尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
     )
-    max_ampt_value_l_cu: float = Field(
+    max_amp_value_l_cu: float = Field(
         default=None,
         nullable=True,
         title="左寸-有效範圍內最大振幅值",
     )
-    max_ampt_value_l_qu: float = Field(
+    max_amp_value_l_qu: float = Field(
         default=None,
         nullable=True,
         title="左關-有效範圍內最大振幅值",
     )
-    max_ampt_value_l_ch: float = Field(
+    max_amp_value_l_ch: float = Field(
         default=None,
         nullable=True,
         title="左尺-有效範圍內最大振幅值",
     )
-    max_ampt_value_r_cu: float = Field(
+    max_amp_value_r_cu: float = Field(
         default=None,
         nullable=True,
         title="右寸-有效範圍內最大振幅值",
     )
-    max_ampt_value_r_qu: float = Field(
+    max_amp_value_r_qu: float = Field(
         default=None,
         nullable=True,
         title="右關-有效範圍內最大振幅值",
     )
-    max_ampt_value_r_ch: float = Field(
+    max_amp_value_r_ch: float = Field(
         default=None,
         nullable=True,
         title="右尺-有效範圍內最大振幅值",

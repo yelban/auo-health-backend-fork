@@ -293,12 +293,12 @@ class MeasureDetailRead(BaseModel):
     max_amp_depth_of_range_r_ch: int = Field(None, title="右尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2")
 
     # infos_analyze
-    max_empt_value_l_cu: float = Field(None, title="左寸-有效範圍內最大振幅值")
-    max_empt_value_l_qu: float = Field(None, title="左關-有效範圍內最大振幅值")
-    max_empt_value_l_ch: float = Field(None, title="左尺-有效範圍內最大振幅值")
-    max_empt_value_r_cu: float = Field(None, title="右寸-有效範圍內最大振幅值")
-    max_empt_value_r_qu: float = Field(None, title="右關-有效範圍內最大振幅值")
-    max_empt_value_r_ch: float = Field(None, title="右尺-有效範圍內最大振幅值")
+    max_amp_value_l_cu: float = Field(None, title="左寸-有效範圍內最大振幅值")
+    max_amp_value_l_qu: float = Field(None, title="左關-有效範圍內最大振幅值")
+    max_amp_value_l_ch: float = Field(None, title="左尺-有效範圍內最大振幅值")
+    max_amp_value_r_cu: float = Field(None, title="右寸-有效範圍內最大振幅值")
+    max_amp_value_r_qu: float = Field(None, title="右關-有效範圍內最大振幅值")
+    max_amp_value_r_ch: float = Field(None, title="右尺-有效範圍內最大振幅值")
 
     # analyze_raw
     max_slope_value_l_cu: float = Field(None, title="左寸斜率最大值")
@@ -380,12 +380,12 @@ class MultiMeasureDetailRead(BaseModel):
     max_amp_depth_of_range_r_ch: int = Field(None, title="右尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2")
 
     # TODO: check
-    max_empt_value_l_cu: float = Field(None, title="左寸-有效範圍內最大振幅值")
-    max_empt_value_l_qu: float = Field(None, title="左關-有效範圍內最大振幅值")
-    max_empt_value_l_ch: float = Field(None, title="左尺-有效範圍內最大振幅值")
-    max_empt_value_r_cu: float = Field(None, title="右寸-有效範圍內最大振幅值")
-    max_empt_value_r_qu: float = Field(None, title="右關-有效範圍內最大振幅值")
-    max_empt_value_r_ch: float = Field(None, title="右尺-有效範圍內最大振幅值")
+    max_amp_value_l_cu: float = Field(None, title="左寸-有效範圍內最大振幅值")
+    max_amp_value_l_qu: float = Field(None, title="左關-有效範圍內最大振幅值")
+    max_amp_value_l_ch: float = Field(None, title="左尺-有效範圍內最大振幅值")
+    max_amp_value_r_cu: float = Field(None, title="右寸-有效範圍內最大振幅值")
+    max_amp_value_r_qu: float = Field(None, title="右關-有效範圍內最大振幅值")
+    max_amp_value_r_ch: float = Field(None, title="右尺-有效範圍內最大振幅值")
 
     # TODO: check
     max_slope_value_l_cu: float = Field(None, title="左寸斜率最大值")
