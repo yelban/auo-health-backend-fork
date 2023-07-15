@@ -430,8 +430,13 @@ def read_file(zip_file: Union[BytesIO, str]):
         return result_dict
 
 
-async def process_file(file: models.File, zip_file: BinaryIO, overwrite: bool):
-    result_dict = None
+async def process_file(
+    file: models.File,
+    zip_file: BinaryIO,
+    overwrite: bool,
+    db_session: AsyncSession = None,
+):
+    result_dict = {}
     try:
         result_dict = read_file(zip_file)
     except Exception as e:
@@ -447,33 +452,51 @@ async def process_file(file: models.File, zip_file: BinaryIO, overwrite: bool):
         raise Exception("checked error")
 
     # check subject exists
-    db_session = SessionLocal()
-    subject = await crud.subject.get_by_sid(
-        db_session=db_session,
-        sid=result_dict["infos.txt"].id,
-    )
-    if not subject:
-        subject_in = schemas.SubjectCreate(
-            sid=result_dict["infos.txt"].id,
-            name=result_dict["infos.txt"].name,
-            birth_date=result_dict["infos.txt"].birth_date,
-            sex=result_dict["infos.txt"].sex,
-            is_active=True,
-        )
-        subject = await crud.subject.create(db_session=db_session, obj_in=subject_in)
-
+    db_session = db_session or SessionLocal()
     infos = result_dict.get("infos.txt")
     infos_analyze = result_dict.get("infos_analyze.txt")
     report = result_dict.get("report.txt")
     bcq = result_dict.get("BCQ.txt", {})
     ver = result_dict.get("ver.ini")
 
+    subject = await crud.subject.get_by_sid_and_proj_num(
+        db_session=db_session,
+        sid=infos.id,
+        proj_num=report.proj_num if report else None,
+    )
+    if not subject:
+        subject_in = schemas.SubjectCreate(
+            sid=infos.id,
+            name=infos.name,
+            birth_date=infos.birth_date,
+            sex=infos.sex,
+            last_measure_time=infos.measure_time,
+            proj_num=report.proj_num if report else None,
+            number=infos.number,
+            is_active=True,
+        )
+        subject = await crud.subject.create(db_session=db_session, obj_in=subject_in)
+    else:
+        subject_in = schemas.SubjectUpdate(
+            birth_date=infos.birth_date,
+            sex=infos.sex,
+            last_measure_time=max(infos.measure_time, subject.last_measure_time)
+            if subject.last_measure_time
+            else infos.measure_time,
+            number=infos.number,
+        )
+        subject = await crud.subject.update(
+            db_session=db_session,
+            obj_current=subject,
+            obj_new=subject_in,
+        )
+
     # TODO: check sid + measure_time as unique key ok
     measure_info = await crud.measure_info.get_exist_measure(
         db_session=db_session,
         sid=subject.sid,
         measure_time=infos.measure_time,
-    )
+    ) or await crud.measure_info.get_by_file_id(db_session=db_session, file_id=file.id)
 
     extra_info = schemas.MeasureInfoExtraInfo(**cal_extra_measure_info(infos_analyze))
 
@@ -501,7 +524,9 @@ async def process_file(file: models.File, zip_file: BinaryIO, overwrite: bool):
         print(f"measure exist: {measure_info.id}")
     if overwrite and measure_info:
         print("start deleting...")
-        await crud.measure_info.remove(db_session=db_session, id=measure_info.id)
+        await db_session.delete(measure_info)
+        await db_session.commit()
+        # await crud.measure_info.remove(db_session=db_session, id=measure_info.id)
         print("deleted")
     if not measure_info or overwrite:
         measure_info_in = schemas.MeasureInfoCreate(
@@ -786,6 +811,8 @@ async def process_file(file: models.File, zip_file: BinaryIO, overwrite: bool):
             db_session=db_session,
             obj_in=measure_raw_in,
         )
+
+    await db_session.close()
 
     return True
 
