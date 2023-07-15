@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from random import randrange
+from typing import Union
 
 from dateutil.relativedelta import relativedelta
 
@@ -158,7 +159,7 @@ def get_pct_cmp_base(cn_dict, c_or_p):
     }
 
 
-def get_age(measure_time, birth_date):
+def get_age(measure_time: datetime, birth_date: Union[datetime, date]):
     if (isinstance(measure_time, datetime) or isinstance(measure_time, date)) and (
         isinstance(birth_date, datetime) or isinstance(birth_date, date)
     ):
@@ -175,6 +176,49 @@ def switch_strength_value(v):
             return 0
         else:
             raise ValueError(f"must be null/0/1/2 but got {v}")
+
+
+def safe_int(v):
+    try:
+        return int(v)
+    except Exception:
+        return None
+
+
+def get_date(text):
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except:
+        return None
+
+
+def get_datetime(text):
+    try:
+        return datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
+    except:
+        return None
+
+
+def get_measure_strength(max_slop, max_amp_value):
+    if max_slop is None or max_amp_value is None:
+        return None
+    if max_slop > 199 and max_amp_value > 34:
+        return 2
+    elif max_slop < 100 and max_amp_value < 10:
+        return 0
+    else:
+        return 1
+
+
+def get_measure_width(range_length, max_amp_value):
+    if range_length is None or max_amp_value is None:
+        return None
+    if range_length / 0.2 < 15 and max_amp_value < 10:
+        return 0
+    elif range_length / 0.2 > 24 and max_amp_value > 34:
+        return 2
+    else:
+        return 1
 
 
 def get_mock_bcq():
