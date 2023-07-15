@@ -368,7 +368,7 @@ def read_file(zip_file: Union[BytesIO, str]):
     )
 
     checked_file_list = []
-    result_dict = {}
+    result_dict = {"error_msg": ""}
     with ZipFile(zip_file, mode="r") as measure_zip:
         infolist = measure_zip.infolist()
         for file_info in infolist:
@@ -398,7 +398,7 @@ def read_file(zip_file: Union[BytesIO, str]):
                             # TODO: check provided columns
                             result_dict[file_name] = schema_in(**dict_obj)
                         except Exception as e:
-                            raise Exception(f"{file_name}: {e}")
+                            result_dict["error_msg"] += f"{file_name}:{e};"
                     elif file_name in validates_6s or file_name in validates_all_s:
                         df = pd.read_csv(StringIO(decoded_data), header=None, sep="\t")
                         side = None
@@ -407,7 +407,7 @@ def read_file(zip_file: Union[BytesIO, str]):
                         elif "Right" in str(file_name_p):
                             side = "right"
                         else:
-                            raise Exception(f"invalid side: {file_name_p}")
+                            result_dict["error_msg"] += f"invalid side: {file_name_p};"
                         result_dict[f"{side}/{file_name}"] = df
 
                 elif file_name == statistics_file:
@@ -436,6 +436,7 @@ async def process_file(file: models.File, zip_file: BinaryIO, overwrite: bool):
         result_dict = read_file(zip_file)
     except Exception as e:
         print("file error: ", e)
+        return {"error_msg": result_dict["error_msg"]}
 
     if not result_dict:
         print("no result")
@@ -801,11 +802,24 @@ async def get_and_write(
     # download blob
     downloader = download_zip_file(blob_service, file.location)
     zip_file = BytesIO(downloader.readall())
-    result = await process_file(file, zip_file, overwrite)
+    result = await process_file(file, zip_file, overwrite, db_session)
     # TODO: design error log table
     print("result:", result)
     if result:
-        file_in = schemas.FileUpdate(file_status=FileStatusType.success, is_valid=True)
+        if isinstance(result, dict):
+            error_msg = result.get("error_msg", "")
+            if error_msg:
+                file_in = schemas.FileUpdate(
+                    file_status=FileStatusType.success,
+                    is_valid=False,
+                    memo=error_msg,
+                )
+        else:
+            file_in = schemas.FileUpdate(
+                file_status=FileStatusType.success,
+                is_valid=True,
+                memo="",
+            )
         await crud.file.update(db_session=db_session, obj_current=file, obj_new=file_in)
 
 
