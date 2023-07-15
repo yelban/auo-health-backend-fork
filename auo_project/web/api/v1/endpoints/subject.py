@@ -55,7 +55,7 @@ class MultiMeasuresBody(BaseModel):
 
 @router.get("/", response_model=SubjectListResponse)
 async def get_subject(
-    id: Optional[str] = Query(None, regex="contains__", title="受測者編號"),
+    number: Optional[str] = Query(None, regex="contains__", title="受測者編號"),
     sid: Optional[str] = Query(None, regex="contains__", title="ID"),
     name: Optional[str] = Query(None, regex="contains__", title="姓名"),
     sex: Optional[SexType] = Query(None, title="性別：男=0, 女=1）"),
@@ -90,11 +90,13 @@ async def get_subject(
     }
     filters = dict([(k, v) for k, v in filters.items() if v is not None and v != []])
     filter_expr = models.Subject.filter_expr(**filters)
-    if id:
+    if number:
         filter_expr.append(
-            cast(models.Subject.id, String).ilike(f'%{id.replace("contains__", "")}%'),
+            cast(models.Subject.number, String).ilike(
+                f'%{number.replace("contains__", "")}%',
+            ),
         )
-    sort_expr = sort_expr.split(",") if sort_expr else ["-updated_at"]
+    sort_expr = sort_expr.split(",") if sort_expr else ["-last_measure_time"]
     sort_expr = [e.replace("+", "") for e in sort_expr]
     order_expr = models.Subject.order_expr(*sort_expr)
 

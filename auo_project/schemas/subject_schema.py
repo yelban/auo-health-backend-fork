@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -71,7 +71,7 @@ class SubjectCreate(SubjectBase):
     pass
 
 
-class SubjectUpdate(SubjectBase):
+class SubjectUpdate(BaseModel):
     birth_date: date = Field(default=None, title="出生年月日")
     sex: int = Field(default=None, title="性別編號")
     memo: str = Field(default=None, max_length=1024, title="受測者標記")
@@ -79,3 +79,5 @@ class SubjectUpdate(SubjectBase):
         title="基準值檢測編號",
         default=None,
     )
+    last_measure_time: datetime = Field(default=None, title="最後檢測時間")
+    number: str = Field(default=None, title="")

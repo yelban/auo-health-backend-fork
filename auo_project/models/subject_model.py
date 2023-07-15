@@ -23,6 +23,9 @@ class SubjectBase(BaseModel):
         title="基準值檢測編號",
         default=None,
     )
+    last_measure_time: datetime = Field(default=None, nullable=True)
+    proj_num: str = Field(default=None, nullable=True)
+    number: str = Field(default=None, nullable=True)
     is_active: bool = Field(index=True, nullable=False, default=True)
 
 
