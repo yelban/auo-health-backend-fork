@@ -873,10 +873,11 @@ async def process_file(
         )
 
     if "BCQ.txt" in result_dict:
-        if not await crud.measure_bcq.get_by_measure_id(
+        bcq_model = await crud.measure_bcq.get_by_measure_id(
             db_session=db_session,
             measure_id=measure_info.id,
-        ):
+        )
+        if bcq_model is None:
             bcq_in = schemas.BCQCreate(
                 **bcq.dict(),
                 measure_id=measure_info.id,
