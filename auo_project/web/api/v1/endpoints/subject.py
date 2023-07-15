@@ -288,6 +288,7 @@ async def get_subject_measures(
             measure_operator=measure.measure_operator,
             proj_num=measure.proj_num,
             memo=measure.memo,
+            has_memo=measure.has_memo,
             age=measure.age,
             bmi=measure.bmi,
             bcq=measure.has_bcq,

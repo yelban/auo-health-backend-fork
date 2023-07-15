@@ -181,18 +181,12 @@ class MeasureInfoReadByList(BaseModel):
     org_name: str = Field(default=None, title="檢測單位")
     irregular_hr: int = Field(default=None, nullable=True, title="節律標記")
     proj_num: str = Field(default=None, title="計畫編號")  # from report.txt
-    has_memo: bool = Field(default=False, title="是否有檢測標記")
     memo: str = Field(default=None, title="檢測標記")
+    has_memo: bool = Field(default=False, title="是否有檢測標記")
     age: int = Field(default=None, title="年齡")
     bcq: bool = Field(default=None, title="BCQ檢測")
     bmi: float = Field(default=None, title="BMI")
     is_standard_measure: bool = Field(default=False, title="是否為基準值")
-
-    @validator("has_memo", always=True)
-    def check_has_memo(cls, v, values):
-        if values.get("memo"):
-            return isinstance(values["memo"], str) and len(values["memo"]) > 0
-        return v
 
     @validator("bmi", always=True)
     def round_bmi(cls, v):
