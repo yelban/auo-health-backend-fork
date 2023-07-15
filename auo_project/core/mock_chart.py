@@ -1,79 +1,9 @@
-from math import ceil, floor
 from random import randint, uniform
 from statistics import mean, quantiles, stdev
-from typing import Union
 
 import numpy as np
 import pydash as py_
 from fastapi import HTTPException
-
-
-def normalize_parameter_name(name):
-    # replace ':' for a026:c056:001 and a026:c056:002
-    if isinstance(name, str):
-        return name.replace(":", "")
-
-
-def is_disease_include_option(answer: str, input_option: str) -> bool:
-    if answer == input_option:
-        return True
-    answer_category_id, answer_disease_id = answer.split(":")
-    option_category_id, option_disease_id = input_option.split(":")
-    # TODO: answer without :000?
-    if answer_category_id == option_category_id and (
-        answer_disease_id == "000" or option_disease_id == "000"
-    ):
-        return True
-    return False
-
-
-def is_disease_match(data: dict, qid: str, input_option: Union[str, dict]):
-    if qid != "a008":
-        return False
-    survey_answers = py_.get(data, "a008", [])
-    if not survey_answers:
-        return False
-
-    if isinstance(input_option, str):
-        if any(
-            [
-                is_disease_include_option(answer, input_option)
-                for answer in survey_answers
-            ],
-        ):
-            return True
-
-    elif isinstance(input_option, dict):
-        includes = input_option.get("include", [])
-        excludes = input_option.get("exclude", [])
-        is_all_include = all(
-            [
-                any(
-                    [
-                        is_disease_include_option(answer, include_option)
-                        for answer in survey_answers
-                    ],
-                )
-                for include_option in includes
-            ],
-        )
-        is_all_exclude = (
-            any(
-                [
-                    any(
-                        [
-                            is_disease_include_option(answer, exclude_option)
-                            for answer in survey_answers
-                        ],
-                    )
-                    for exclude_option in excludes
-                ],
-            )
-            is False
-        )
-        if is_all_include and is_all_exclude:
-            return True
-    return False
 
 
 def get_data_range():
@@ -97,23 +27,6 @@ def get_data_range():
         range_dict[f"pncv:p{i}"] = (0, 1)
 
     return range_dict
-
-
-def get_data_range_from_data(data):
-    min_value = floor(min([e["y"][0] for e in data]))
-    max_value = (
-        ceil(max([e["y"][-1] for e in data]) * 1.2)
-        if max([e["y"][-1] for e in data]) >= 1
-        else max([e["y"][-1] for e in data]) * 1.2
-    )
-    if min_value < 0:
-        min_value = min_value * 1.2
-    else:
-        min_value = min_value * 0.8
-    # print(data_range, min_value, max_value)
-    # data_range = [min(min_value, data_range[0]), max(max_value, data_range[1])]
-    data_range = [min_value, max_value]
-    return data_range
 
 
 def get_data_by_column(column, n=100):
@@ -152,8 +65,6 @@ def get_random_data(min, max):
 
 
 def get_box_plot_data(data_list):
-    if len(data_list) < 2:
-        return [0, 0, 0, 0, 0]
     q1, q2, q3 = quantiles(data_list, n=4)
     lower = q1 - 1.5 * (q3 - q1)
     upper = q3 + 1.5 * (q3 - q1)
@@ -167,8 +78,6 @@ def get_box_plot_data(data_list):
 
 
 def get_mean_and_std(data_list):
-    if len(data_list) < 2:
-        return [0, 0]
     return [mean(data_list), stdev(data_list)]
 
 
@@ -254,7 +163,7 @@ def get_filters():
     return output
 
 
-def get_chart_type1_data(x_options, y, z, z_options, sdata):
+def get_chart_type1_data(x_options, y, z, z_options):
     time_domains_dict = {
         e: "time_domain" for e in "h1,t1,h1/t1,PR,w1,w1/t,t1/t,PW,PWCV".split(",")
     }
@@ -277,24 +186,14 @@ def get_chart_type1_data(x_options, y, z, z_options, sdata):
 
     for x_option in x_options:
         for z_option in z_options:
-            match_data = [
-                e["y"]
-                for e in sdata
-                if e["y"] is not None
-                and e["x"] == x_option
-                and (
-                    py_.get(e, normalize_parameter_name(z)) == z_option["value"]
-                    or is_disease_match(e, z, z_option["value"])
-                )
-            ]
-
-            statistics_data = get_box_plot_data(match_data)
+            random_data = get_data_by_column(column=y, n=500)
+            statistics_data = get_box_plot_data(random_data)
             data.append(
                 {
                     "x": x_option,
                     # [lower, q1, q2, q3, upper]
                     "y": statistics_data,
-                    "z": z_option["label"],
+                    "z": z_option,
                 },
             )
     domain_last = y
@@ -307,16 +206,16 @@ def get_chart_type1_data(x_options, y, z, z_options, sdata):
             domain_last,
         ]
 
-    data_range = get_data_range_from_data(data)
+    data_range_dict = get_data_range()
     return {
         "y": {"domain": return_domain},
         "z": z,
         "data": data,
-        "data_range": data_range,
+        "data_range": data_range_dict.get(domain_last),
     }
 
 
-def get_chart_type2_data(x, x_options, domain_last, six_pulse, z, z_options, sdata):
+def get_chart_type2_data(x, x_options, domain_last, six_pulse, z, z_options):
     time_domains_dict = {
         e: "time_domain" for e in "h1,t1,h1/t1,PR,w1,w1/t,t1/t,PW,PWCV".split(",")
     }
@@ -336,28 +235,17 @@ def get_chart_type2_data(x, x_options, domain_last, six_pulse, z, z_options, sda
     # TODO: check z is valid
 
     data = []
+
     for x_option in x_options:
         for z_option in z_options:
-            match_data = [
-                e["y"]
-                for e in sdata
-                if e["y"] is not None
-                and (
-                    e["x"] == x_option.get("value")
-                    or is_disease_match(e, x, x_option.get("value"))
-                )
-                and (
-                    py_.get(e, normalize_parameter_name(z)) == z_option["value"]
-                    or is_disease_match(e, z, z_option["value"])
-                )
-            ]
-            statistics_data = get_box_plot_data(match_data)
+            random_data = get_data_by_column(column=domain_last, n=500)
+            statistics_data = get_box_plot_data(random_data)
             data.append(
                 {
                     "x": x_option.get("label"),
                     # [lower, q1, q2, q3, upper]
                     "y": statistics_data,
-                    "z": z_option["label"],
+                    "z": z_option,
                 },
             )
     if domain_last in time_domains_dict or domain_last == "A0":
@@ -369,31 +257,23 @@ def get_chart_type2_data(x, x_options, domain_last, six_pulse, z, z_options, sda
             domain_last,
         ]
 
-    data_range = get_data_range_from_data(data)
+    data_range_dict = get_data_range()
     return {
         "x": x,
         "y": {"six_pulse": six_pulse, "domain": return_domain},
         "z": z,
         "data": data,
-        "data_range": data_range,
+        "data_range": data_range_dict.get(domain_last),
     }
 
 
-def get_chart_type3_data(x_options, six_pulse, statistics, z, z_options, sdata):
+def get_chart_type3_data(x_options, six_pulse, statistics, z, z_options):
     data = []
-    data_range = [0, 0]
     for x_option in x_options:
         for z_option in z_options:
-            match_data = [
-                py_.get(e, x_option.lower())
-                for e in sdata
-                if py_.get(e, x_option.lower()) is not None
-                and (
-                    py_.get(e, normalize_parameter_name(z)) == z_option["value"]
-                    or is_disease_match(e, z, z_option["value"])
-                )
-            ]
-            mean_val, std_val = get_mean_and_std(match_data)
+
+            random_data = get_data_by_column_low_std(column="cn", n=500)
+            mean_val, std_val = get_mean_and_std(random_data)
 
             data.append(
                 {
@@ -405,14 +285,11 @@ def get_chart_type3_data(x_options, six_pulse, statistics, z, z_options, sdata):
                         "yMax": round(mean_val + std_val, 2),
                         "yStd": round(std_val, 2),
                     },
-                    "z": z_option["label"],
+                    "z": z_option,  # z
                 },
             )
 
-            data_range[0] = min(data_range[0], data[-1]["y"]["yMin"])
-            data_range[1] = max(data_range[1], data[-1]["y"]["yMax"])
-
-    # data_range_dict = get_data_range()
+    data_range_dict = get_data_range()
 
     new_data = (
         py_.chain(data)
@@ -428,13 +305,9 @@ def get_chart_type3_data(x_options, six_pulse, statistics, z, z_options, sdata):
     )
     labels = x_options
 
-    if data_range[0] < 0:
-        data_range[0] = data_range[0] * 1.2
-    data_range[1] = data_range[1] * 1.2
-
     return {
         "y": {"six_pulse": six_pulse, "statistics": statistics},
         "z": z,
         "data": {"labels": labels, "datasets": new_data},
-        "data_range": data_range,
+        "data_range": data_range_dict.get("cn"),
     }
