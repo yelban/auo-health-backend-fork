@@ -34,6 +34,7 @@ from auo_project.core.recipe import (
     validate_value,
     validate_values,
 )
+from auo_project.core.survey import get_survey_result
 from auo_project.web.api import deps
 
 router = APIRouter()
@@ -45,8 +46,33 @@ class PatchRecipeChartsInput(BaseModel):
     chart_settings: List[schemas.ChartSetting]
 
 
+class ExportCSVInput(BaseModel):
+    analytical_params: schemas.RecipeAnalyticalParamsInput
+    chart_settings: List[schemas.ChartSetting]
+
+
 class RecipeChartDataInput(schemas.RecipeAnalyticalParamsInput, schemas.ChartSetting):
     pass
+
+
+def get_blood_pressure_option(sbp: int, dbp: int):
+    if sbp is None or dbp is None:
+        return None
+    if sbp < 90 and dbp < 60:
+        return "c029:005"
+    elif sbp < 130 and dbp < 85:
+        return "c029:001"
+    elif sbp >= 130 and sbp < 140 and dbp < 90:
+        return "c029:002"
+    elif sbp >= 140 and sbp < 160 and dbp < 100:
+        return "c029:003"
+    elif sbp >= 160 and dbp >= 100:
+        return "c029:004"
+    return None
+
+
+def get_blood_pressure(measure_info):
+    return get_blood_pressure_option(measure_info.sbp, measure_info.dbp)
 
 
 @router.get("/parameter/basic")
@@ -425,7 +451,8 @@ async def get_analytical_result(
 
     # handle select "all" then filter z options: a001, a008, a027, a030
     def process_z_options_by_selected_option(z_options, parameters_input):
-        block_z_options = []
+        # TODO: hide z option: 介入因子、血壓 for demo
+        block_z_options = ["a002"]
         # 檢測日期
         if parameters_input.a001 == "all":
             block_z_options.append("a001")
@@ -478,7 +505,7 @@ async def get_chart_data(
     input: RecipeChartDataInput,
     recipe_id: UUID,
     db_session: AsyncSession = Depends(deps.get_db),
-    # current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
     recipe = await crud.recipe.get(db_session=db_session, id=recipe_id)
@@ -580,14 +607,112 @@ async def get_chart_data(
         z_options = z_options_dict.get(input.z, [])
         z_labels = get_labels(z_options)
         domain = input.y.get("domain")
+
+        # TODO: filter primary and secondary
+        table_column = input.y["domain"][-1].lower()
+        if "/" in table_column:
+            table_column = table_column.replace("/", "_div_")
+        elif ":" in table_column:
+            table_column = table_column.split(":")[-1]
+        # TODO: how to choose measure info? the same date?
+        survey_result = await get_survey_result()
+        survey_dict_by_number = {x.number: x for x in survey_result}
+        survey_number_list = [x.number for x in survey_result]
+        measures = await crud.measure_info.get_by_numbers(
+            db_session=db_session,
+            list_ids=survey_number_list,
+            relations=["statistics"],
+        )
+        measure_id_number_dict = {measure.id: measure.number for measure in measures}
+        measure_id_dict = {measure.id: measure for measure in measures}
+        measure_statistics = py_.flatten([measure.statistics for measure in measures])
+        statisitc_filter = "MEAN"
+        if "cv" in table_column:
+            statisitc_filter = "CV"
+            table_column = table_column.replace("cv", "")
+        if table_column == "pr":
+            table_column = "hr"
+
+        hand_map = {"Left": "左", "Right": "右"}
+        position_map = {"Cu": "寸", "Qu": "關", "Ch": "尺"}
+
+        # TODO: check whether filter pass rate
+        measure_statistics = [
+            {
+                **survey_dict_by_number.get(
+                    measure_id_number_dict.get(statistic.measure_id),
+                ).dict(),
+                "a028": get_blood_pressure(measure_id_dict[statistic.measure_id]),
+                "measure_id": statistic.measure_id,
+                "number": measure_id_number_dict.get(statistic.measure_id),
+                "x_label": hand_map.get(statistic.hand, "")
+                + position_map.get(statistic.position, ""),
+                "x": f"{statistic.hand.lower()[0]}_{statistic.position.lower()}",
+                "y": getattr(statistic, table_column),
+            }
+            for statistic in measure_statistics
+            if statistic.statistic.upper() == statisitc_filter.upper()
+        ]
         result = get_chart_type1_data(
             x_options,
             input.y["domain"][-1],
             input.z,
-            z_labels,
+            z_options,
+            sdata=measure_statistics,
         )
 
     elif input.chart_type == AdvanceChartType.parameter_cross:
+        table_column = input.y["domain"][-1].lower()
+        if "/" in table_column:
+            table_column = table_column.replace("/", "_div_")
+        elif ":" in table_column:
+            table_column = table_column.split(":")[-1]
+        # 如果用 number 找只有找到 39 筆
+        survey_result = await get_survey_result()
+        survey_dict_by_number = {x.number: x for x in survey_result}
+        survey_number_list = [x.number for x in survey_result]
+        measures = await crud.measure_info.get_by_numbers(
+            db_session=db_session,
+            list_ids=survey_number_list,
+            relations=["statistics"],
+        )
+        measure_id_number_dict = {measure.id: measure.number for measure in measures}
+        measure_id_dict = {measure.id: measure for measure in measures}
+        measure_statistics = py_.flatten([measure.statistics for measure in measures])
+        statisitc_filter = "MEAN"
+        if "cv" in table_column:
+            statisitc_filter = "CV"
+            table_column = table_column.replace("cv", "")
+        if table_column == "pr":
+            table_column = "hr"
+
+        # TODO: check whether filter pass rate
+        def normalize_parameter_name(name):
+            # replace ':' for a026:c056:001 and a026:c056:002
+            if isinstance(name, str):
+                return name.replace(":", "")
+
+        measure_statistics = [
+            {
+                **survey_dict_by_number.get(
+                    measure_id_number_dict.get(statistic.measure_id),
+                ).dict(),
+                "a028": get_blood_pressure(measure_id_dict[statistic.measure_id]),
+                "statistic_id": statistic.id,
+                "measure_id": statistic.measure_id,
+                "number": measure_id_number_dict.get(statistic.measure_id),
+                "x": getattr(
+                    survey_dict_by_number.get(
+                        measure_id_number_dict.get(statistic.measure_id),
+                    ),
+                    normalize_parameter_name(input.x),
+                ),
+                "y": getattr(statistic, table_column),
+            }
+            for statistic in measure_statistics
+            if statistic.statistic == statisitc_filter
+        ]
+
         x_options = z_options_dict.get(input.x, [])
         z_options = z_options_dict.get(input.z, [])
         z_labels = get_labels(z_options)
@@ -600,7 +725,8 @@ async def get_chart_data(
             domain_last,
             six_pulse,
             input.z,
-            z_labels,
+            z_options,
+            sdata=measure_statistics,
         )
 
     elif input.chart_type == AdvanceChartType.six_pulse_cn:
@@ -608,13 +734,46 @@ async def get_chart_data(
         z_options = z_options_dict.get(input.z, [])
         z_labels = get_labels(z_options)
         six_pulse = input.y.get("six_pulse")
+        hand_lc = six_pulse.split("_")[0]
+        position_lc = six_pulse.split("_")[1]
         statistics = input.y.get("statistics")
+        statisitc_filter = statistics.upper()
+
+        survey_result = await get_survey_result()
+        survey_dict_by_number = {x.number: x for x in survey_result}
+        survey_number_list = [x.number for x in survey_result]
+        measures = await crud.measure_info.get_by_numbers(
+            db_session=db_session,
+            list_ids=survey_number_list,
+            relations=["statistics"],
+        )
+        measure_id_dict = {measure.id: measure for measure in measures}
+        measure_id_number_dict = {measure.id: measure.number for measure in measures}
+        measure_statistics = py_.flatten([measure.statistics for measure in measures])
+        measure_statistics = [
+            {
+                **survey_dict_by_number.get(
+                    measure_id_number_dict.get(statistic.measure_id),
+                ).dict(),
+                **statistic.dict(),
+                "a028": get_blood_pressure(measure_id_dict[statistic.measure_id]),
+                "statistic_id": statistic.id,
+                "measure_id": statistic.measure_id,
+                "number": measure_id_number_dict.get(statistic.measure_id),
+            }
+            for statistic in measure_statistics
+            if statistic.statistic == statisitc_filter
+            and statistic.hand[0].lower() == hand_lc
+            and statistic.position.lower() == position_lc
+        ]
+
         result = get_chart_type3_data(
             x_options,
             six_pulse,
             statistics,
             input.z,
-            z_labels,
+            z_options,
+            sdata=measure_statistics,
         )
 
     return result
