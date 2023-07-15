@@ -67,28 +67,28 @@ class Tongue(BaseModel):
 class BCQ(BaseModel):
     exist: bool = Field(False, title="是否有 BCQ 結果")
     yang_state_spec: Dict[str, Any] = Field(
-        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
-        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
+        {"good": [0, 13], "fair": [14, 29], "serious": [30, 100]},
+        title="嚴重程度; 良好 good 0-13/普通 fair 14-29/嚴重 serious 30-100",
     )
     yin_state_spec: Dict[str, Any] = Field(
-        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
-        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
+        {"good": [0, 13], "fair": [14, 29], "serious": [30, 100]},
+        title="嚴重程度; 良好 good 0-13/普通 fair 14-29/嚴重 serious 30-100",
     )
     phlegm_state_spec: Dict[str, Any] = Field(
         {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
         title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
     )
     yang_second_state_spec: Dict[str, Any] = Field(
-        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
-        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
+        {"good": [0, 100], "fair": [101, 102], "serious": [103, 104]},
+        title="嚴重程度; 未定義",
     )
     yin_second_state_spec: Dict[str, Any] = Field(
-        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
-        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
+        {"good": [0, 100], "fair": [101, 102], "serious": [103, 104]},
+        title="嚴重程度; 未定義",
     )
     phlegm_second_state_spec: Dict[str, Any] = Field(
-        {"good": [0, 16], "fair": [17, 29], "serious": [30, 100]},
-        title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
+        {"good": [0, 100], "fair": [101, 102], "serious": [103, 104]},
+        title="嚴重程度; 未定義",
     )
     score_yang: int = Field(None, title="總分-陽(int)")
     score_yin: int = Field(None, title="總分-陰(int)")

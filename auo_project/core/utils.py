@@ -1,6 +1,9 @@
 from datetime import date, datetime
+from random import randrange
 
 from dateutil.relativedelta import relativedelta
+
+from auo_project import schemas
 
 
 def mask_credential_name(s: str):
@@ -172,3 +175,43 @@ def switch_strength_value(v):
             return 0
         else:
             raise ValueError(f"must be null/0/1/2 but got {v}")
+
+
+def get_mock_bcq():
+    return schemas.BCQ(
+        exist=randrange(0, 1),
+        score_yang=randrange(0, 100),
+        score_yin=randrange(0, 100),
+        score_phlegm=randrange(0, 100),
+        score_yang_head=randrange(0, 100),
+        score_yang_chest=randrange(0, 100),
+        score_yang_limbs=randrange(0, 100),
+        score_yang_abdomen=randrange(0, 100),
+        score_yang_surface=randrange(0, 100),
+        score_yin_head=randrange(0, 100),
+        score_yin_limbs=randrange(0, 100),
+        score_yin_gt=randrange(0, 100),
+        score_yin_surface=randrange(0, 100),
+        score_yin_abdomen=randrange(0, 100),
+        score_phlegm_trunk=randrange(0, 100),
+        score_phlegm_surface=randrange(0, 100),
+        score_phlegm_head=randrange(0, 100),
+        score_phlegm_gt=randrange(0, 100),
+        percentage_yang=randrange(0, 100),
+        percentage_yin=randrange(0, 100),
+        percentage_phlegm=randrange(0, 100),
+        percentage_yang_head=randrange(0, 100),
+        percentage_yang_chest=randrange(0, 100),
+        percentage_yang_limbs=randrange(0, 100),
+        percentage_yang_abdomen=randrange(0, 100),
+        percentage_yang_surface=randrange(0, 100),
+        percentage_yin_head=randrange(0, 100),
+        percentage_yin_limbs=randrange(0, 100),
+        percentage_yin_gt=randrange(0, 100),
+        percentage_yin_surface=randrange(0, 100),
+        percentage_yin_abdomen=randrange(0, 100),
+        percentage_phlegm_trunk=randrange(0, 100),
+        percentage_phlegm_surface=randrange(0, 100),
+        percentage_phlegm_head=randrange(0, 100),
+        percentage_phlegm_gt=randrange(0, 100),
+    )

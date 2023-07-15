@@ -1,5 +1,4 @@
 from datetime import datetime
-from random import randrange
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -670,41 +669,95 @@ async def get_multi_measure_summary(
             ),
             # TODO: remove me
             bcq=schemas.BCQ(
-                exist=randrange(0, 1),
-                score_yang=randrange(0, 100),
-                score_yin=randrange(0, 100),
-                score_phlegm=randrange(0, 100),
-                score_yang_head=randrange(0, 100),
-                score_yang_chest=randrange(0, 100),
-                score_yang_limbs=randrange(0, 100),
-                score_yang_abdomen=randrange(0, 100),
-                score_yang_surface=randrange(0, 100),
-                score_yin_head=randrange(0, 100),
-                score_yin_limbs=randrange(0, 100),
-                score_yin_gt=randrange(0, 100),
-                score_yin_surface=randrange(0, 100),
-                score_yin_abdomen=randrange(0, 100),
-                score_phlegm_trunk=randrange(0, 100),
-                score_phlegm_surface=randrange(0, 100),
-                score_phlegm_head=randrange(0, 100),
-                score_phlegm_gt=randrange(0, 100),
-                percentage_yang=randrange(0, 100),
-                percentage_yin=randrange(0, 100),
-                percentage_phlegm=randrange(0, 100),
-                percentage_yang_head=randrange(0, 100),
-                percentage_yang_chest=randrange(0, 100),
-                percentage_yang_limbs=randrange(0, 100),
-                percentage_yang_abdomen=randrange(0, 100),
-                percentage_yang_surface=randrange(0, 100),
-                percentage_yin_head=randrange(0, 100),
-                percentage_yin_limbs=randrange(0, 100),
-                percentage_yin_gt=randrange(0, 100),
-                percentage_yin_surface=randrange(0, 100),
-                percentage_yin_abdomen=randrange(0, 100),
-                percentage_phlegm_trunk=randrange(0, 100),
-                percentage_phlegm_surface=randrange(0, 100),
-                percentage_phlegm_head=randrange(0, 100),
-                percentage_phlegm_gt=randrange(0, 100),
+                exist=measure.has_bcq,
+                score_yang=measure.bcq.percentage_yang if measure.bcq else None,
+                score_yin=measure.bcq.percentage_yin if measure.bcq else None,
+                score_phlegm=measure.bcq.percentage_phlegm if measure.bcq else None,
+                score_yang_head=measure.bcq.percentage_yang_head
+                if measure.bcq
+                else None,
+                score_yang_chest=measure.bcq.percentage_yang_chest
+                if measure.bcq
+                else None,
+                score_yang_limbs=measure.bcq.percentage_yang_limbs
+                if measure.bcq
+                else None,
+                score_yang_abdomen=measure.bcq.percentage_yang_abdomen
+                if measure.bcq
+                else None,
+                score_yang_surface=measure.bcq.percentage_yang_surface
+                if measure.bcq
+                else None,
+                score_yin_head=measure.bcq.percentage_yin_head if measure.bcq else None,
+                score_yin_limbs=measure.bcq.percentage_yin_limbs
+                if measure.bcq
+                else None,
+                score_yin_gt=measure.bcq.percentage_yin_gt if measure.bcq else None,
+                score_yin_surface=measure.bcq.percentage_yin_surface
+                if measure.bcq
+                else None,
+                score_yin_abdomen=measure.bcq.percentage_yin_abdomen
+                if measure.bcq
+                else None,
+                score_phlegm_trunk=measure.bcq.percentage_phlegm_trunk
+                if measure.bcq
+                else None,
+                score_phlegm_surface=measure.bcq.percentage_phlegm_surface
+                if measure.bcq
+                else None,
+                score_phlegm_head=measure.bcq.percentage_phlegm_head
+                if measure.bcq
+                else None,
+                score_phlegm_gt=measure.bcq.percentage_phlegm_gt
+                if measure.bcq
+                else None,
+                percentage_yang=measure.bcq.percentage_yang if measure.bcq else None,
+                percentage_yin=measure.bcq.percentage_yin if measure.bcq else None,
+                percentage_phlegm=measure.bcq.percentage_phlegm
+                if measure.bcq
+                else None,
+                percentage_yang_head=measure.bcq.percentage_yang_head
+                if measure.bcq
+                else None,
+                percentage_yang_chest=measure.bcq.percentage_yang_chest
+                if measure.bcq
+                else None,
+                percentage_yang_limbs=measure.bcq.percentage_yang_limbs
+                if measure.bcq
+                else None,
+                percentage_yang_abdomen=measure.bcq.percentage_yang_abdomen
+                if measure.bcq
+                else None,
+                percentage_yang_surface=measure.bcq.percentage_yang_surface
+                if measure.bcq
+                else None,
+                percentage_yin_head=measure.bcq.percentage_yin_head
+                if measure.bcq
+                else None,
+                percentage_yin_limbs=measure.bcq.percentage_yin_limbs
+                if measure.bcq
+                else None,
+                percentage_yin_gt=measure.bcq.percentage_yin_gt
+                if measure.bcq
+                else None,
+                percentage_yin_surface=measure.bcq.percentage_yin_surface
+                if measure.bcq
+                else None,
+                percentage_yin_abdomen=measure.bcq.percentage_yin_abdomen
+                if measure.bcq
+                else None,
+                percentage_phlegm_trunk=measure.bcq.percentage_phlegm_trunk
+                if measure.bcq
+                else None,
+                percentage_phlegm_surface=measure.bcq.percentage_phlegm_surface
+                if measure.bcq
+                else None,
+                percentage_phlegm_head=measure.bcq.percentage_phlegm_head
+                if measure.bcq
+                else None,
+                percentage_phlegm_gt=measure.bcq.percentage_phlegm_gt
+                if measure.bcq
+                else None,
             ),
             # bcq=measure.bcq or {},
         )
