@@ -38,7 +38,6 @@ class FileBase(BaseModel):
     is_valid: bool = Field(default=False, nullable=False, title="檔案是否驗證成功。")
     memo: str = Field(
         default="",
-        max_length=128,
         index=False,
         nullable=False,
         title="備註",
