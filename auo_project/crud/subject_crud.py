@@ -15,5 +15,18 @@ class CRUDSubject(CRUDBase[Subject, SubjectCreate, SubjectUpdate]):
         subject = await db_session.execute(select(Subject).where(Subject.sid == sid))
         return subject.scalar_one_or_none()
 
+    async def get_by_sid_and_proj_num(
+        self, *, db_session: AsyncSession, sid: str, proj_num: str = None
+    ) -> Optional[Subject]:
+        if proj_num:
+            subject = await db_session.execute(
+                select(Subject).where(Subject.sid == sid, Subject.proj_num is None),
+            )
+        else:
+            subject = await db_session.execute(
+                select(Subject).where(Subject.sid == sid, Subject.proj_num == proj_num),
+            )
+        return subject.scalar_one_or_none()
+
 
 subject = CRUDSubject(Subject)

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import func, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud
 from auo_project.crud.base_crud import CRUDBase
@@ -40,6 +41,14 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
             select(MeasureInfo).where(MeasureInfo.id == id).options(*options),
         )
         return measure.scalar_one_or_none()
+
+    async def get_by_file_id(
+        self, db_session, *, file_id: UUID
+    ) -> Optional[MeasureInfo]:
+        response = await db_session.execute(
+            select(MeasureInfo).where(MeasureInfo.file_id == file_id),
+        )
+        return response.scalar_one_or_none()
 
     # TODO: add permission filter
     async def get_proj_num(
@@ -102,6 +111,34 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
             if e[0]
         ]
         return result
+
+    async def get_by_numbers(
+        self,
+        *,
+        list_ids: List[str],
+        relations: List[Any] = [],
+        db_session: AsyncSession,
+    ) -> Optional[List[MeasureInfo]]:
+        options = []
+        for relation in relations:
+            if isinstance(relation, str):
+                options.append(selectinload(getattr(self.model, relation)))
+            else:
+                options.append(selectinload(relation))
+        response = await db_session.execute(
+            select(self.model).where(self.model.number.in_(list_ids)).options(*options),
+        )
+        return response.scalars().all()
+
+    async def get_all_by_measure_time(
+        self, db_session, *, measure_time: datetime
+    ) -> Optional[List[MeasureInfo]]:
+        response = await db_session.execute(
+            select(MeasureInfo).where(
+                MeasureInfo.measure_time >= measure_time,
+            ),
+        )
+        return response.scalars().all()
 
 
 measure_info = CRUDMeasureInfo(MeasureInfo)
