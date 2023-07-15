@@ -78,13 +78,16 @@ async def get_subject(
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
     start_date, end_date = dateutils.get_dates()
+    if birth_date:
+        try:
+            birth_date = datetime.strptime(birth_date.replace("-", ""), "%Y%m%d")
+        except Exception:
+            raise HTTPException(status_code=400, detail="date format error")
 
     filters = {
         "name__contains": name.replace("contains__", "") if name else None,
         "sid__contains": sid.replace("contains__", "") if sid else None,
-        "birth_date": datetime.strptime(birth_date.replace("-", ""), "%Y%m%d")
-        if birth_date
-        else None,
+        "birth_date": birth_date,
         "sex": sex,
         "memo__contains": memo.replace("contains__", "") if memo else None,
     }
