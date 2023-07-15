@@ -59,7 +59,8 @@ class RecipeBasicParameterInput(BaseModel):
     s043: str = Field(title="目前懷孕週數", example="all")
     # s044: str = Field(title="心情溫度計", example="all")
     s045: str = Field(title="總分", example="all")
-    s046: str = Field(title="有自殺想法", example="all")
+    # s046 問題比較敏感目前不需顯示
+    # s046: str = Field(title="有自殺想法", example="all")
 
 
 class RecipeAnalyticalParamsInput(BaseModel):

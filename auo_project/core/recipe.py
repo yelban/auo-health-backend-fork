@@ -1173,23 +1173,39 @@ def convert_disease_option_label(
 def get_chart_disease_z_options(loaded_value, disease_options_dict):
     if isinstance(loaded_value, list):
         if all([isinstance(e, str) for e in loaded_value]):
-            return [
+            options = [
                 convert_disease_option_label(py_.get(disease_options_dict, e))
                 for e in loaded_value
             ]
+            options = [
+                {
+                    "value": f"{e.category_id}:{e.value}",
+                    "label": e.label,
+                    "category_id": e.category_id,
+                }
+                for e in options
+            ]
+            return options
         elif all([isinstance(e, dict) for e in loaded_value]):
-            labels = []
+            options = []
             for e in loaded_value:
-                include = e.get("include")
-                excludes = e.get("exclude")
-                include_label = py_.get(disease_options_dict, f"{include[0]}.label")
+                includes = e.get("include", [])
+                excludes = e.get("exclude", [])
+                include_label = convert_disease_option_label(
+                    py_.get(disease_options_dict, includes[0]),
+                ).label
                 exclude_labels = ", ".join(
-                    [py_.get(disease_options_dict, f"{e}.label") for e in excludes],
+                    [
+                        convert_disease_option_label(
+                            py_.get(disease_options_dict, e),
+                        ).label
+                        for e in excludes
+                    ],
                 )
-                labels.append(
+                options.append(
                     {"value": e, "label": f"{include_label}-{exclude_labels}"},
                 )
-            return labels
+            return options
     return []
 
 
