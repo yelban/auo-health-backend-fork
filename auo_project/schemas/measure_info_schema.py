@@ -221,6 +221,8 @@ class MeasureInfoUpdate(BaseModel):
         title="右手節律異常類型; 無:null/止無定數:0/止有定數:1",
     )
     memo: str = Field(default=None, max_length=1024, title="檢測標記")
+    has_memo: bool = Field(default=None, title="是否有檢測標記")
+    has_bcq: bool = Field(default=None, title="是否有BCQ檢測")
     comment: str = Field(
         default=None,
         max_length=1024,
@@ -315,12 +317,19 @@ class MeasureDetailRead(BaseModel):
     strength_r_ch: int = Field(None, title="右尺力量; 無:null/無力:0/正常:1/有力:2")
 
     # report / info
-    width_l_cu: int = Field(None, title="左寸粗細; 無:null/細:0/正常:1/粗:2")
-    width_l_qu: int = Field(None, title="左關粗細; 無:null/細:0/正常:1/粗:2")
-    width_l_ch: int = Field(None, title="左尺粗細; 無:null/細:0/正常:1/粗:2")
-    width_r_cu: int = Field(None, title="右寸粗細; 無:null/細:0/正常:1/粗:2")
-    width_r_qu: int = Field(None, title="右關粗細; 無:null/細:0/正常:1/粗:2")
-    width_r_ch: int = Field(None, title="右尺粗細; 無:null/細:0/正常:1/粗:2")
+    width_l_cu: int = Field(None, title="左寸虛實; 無:null/虛:0/正常:1/實:2")
+    width_l_qu: int = Field(None, title="左關虛實; 無:null/虛:0/正常:1/實:2")
+    width_l_ch: int = Field(None, title="左尺虛實; 無:null/虛:0/正常:1/實:2")
+    width_r_cu: int = Field(None, title="右寸虛實; 無:null/虛:0/正常:1/實:2")
+    width_r_qu: int = Field(None, title="右關虛實; 無:null/虛:0/正常:1/實:2")
+    width_r_ch: int = Field(None, title="右尺虛實; 無:null/虛:0/正常:1/實:2")
+
+    width_value_l_cu: float = Field(None, title="左寸虛實值(時間，單位為秒)")
+    width_value_l_qu: float = Field(None, title="左關虛實值(時間，單位為秒)")
+    width_value_l_ch: float = Field(None, title="左尺虛實值(時間，單位為秒)")
+    width_value_r_cu: float = Field(None, title="右寸虛實值(時間，單位為秒)")
+    width_value_r_qu: float = Field(None, title="右關虛實值(時間，單位為秒)")
+    width_value_r_ch: float = Field(None, title="右尺虛實值(時間，單位為秒)")
 
     # tongue
     tongue: Tongue = Field({}, title="舌象資訊與圖片")

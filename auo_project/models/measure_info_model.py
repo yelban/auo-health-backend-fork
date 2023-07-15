@@ -191,6 +191,13 @@ class MeasureInfoBase(BaseModel):
     range_length_r_qu: float = Field(default=None, title="右關有效範圍長度(單位:mm)")
     range_length_r_ch: float = Field(default=None, title="右尺有效範圍長度(單位:mm)")
 
+    width_l_cu: int = Field(default=None, title="左寸虛實; 無:null/虛:0/正常:1/實:2")
+    width_l_qu: int = Field(default=None, title="左關虛實; 無:null/虛:0/正常:1/實:2")
+    width_l_ch: int = Field(default=None, title="左尺虛實; 無:null/虛:0/正常:1/實:2")
+    width_r_cu: int = Field(default=None, title="右寸虛實; 無:null/虛:0/正常:1/實:2")
+    width_r_qu: int = Field(default=None, title="右關虛實; 無:null/虛:0/正常:1/實:2")
+    width_r_ch: int = Field(default=None, title="右尺虛實; 無:null/虛:0/正常:1/實:2")
+
     static_max_amp_l_cu: float = Field(
         default=None,
         title="靜態壓有效範圍-左寸-最大振幅靜態壓值(單位:mmHg)",

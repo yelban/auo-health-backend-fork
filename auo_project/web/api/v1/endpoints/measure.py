@@ -14,7 +14,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
 from auo_project.core.config import settings
-from auo_project.core.utils import compare_cn_diff, get_hr_type
+from auo_project.core.utils import (
+    compare_cn_diff,
+    get_hr_type,
+    get_measure_strength,
+    get_measure_width,
+)
 from auo_project.web.api import deps
 
 router = APIRouter()
@@ -114,6 +119,7 @@ def get_scatter_chart(data):
     for c in names:
         df.loc[c] = pd.to_numeric(df[c], errors="coerce")
     df = df.dropna()
+    df = df.assign(depth=df.depth / 0.2)
 
     return {
         "static_amp": ScatterChart(
@@ -224,6 +230,7 @@ async def get_measure_summary(
     }
 
     all_sec = {
+        # 振幅與靜態壓
         "static_amp": {
             "l_cu": all_chart["l_cu"]["static_amp"],
             "l_qu": all_chart["l_qu"]["static_amp"],
@@ -232,6 +239,7 @@ async def get_measure_summary(
             "r_qu": all_chart["r_qu"]["static_amp"],
             "r_ch": all_chart["r_ch"]["static_amp"],
         },
+        # 振幅與時間
         "depth_amp": {
             "l_cu": all_chart["l_cu"]["depth_amp"],
             "l_qu": all_chart["l_qu"]["depth_amp"],
@@ -342,18 +350,60 @@ async def get_measure_summary(
             max_slope_value_r_cu=measure.max_slope_value_r_cu,
             max_slope_value_r_qu=measure.max_slope_value_r_qu,
             max_slope_value_r_ch=measure.max_slope_value_r_ch,
-            strength_l_cu=measure.strength_l_cu,
-            strength_l_qu=measure.strength_l_qu,
-            strength_l_ch=measure.strength_l_ch,
-            strength_r_cu=measure.strength_r_cu,
-            strength_r_qu=measure.strength_r_qu,
-            strength_r_ch=measure.strength_r_ch,
-            width_l_cu=measure.width_l_cu,
-            width_l_qu=measure.width_l_qu,
-            width_l_ch=measure.width_l_ch,
-            width_r_cu=measure.width_r_cu,
-            width_r_qu=measure.width_r_qu,
-            width_r_ch=measure.width_r_ch,
+            strength_l_cu=get_measure_strength(
+                measure.max_slope_value_l_cu,
+                measure.max_ampt_value_l_cu,
+            ),
+            strength_l_qu=get_measure_strength(
+                measure.max_slope_value_l_qu,
+                measure.max_ampt_value_l_qu,
+            ),
+            strength_l_ch=get_measure_strength(
+                measure.max_slope_value_l_ch,
+                measure.max_ampt_value_l_ch,
+            ),
+            strength_r_cu=get_measure_strength(
+                measure.max_slope_value_r_cu,
+                measure.max_ampt_value_r_cu,
+            ),
+            strength_r_qu=get_measure_strength(
+                measure.max_slope_value_r_qu,
+                measure.max_ampt_value_r_qu,
+            ),
+            strength_r_ch=get_measure_strength(
+                measure.max_slope_value_r_ch,
+                measure.max_ampt_value_r_ch,
+            ),
+            width_l_cu=get_measure_width(
+                measure.range_length_l_cu,
+                measure.max_ampt_value_l_cu,
+            ),
+            width_l_qu=get_measure_width(
+                measure.range_length_l_qu,
+                measure.max_ampt_value_l_qu,
+            ),
+            width_l_ch=get_measure_width(
+                measure.range_length_l_ch,
+                measure.max_ampt_value_l_ch,
+            ),
+            width_r_cu=get_measure_width(
+                measure.range_length_r_cu,
+                measure.max_ampt_value_r_cu,
+            ),
+            width_r_qu=get_measure_width(
+                measure.range_length_r_qu,
+                measure.max_ampt_value_r_qu,
+            ),
+            width_r_ch=get_measure_width(
+                measure.range_length_r_ch,
+                measure.max_ampt_value_r_ch,
+            ),
+            width_value_l_cu=round(measure.range_length_l_cu / 0.2, 1),
+            width_value_l_qu=round(measure.range_length_l_qu / 0.2, 1),
+            width_value_l_ch=round(measure.range_length_l_ch / 0.2, 1),
+            width_value_r_cu=round(measure.range_length_r_cu / 0.2, 1),
+            width_value_r_qu=round(measure.range_length_r_qu / 0.2, 1),
+            width_value_r_ch=round(measure.range_length_r_ch / 0.2, 1),
             comment=measure.comment,
             # TODO: changme
             bcq=schemas.BCQ(
@@ -891,6 +941,7 @@ async def update_measure_memo(
         )
     measure_in = schemas.MeasureInfoUpdate(
         memo=memo.content,
+        has_memo=isinstance(memo.content, str) and len(memo.content) > 0,
     )
     await crud.measure_info.update(
         db_session=db_session,

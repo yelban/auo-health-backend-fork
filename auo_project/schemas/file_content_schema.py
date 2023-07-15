@@ -20,32 +20,32 @@ class FileInfos(BaseModel):
     tongue: bool = Field(None, title="")  #
     measure_time: datetime
     measure_operator: str = Field(None, title="")  #
-    select_index_l_cu: int = Field(None)
+    select_index_l_cu: str = Field(None)  # 20230612 changed
     range_length_l_cu: float = Field(None)  # int
     max_ampt_index_l_cu: int = Field(None)
     max_ampt_value_l_cu: float = Field(None)
     irregular_hr_l_cu: bool = Field(None)
-    select_index_l_qu: int = Field(None)
+    select_index_l_qu: str = Field(None)  # 20230612 changed
     range_length_l_qu: float = Field(None)
     max_ampt_index_l_qu: int = Field(None)
     max_ampt_value_l_qu: float = Field(None)
     irregular_hr_l_qu: bool = Field(None)
-    select_index_l_ch: int = Field(None)
+    select_index_l_ch: str = Field(None)  # 20230612 changed
     range_length_l_ch: float = Field(None)  # int
     max_ampt_index_l_ch: int = Field(None)
     max_ampt_value_l_ch: float = Field(None)
     irregular_hr_l_ch: bool = Field(None)
-    select_index_r_cu: int = Field(None)
+    select_index_r_cu: str = Field(None)  # 20230612 changed
     range_length_r_cu: float = Field(None)  # int
     max_ampt_index_r_cu: int = Field(None)
     max_ampt_value_r_cu: float = Field(None)
     irregular_hr_r_cu: bool = Field(None)
-    select_index_r_qu: int = Field(None)
+    select_index_r_qu: str = Field(None)  # 20230612 changed
     range_length_r_qu: float = Field(None)  # int
     max_ampt_index_r_qu: int = Field(None)
     max_ampt_value_r_qu: float = Field(None)
     irregular_hr_r_qu: bool = Field(None)
-    select_index_r_ch: int = Field(None)
+    select_index_r_ch: str = Field(None)  # 20230612 changed
     range_length_r_ch: float = Field(None)
     max_ampt_index_r_ch: int = Field(None)
     max_ampt_value_r_ch: float = Field(None)
@@ -82,7 +82,7 @@ class FileInfos(BaseModel):
     special_r: str = Field(None)
     comment: str = Field(None)
 
-    @validator("birth_date", pre=True)
+    @validator("birth_date", always=True)
     def convert_birth_date(cls, v, values):
         if values.get("birthday"):
             try:
