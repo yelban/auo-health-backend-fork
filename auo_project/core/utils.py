@@ -1,7 +1,8 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from random import randrange
 from typing import Union
 
+import dateutil.parser
 from dateutil.relativedelta import relativedelta
 
 from auo_project import schemas
@@ -185,9 +186,24 @@ def safe_int(v):
         return None
 
 
+def safe_parse_dt(s):
+    try:
+        return dateutil.parser.parse(s)
+    except Exception as e:
+        print(e)
+        return None
+
+
 def get_date(text):
     try:
         return datetime.strptime(text, "%Y-%m-%d").date()
+    except:
+        return None
+
+
+def get_time(text):
+    try:
+        return datetime.strptime(text, "%H:%M").time()
     except:
         return None
 
@@ -197,6 +213,20 @@ def get_datetime(text):
         return datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
     except:
         return None
+
+
+def time_in_range(start, end, x):
+    """Return true if x is in the range [start, end]"""
+    try:
+        start = start if isinstance(start, time) else get_time(start)
+        end = end if isinstance(end, time) else get_time(end)
+        x = x if isinstance(x, time) else get_time(x)
+        if start <= end:
+            return start <= x <= end
+        else:
+            return start <= x or x <= end
+    except Exception as e:
+        print("error", e)
 
 
 def get_measure_strength(max_slop, max_amp_value):

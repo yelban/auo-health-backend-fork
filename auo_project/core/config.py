@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
+    UPLOAD_TIMEOUT: int = 60 * 60 * 24 * 1  # 1 day
 
     # Variables for the database
     DATABASE_USER: str
@@ -113,7 +114,7 @@ class Settings(BaseSettings):
     USER_PASSWORD1: str = ""
     USER_PASSWORD2: str = ""
 
-    MAX_SIZE_PER_UPLOAD: int = 1000
+    MAX_SIZE_PER_UPLOAD: int = 20
     MAX_SIZE_PER_FILE: int = 100
     ROWS_PER_PAGE: int = 500
     MAX_ROWS_PER_PAGE: int = 500

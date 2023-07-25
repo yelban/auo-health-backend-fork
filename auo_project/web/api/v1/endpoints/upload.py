@@ -1,13 +1,14 @@
+from datetime import datetime
 from typing import Any, List, Optional, Sequence
 from uuid import UUID
 
-import dateutil.parser
-import sqlmodel
+import sqlalchemy as sa
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.param_functions import Depends
 from pydantic import BaseModel
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload
-from sqlalchemy.sql import operators
+from sqlalchemy.sql.expression import cast
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -15,7 +16,7 @@ from auo_project import crud, models, schemas
 from auo_project.core.config import settings
 from auo_project.core.constants import FileStatusType, UploadStatusType
 from auo_project.core.pagination import Pagination
-from auo_project.core.query import OPERATOR_SPLITTER, OPERATORS
+from auo_project.core.utils import safe_int, safe_parse_dt
 from auo_project.models import File, Upload, User
 from auo_project.web.api import deps
 
@@ -121,7 +122,7 @@ class PageToBeFixed(BaseModel):
 
 @router.get("/", response_model=PageToBeFixed)
 async def get_upload_list(
-    upload_id: Optional[str] = Query(None, regex="exact__", title="上傳編號"),
+    upload_id: Optional[str] = Query(None, regex="(exact__|contains__)", title="上傳編號"),
     filename: Optional[str] = Query(None, regex="contains__", title="檔案名稱"),
     owner_name: Optional[str] = Query(None, regex="contains__", title="上傳者"),
     start_from: Optional[List[str]] = Query([], regex="(ge|le)__", title="上傳時間"),
@@ -130,17 +131,12 @@ async def get_upload_list(
         regex="in__",
         title="上傳狀態。請以,隔開值，例如: in__0,1,2",
     ),
-    file_status: Optional[str] = Query(
-        None,
-        regex="in__",
-        title="檔案狀態。請以,隔開值，例如: in__0,1,2",
-    ),
     is_valid: Optional[str] = Query(
         None,
         regex="in__",
         title="檔案驗證是否成功。請以,隔開值，例如: in__true,false",
     ),
-    pagniation: Pagination = Depends(),
+    pagination: Pagination = Depends(),
     sort_expr: Optional[str] = Query(
         "-start_from",
         title="排序。start_from 代表由小到大排。-start_from 代表由大到小排。",
@@ -157,7 +153,6 @@ async def get_upload_list(
     # TODO: upload_id change to contains
     if upload_id:
         upload_id = upload_id.replace("exact__", "contains__")
-    # TODO: filter dup file
 
     order_expr = None
     sort_model = None
@@ -181,63 +176,60 @@ async def get_upload_list(
         order_expr = (getattr(sort_model, order_by)(),)
 
     expressions = []
-    filter_list = [
-        (Upload.id, upload_id),
-        (File.name, filename),
-        (User.full_name, owner_name),
-        *[(Upload.start_from, exp) for exp in start_from],
-        (Upload.display_file_number, "gt__0"),
-        (Upload.upload_status, upload_status),
-        (File.file_status, file_status),
-        (File.is_valid, is_valid),
-    ]
 
-    expressions = []
-    for filter in filter_list:
-        print("filter ", filter)
-        col = filter[0]
-        op_name_value = filter[1]
-        if not op_name_value:
-            continue
-        if OPERATOR_SPLITTER in op_name_value:
-            op_name, value = op_name_value.rsplit(OPERATOR_SPLITTER, 1)
-            # TODO: fixme
-            if isinstance(col.expression.type, sqlmodel.sql.sqltypes.GUID):
-                if not isinstance(value, UUID):
-                    import sqlalchemy as sa
-                    from sqlalchemy.sql.expression import cast
+    start_from_ge_list = [exp for exp in start_from if "ge__" in exp]
+    start_from_le_list = [exp for exp in start_from if "le__" in exp]
+    start_from_ge = start_from_ge_list and start_from_ge_list[0].replace("ge__", "")
+    start_from_le = start_from_le_list and start_from_le_list[0].replace("le__", "")
 
-                    col = cast(col, sa.String)
-            elif col.expression.name in ("display_file_number"):
-                value = int(value)
-            elif col.expression.name in ("start_from"):
-                try:
-                    value = dateutil.parser.parse(value)
-                except Exception as e:
-                    print(e)
-                    raise HTTPException(422, "dateformat is not valid")
-            elif col.expression.name in ("upload_status", "file_status"):
-                import sqlalchemy as sa
+    upload_filters = {
+        "display_file_number__gt": 0,
+        "upload_status__in": list(
+            filter(
+                lambda x: x,
+                map(safe_int, upload_status.replace("in__", "").split(",")),
+            ),
+        )
+        if upload_status
+        else None,
+        "start_from__ge": safe_parse_dt(start_from_ge),
+        "start_from__le": safe_parse_dt(start_from_le),
+    }
+    upload_filters = dict(
+        [(k, v) for k, v in upload_filters.items() if v is not None and v != []],
+    )
+    upload_filter_expr = models.Upload.filter_expr(**upload_filters)
+    if upload_id:
+        upload_filter_expr.append(
+            cast(Upload.id, sa.String).contains(upload_id.replace("contains__", "")),
+        )
 
-                value = [
-                    int(x) if isinstance(col.expression.type, sa.Integer) else x
-                    for x in value.split(",")
-                ]
-            elif col.expression.name in ("is_valid"):
-                new_value = []
-                if "true" in value:
-                    new_value += [True]
-                if "false" in value:
-                    new_value += [False]
-                value = new_value
-            op = OPERATORS.get(op_name)
-            if not op:
-                raise Exception(f"cannot handle op {op}")
-        else:
-            op = operators.eq
-            value = op_name_value
-        print(op, col, type(col), value)
-        expressions.append(op(col, value))
+    user_filters = {
+        "full_name__contains": owner_name.replace("contains__", "")
+        if owner_name
+        else None,
+    }
+    user_filters = dict(
+        [(k, v) for k, v in user_filters.items() if v is not None and v != []],
+    )
+    user_filter_expr = models.User.filter_expr(**user_filters)
+
+    file_filters = {
+        "name__contains": filename.replace("contains__", "") if filename else None,
+    }
+    file_filters = dict(
+        [(k, v) for k, v in file_filters.items() if v is not None and v != []],
+    )
+    file_filter_expr = models.File.filter_expr(**file_filters)
+    if is_valid:
+        true_cond = File.is_valid == True
+        false_cond = and_(File.is_valid == False, File.is_dup == False).self_group()
+        if "true" in is_valid and "false" in is_valid:
+            file_filter_expr.append(or_(true_cond, false_cond))
+        elif "true" in is_valid:
+            file_filter_expr.append(true_cond)
+        elif "false" in is_valid:
+            file_filter_expr.append(false_cond)
 
     auth_cond = []
     group_names = [group.name for group in current_user.groups]
@@ -249,7 +241,12 @@ async def get_upload_list(
     elif "user" in group_names or "subject" in group_names:
         auth_cond.append(User.id == current_user.id)
 
-    expressions += auth_cond
+    expressions = [
+        *upload_filter_expr,
+        *file_filter_expr,
+        *user_filter_expr,
+        *auth_cond,
+    ]
     print("expressions", expressions)
 
     query = (
@@ -267,13 +264,13 @@ async def get_upload_list(
         query=query,
         order_expr=order_expr,
         unique=False,
-        skip=(pagniation.page - 1) * pagniation.per_page,
-        limit=pagniation.per_page,
+        skip=(pagination.page - 1) * pagination.per_page,
+        limit=pagination.per_page,
     )
     # TODO: FIXME
     resp = await db_session.execute(select(func.count()).select_from(query.subquery()))
     total_count = resp.scalar_one()
-    result = await pagniation.paginate2(total_count, items)
+    result = await pagination.paginate2(total_count, items)
     return result
 
 

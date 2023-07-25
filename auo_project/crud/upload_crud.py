@@ -1,6 +1,7 @@
 from typing import List, Optional
 from uuid import UUID
 
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud
@@ -119,6 +120,13 @@ class CRUDUpload(CRUDBase[Upload, UploadCreate, UploadUpdate]):
                 and not file.file_status in (FileStatusType.canceled.value,)
             ],
         )
+
+    async def get_uploading_upload(self, db_session: AsyncSession):
+        query = select(self.model).where(
+            self.model.upload_status == UploadStatusType.uploading.value,
+        )
+        response = await db_session.execute(query)
+        return response.scalars().all()
 
 
 upload = CRUDUpload(Upload)

@@ -1,5 +1,6 @@
 # file: root/__init__.py
 from asyncio import run
+from datetime import datetime
 from functools import wraps
 from uuid import UUID
 
@@ -81,12 +82,30 @@ async def create_user(
 @cli.async_command()
 async def rewrite_file(
     file_id: UUID,
+    overwrite: bool = False,
 ):
     """Rewrite file to Database"""
     db_session = SessionLocal()
     file = await crud.file.get(db_session=db_session, id=file_id)
-    await get_and_write(db_session=db_session, file_id=file.id, overwrite=True)
+    await get_and_write(db_session=db_session, file_id=file.id, overwrite=overwrite)
     typer.echo(f"rewrite file id {file_id}")
+
+
+@cli.async_command()
+async def rewrite_file_by_measure_time(
+    measure_time: datetime,
+    overwrite: bool = False,
+):
+    """Rewrite file to Database measure time greater than input"""
+    db_session = SessionLocal()
+    measures = await crud.measure_info.get_all_by_measure_time(
+        db_session=db_session,
+        measure_time=datetime.strptime(measure_time, "%Y-%m-%d"),
+    )
+    file_ids = [measure.file_id for measure in measures]
+    for file_id in file_ids:
+        await get_and_write(db_session=db_session, file_id=file_id, overwrite=overwrite)
+        typer.echo(f"rewrite file id {file_id}")
 
 
 @cli.command()

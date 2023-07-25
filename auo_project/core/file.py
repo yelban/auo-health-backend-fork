@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime
 from io import BytesIO, StringIO
 from os.path import abspath, dirname
 from os.path import join as joinpath
@@ -21,7 +22,11 @@ from auo_project.core.azure import (
     upload_internet_file,
 )
 from auo_project.core.config import settings
-from auo_project.core.constants import LOW_PASS_RATE_THRESHOLD, FileStatusType
+from auo_project.core.constants import (
+    LOW_PASS_RATE_THRESHOLD,
+    FileStatusType,
+    UploadStatusType,
+)
 from auo_project.core.security import decrypt
 from auo_project.core.utils import get_age, safe_divide, safe_substract
 from auo_project.db.session import SessionLocal

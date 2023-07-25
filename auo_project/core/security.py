@@ -377,12 +377,16 @@ class AuthJWT(AuthConfig):
 
         if type_token == "access":
             cookie_key = self._access_cookie_key
-            cookie = request.cookies.get(cookie_key)
+            cookie = request.cookies.get(cookie_key) or request.headers.get(
+                cookie_key.replace("_", "-"),
+            )
             csrf_token = request.headers.get(self._access_csrf_header_name)
             # print('access', cookie, csrf_token)
         if type_token == "refresh":
             cookie_key = self._refresh_cookie_key
-            cookie = request.cookies.get(cookie_key)
+            cookie = request.cookies.get(cookie_key) or request.headers.get(
+                cookie_key.replace("_", "-"),
+            )
             csrf_token = request.headers.get(self._refresh_csrf_header_name)
 
         if not cookie:
@@ -406,10 +410,10 @@ class AuthJWT(AuthConfig):
         if request and request.headers:
             is_localhost = "http://localhost:3000" in request.headers.get("origin", "")
         is_localhost = True
-        if self._cookie_csrf_protect and csrf_token and not is_localhost:
+        if self._cookie_csrf_protect and csrf_token and is_localhost is False:
             if request.method in self._csrf_methods:
                 if "csrf" not in self._decoded_token:
-                    raise JWTDecodeError(status_code=422, message="Missing claim: csrf")
+                    raise JWTDecodeError(status_code=401, message="Missing claim: csrf")
                 if not hmac.compare_digest(csrf_token, self._decoded_token["csrf"]):
                     raise CSRFError(
                         status_code=401,
@@ -474,7 +478,7 @@ class AuthJWT(AuthConfig):
         try:
             unverified_headers = self.get_unverified_jwt_headers(encoded_token)
         except Exception as err:
-            raise InvalidHeaderError(status_code=422, message=str(err))
+            raise InvalidHeaderError(status_code=401, message=str(err))
 
         try:
             # secret_key = self._secret_key
@@ -492,7 +496,7 @@ class AuthJWT(AuthConfig):
                 algorithms=algorithms,
             )
         except Exception as err:
-            raise JWTDecodeError(status_code=422, message=str(err))
+            raise JWTDecodeError(status_code=401, message=str(err))
 
     def _verify_jwt_in_request(
         self,
@@ -522,9 +526,9 @@ class AuthJWT(AuthConfig):
         if decoded_token["type"] != type_token:
             msg = "Only {} tokens are allowed".format(type_token)
             if type_token == "access":
-                raise AccessTokenRequired(status_code=422, message=msg)
+                raise AccessTokenRequired(status_code=401, message=msg)
             if type_token == "refresh":
-                raise RefreshTokenRequired(status_code=422, message=msg)
+                raise RefreshTokenRequired(status_code=401, message=msg)
 
         if fresh and not decoded_token["fresh"]:
             raise FreshTokenRequired(status_code=401, message="Fresh token required")
@@ -581,10 +585,10 @@ class AuthJWT(AuthConfig):
         is_localhost = True
         if self._cookie_csrf_protect and csrf_token and not is_localhost:
             if "csrf" not in self._decoded_token:
-                raise JWTDecodeError(status_code=422, message="Missing claim: csrf")
+                raise JWTDecodeError(status_code=401, message="Missing claim: csrf")
             if "fingerprint" not in self._decoded_token:
                 raise JWTDecodeError(
-                    status_code=422,
+                    status_code=401,
                     message="Missing claim: fingerprint",
                 )
             if not hmac.compare_digest(csrf_token, self._decoded_token["csrf"]):

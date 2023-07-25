@@ -134,14 +134,14 @@ async def get_subject(
         db_session=db_session,
         query=query,
         order_expr=order_expr,
-        skip=(pagniation.page - 1) * pagniation.per_page,
-        limit=pagniation.per_page,
+        skip=(pagination.page - 1) * pagination.per_page,
+        limit=pagination.per_page,
     )
     resp = await db_session.execute(select(func.count()).select_from(query.subquery()))
     total_count = resp.scalar_one()
 
     return SubjectListResponse(
-        subject=await pagniation.paginate2(total_count, items),
+        subject=await pagination.paginate2(total_count, items),
         measure_times=MEASURE_TIMES,
     )
 
@@ -188,7 +188,7 @@ async def get_subject_measures(
         title="measure_time 代表由小到大排。-measure_time 代表由大到小排。",
     ),
     dateutils: DateUtils = Depends(),
-    pagniation: Pagination = Depends(),
+    pagination: Pagination = Depends(),
     *,
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
@@ -275,8 +275,8 @@ async def get_subject_measures(
         order_expr=order_expr,
         relations=["org"],
         unique=False,
-        skip=(pagniation.page - 1) * pagniation.per_page,
-        limit=pagniation.per_page,
+        skip=(pagination.page - 1) * pagination.per_page,
+        limit=pagination.per_page,
     )
 
     measures = [
@@ -299,7 +299,7 @@ async def get_subject_measures(
 
     resp = await db_session.execute(select(func.count()).select_from(query.subquery()))
     total_count = resp.scalar_one()
-    page_result = await pagniation.paginate2(total_count, measures)
+    page_result = await pagination.paginate2(total_count, measures)
 
     # TODO: user, division mapping
     org_names = [{"value": current_user.org.id, "key": current_user.org.name}]
