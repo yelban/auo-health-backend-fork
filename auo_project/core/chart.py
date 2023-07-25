@@ -100,6 +100,8 @@ def get_data_range():
 
 
 def get_data_range_from_data(data):
+    if not data:
+        return [0, 0]
     min_value = floor(min([e["y"][0] for e in data]))
     max_value = (
         ceil(max([e["y"][-1] for e in data]) * 1.2)
@@ -110,8 +112,6 @@ def get_data_range_from_data(data):
         min_value = min_value * 1.2
     else:
         min_value = min_value * 0.8
-    # print(data_range, min_value, max_value)
-    # data_range = [min(min_value, data_range[0]), max(max_value, data_range[1])]
     data_range = [min_value, max_value]
     return data_range
 
