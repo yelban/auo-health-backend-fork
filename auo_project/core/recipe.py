@@ -118,8 +118,6 @@ def handle_date_related_params(loaded_value, component_names):
         end = loaded_value["end"]
         if not (is_valid_hour(start) and is_valid_hour(end)):
             raise ValueError(f"{start} or {end} is not valid hour format (HH:MM)")
-        elif start > end:
-            raise ValueError(f"start: {start} is greater than end: {end}")
         return json.dumps(loaded_value), "calendar_date"
 
 
