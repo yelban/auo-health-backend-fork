@@ -517,7 +517,7 @@ async def process_file(
     )
 
     bmi = None
-    if isinstance(infos.height, int) and isinstance(infos.weight, int):
+    if isinstance(infos.height, float) and isinstance(infos.weight, float):
         bmi = safe_divide(infos.weight, (infos.height / 100) ** 2)
 
     if measure_info:

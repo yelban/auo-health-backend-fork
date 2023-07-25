@@ -51,8 +51,8 @@ class FileInfos(BaseModel):
     max_ampt_value_r_ch: float = Field(None)
     irregular_hr_r_ch: bool = Field(None)
     sex: int = Field(None)
-    height: int = Field(None)
-    weight: int = Field(None)
+    height: float = Field(None)
+    weight: float = Field(None)
     # BMI: float
     sbp: int = Field(None)  # SBP
     dbp: int = Field(None)  # DBP
@@ -405,8 +405,8 @@ class FileReport(BaseModel):
     measure_time: str
     measure_operator: str = Field(None)
     sex: int = Field(None)
-    height: int = Field(None)
-    weight: int = Field(None)
+    height: float = Field(None)
+    weight: float = Field(None)
     sbp: int = Field(None, title="SBP")
     dbp: int = Field(None, title="DBP")
     judge_time: str = Field(None)
