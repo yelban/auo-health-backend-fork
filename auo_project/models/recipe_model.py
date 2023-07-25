@@ -25,6 +25,11 @@ class RecipeBase(BaseModel):
         title="圖表設定",
         sa_column=Column(JSON),
     )
+    analytical_unique_options: Optional[Dict[str, Any]] = Field(
+        None,
+        title="分析選項不重複值",
+        sa_column=Column(JSON),
+    )
 
 
 class Recipe(BaseUUIDModel, BaseTimestampModel, RecipeBase, table=True):

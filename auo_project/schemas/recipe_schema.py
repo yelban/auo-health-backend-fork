@@ -24,6 +24,7 @@ class RecipeCreate(BaseModel):
     subject_num_snapshot: Optional[int] = None
     snapshot_at: Optional[datetime] = None
     chart_settings: Optional[List[Dict[str, Any]]] = []
+    analytical_unique_options: Optional[Dict[str, Any]] = []
     is_active: bool = False
 
 
@@ -34,6 +35,7 @@ class RecipeUpdate(BaseModel):
     snapshot_at: Optional[datetime] = None
     is_active: Optional[bool] = None
     chart_settings: Optional[List[Dict[str, Any]]] = []
+    analytical_unique_options: Optional[Dict[str, Any]] = []
 
 
 class RecipeListResponse(BaseModel):
