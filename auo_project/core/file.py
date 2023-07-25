@@ -447,6 +447,10 @@ async def process_file(
         print("no result")
         return
 
+    if result_dict.get("error_msg"):
+        print("file error: ", e)
+        return {"error_msg": result_dict["error_msg"]}
+
     checked = data_integrity_check(result_dict)
     if not checked:
         raise Exception("checked error")
