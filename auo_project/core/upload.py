@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import HTTPException
 
@@ -10,6 +10,44 @@ from auo_project.core.file import get_and_write
 from auo_project.schemas.file_schema import FileUpdate
 from auo_project.schemas.upload_schema import UploadUpdate
 from auo_project.web.api import deps
+
+
+async def update_uploading_upload_status():
+    async with deps.get_db2() as db_session:
+        uploads = await crud.upload.get_uploading_upload(db_session=db_session)
+        for upload in uploads:
+            is_all_files_success = await crud.upload.is_files_all_success(
+                db_session=db_session,
+                upload_id=upload.id,
+            )
+            display_file_number = await crud.upload.get_display_file_number(
+                db_session=db_session,
+                upload_id=upload.id,
+            )
+            if is_all_files_success:
+                upload_in = UploadUpdate(
+                    upload_status=UploadStatusType.success.value,
+                    end_to=datetime.utcnow(),
+                    display_file_number=display_file_number,
+                )
+                await crud.upload.update(
+                    db_session=db_session,
+                    obj_current=upload,
+                    obj_new=upload_in,
+                )
+            elif upload.created_at < (
+                datetime.utcnow() - timedelta(seconds=settings.UPLOAD_TIMEOUT)
+            ):
+                upload_in = UploadUpdate(
+                    upload_status=UploadStatusType.failed.value,
+                    end_to=datetime.utcnow(),
+                    display_file_number=display_file_number,
+                )
+                await crud.upload.update(
+                    db_session=db_session,
+                    obj_current=upload,
+                    obj_new=upload_in,
+                )
 
 
 async def post_finish(arbitrary_json):
@@ -104,11 +142,24 @@ async def post_finish(arbitrary_json):
                     obj_new=upload_in,
                 )
 
+            display_file_number = await crud.upload.get_display_file_number(
+                db_session=db_session,
+                upload_id=file.upload_id,
+            )
+            upload_in = UploadUpdate(display_file_number=display_file_number)
+            await crud.upload.update(
+                db_session=db_session,
+                obj_current=file.upload,
+                obj_new=upload_in,
+            )
+
             await get_and_write(db_session=db_session, file_id=file.id)
 
             return {"msg": "ok"}
         except Exception as e:
-            print("error:", e)
+            import traceback
+
+            traceback.print_exc()
             if file:
                 file_in = FileUpdate(
                     file_status=FileStatusType.failed.value,

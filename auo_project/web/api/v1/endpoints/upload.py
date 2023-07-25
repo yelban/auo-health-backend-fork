@@ -292,5 +292,26 @@ async def cancel_upload(
     upload = await crud.upload.get(db_session=db_session, id=upload_id)
     if not upload:
         raise HTTPException(status_code=404, detail=f"Not found upload id: {upload_id}")
-    upload = await crud.upload.cancel(db_session=db_session, upload_id=upload_id)
+
+    is_all_files_success = await crud.upload.is_files_all_success(
+        db_session=db_session,
+        upload_id=upload.id,
+    )
+    display_file_number = await crud.upload.get_display_file_number(
+        db_session=db_session,
+        upload_id=upload.id,
+    )
+    if is_all_files_success:
+        upload_in = schemas.UploadUpdate(
+            upload_status=UploadStatusType.success.value,
+            end_to=datetime.utcnow(),
+            display_file_number=display_file_number,
+        )
+        await crud.upload.update(
+            db_session=db_session,
+            obj_current=upload,
+            obj_new=upload_in,
+        )
+    else:
+        upload = await crud.upload.cancel(db_session=db_session, upload_id=upload_id)
     return upload

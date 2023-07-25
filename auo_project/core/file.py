@@ -1009,17 +1009,37 @@ async def get_and_write(
             error_msg = result.get("error_msg", "")
             if error_msg:
                 file_in = schemas.FileUpdate(
-                    file_status=FileStatusType.success,
+                    file_status=FileStatusType.success.value,
                     is_valid=False,
                     memo=error_msg,
                 )
         else:
             file_in = schemas.FileUpdate(
-                file_status=FileStatusType.success,
+                file_status=FileStatusType.success.value,
                 is_valid=True,
                 memo="",
             )
         await crud.file.update(db_session=db_session, obj_current=file, obj_new=file_in)
+        is_all_files_success = await crud.upload.is_files_all_success(
+            db_session=db_session,
+            upload_id=file.upload_id,
+        )
+
+        if is_all_files_success:
+            display_file_number = await crud.upload.get_display_file_number(
+                db_session=db_session,
+                upload_id=file.upload_id,
+            )
+            upload_in = schemas.UploadUpdate(
+                upload_status=UploadStatusType.success.value,
+                end_to=datetime.utcnow(),
+                display_file_number=display_file_number,
+            )
+            await crud.upload.update(
+                db_session=db_session,
+                obj_current=file.upload,
+                obj_new=upload_in,
+            )
 
 
 async def process_dir(dir: str):

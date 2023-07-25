@@ -106,5 +106,19 @@ class CRUDUpload(CRUDBase[Upload, UploadCreate, UploadUpdate]):
             )
         )
 
+    async def get_display_file_number(self, db_session: AsyncSession, upload_id: UUID):
+        upload = await super().get(db_session=db_session, id=upload_id)
+        if not upload:
+            return 0
+        return sum(
+            [
+                file.file_status
+                in (FileStatusType.success.value, FileStatusType.uploading.value)
+                for file in upload.all_files
+                if not (file.is_dup and file.file_status == FileStatusType.init.value)
+                and not file.file_status in (FileStatusType.canceled.value,)
+            ],
+        )
+
 
 upload = CRUDUpload(Upload)
