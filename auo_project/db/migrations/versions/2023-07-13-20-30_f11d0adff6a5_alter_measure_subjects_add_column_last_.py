@@ -39,7 +39,7 @@ def upgrade() -> None:
         "subjects",
         sa.Column(
             "proj_num",
-            sqlmodel.DateTime,
+            sqlmodel.String(128),
             nullable=True,
         ),
         schema="measure",
