@@ -35,6 +35,10 @@ Like this:
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --project-directory . up
 ```
 
+```bash
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prd.yml --project-directory . up
+```
+
 This command exposes the web application on port 8000, mounts current directory and enables autoreload.
 
 But you have to rebuild image every time you modify `poetry.lock` or `pyproject.toml` with this command:
@@ -205,5 +209,16 @@ poetry run python -m auo_project.cli shell
 
 ## Streamlit
 ```bash
-PYTHONPATH=$PWD poetry run streamlit run -m auo_project/streamlit/web_app.py
+PYTHONPATH=$PWD poetry run streamlit run auo_project/streamlit/web_app.py
+```
+
+## rewrite_file
+```
+await rewrite_file("c3d30600-9f91-45fc-9d98-0a16986646d6")
+```
+
+
+## zip files
+```
+find . -d 1 -type dir -exec zip -r {}.zip {} \;
 ```
