@@ -19,6 +19,7 @@ from auo_project.core.utils import (
     get_hr_type,
     get_measure_strength,
     get_measure_width,
+    safe_divide,
 )
 from auo_project.web.api import deps
 
@@ -289,6 +290,13 @@ async def get_measure_summary(
         },
     }
 
+    width_value_l_cu = safe_divide(measure.range_length_l_cu, 0.2)
+    width_value_l_qu = safe_divide(measure.range_length_l_qu, 0.2)
+    width_value_l_ch = safe_divide(measure.range_length_l_ch, 0.2)
+    width_value_r_cu = safe_divide(measure.range_length_r_cu, 0.2)
+    width_value_r_qu = safe_divide(measure.range_length_r_qu, 0.2)
+    width_value_r_ch = safe_divide(measure.range_length_r_ch, 0.2)
+
     return schemas.MeasureDetailResponse(
         subject=schemas.SubjectRead(
             **jsonable_encoder(subject),
@@ -403,12 +411,12 @@ async def get_measure_summary(
                 measure.range_length_r_ch,
                 measure.max_amp_value_r_ch,
             ),
-            width_value_l_cu=round(measure.range_length_l_cu / 0.2, 1),
-            width_value_l_qu=round(measure.range_length_l_qu / 0.2, 1),
-            width_value_l_ch=round(measure.range_length_l_ch / 0.2, 1),
-            width_value_r_cu=round(measure.range_length_r_cu / 0.2, 1),
-            width_value_r_qu=round(measure.range_length_r_qu / 0.2, 1),
-            width_value_r_ch=round(measure.range_length_r_ch / 0.2, 1),
+            width_value_l_cu=round(width_value_l_cu, 1) if width_value_l_cu else None,
+            width_value_l_qu=round(width_value_l_qu, 1) if width_value_l_qu else None,
+            width_value_l_ch=round(width_value_l_ch, 1) if width_value_l_ch else None,
+            width_value_r_cu=round(width_value_r_cu, 1) if width_value_r_cu else None,
+            width_value_r_qu=round(width_value_r_qu, 1) if width_value_r_qu else None,
+            width_value_r_ch=round(width_value_r_ch, 1) if width_value_r_ch else None,
             comment=measure.comment,
             # TODO: changme
             bcq=schemas.BCQ(
