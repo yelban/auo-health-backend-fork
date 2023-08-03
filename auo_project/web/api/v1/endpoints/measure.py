@@ -165,6 +165,11 @@ async def get_measure_summary(
             status_code=400,
             detail=f"Not found measure id: {measure_id}",
         )
+    if measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
 
     subject = measure.subject
     standard_measure_info = None
@@ -898,6 +903,12 @@ async def get_measure_six_sec_pw(
             detail=f"Not found measure id: {measure_id}",
         )
 
+    if measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
     def gen_data(content):
         if not content:
             return LineChart(data=[], x_field="x", y_field="y")
@@ -939,6 +950,13 @@ async def update_measure_memo(
             status_code=400,
             detail=f"Not found measure id: {measure_id}",
         )
+
+    if measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
     measure_in = schemas.MeasureInfoUpdate(
         memo=memo.content,
         has_memo=isinstance(memo.content, str) and len(memo.content) > 0,
@@ -969,6 +987,13 @@ async def update_measure_comment(
             status_code=400,
             detail=f"Not found measure id: {measure_id}",
         )
+
+    if measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
     measure_in = schemas.MeasureInfoUpdate(
         comment=comment.content,
     )
@@ -1003,6 +1028,13 @@ async def update_measure_tongue_info(
             status_code=400,
             detail=f"Not found tongue of measure id: {measure_id}",
         )
+
+    if measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
     tongue_in = schemas.MeasureTongueUpdate(
         tongue_color=tongue_info.tongue_color,
         tongue_shap=tongue_info.tongue_shap if tongue_info.tongue_shap else None,
@@ -1041,6 +1073,13 @@ async def update_measure_irregular_hr(
             status_code=400,
             detail=f"Not found measure id: {measure_id}",
         )
+
+    if measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
     irregular_hr_type_l = None
     irregular_hr_type_r = None
     if measure.irregular_hr_l == 1 and irregular_hr.side == 0:
