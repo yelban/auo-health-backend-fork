@@ -88,6 +88,8 @@ class CNChart(BaseModel):
 
 
 def get_poly_points(x, y, degree, step):
+    if x.shape[0] == 0 or y.shape[0] == 0:
+        return []
     p = Polynomial.fit(x, y, deg=degree)
     points = [
         [round(i, 1), round(p(i), 1)]
