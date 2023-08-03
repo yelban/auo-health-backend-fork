@@ -312,7 +312,7 @@ async def get_subject_measures(
     org_names = [{"value": current_user.org.id, "key": current_user.org.name}]
 
     measure_operators_query = select(
-        func.distinct(MeasureInfo.measure_operator),
+        func.distinct(base_query.c.measure_operator),
     ).select_from(base_query.subquery())
     measure_operators_result = await db_session.execute(measure_operators_query)
     measure_operators = [
@@ -321,7 +321,7 @@ async def get_subject_measures(
         if operator[0]
     ]
 
-    consult_dr_query = select(func.distinct(MeasureInfo.judge_dr)).select_from(
+    consult_dr_query = select(func.distinct(base_query.c.judge_dr)).select_from(
         base_query.subquery(),
     )
     consult_drs_result = await db_session.execute(consult_dr_query)
@@ -331,7 +331,7 @@ async def get_subject_measures(
         if consult_dr[0]
     ]
 
-    proj_nums_query = select(func.distinct(MeasureInfo.proj_num)).select_from(
+    proj_nums_query = select(func.distinct(base_query.c.proj_num)).select_from(
         base_query.subquery(),
     )
     proj_nums_result = await db_session.execute(proj_nums_query)
