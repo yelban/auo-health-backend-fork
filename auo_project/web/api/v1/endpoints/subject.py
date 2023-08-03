@@ -70,7 +70,7 @@ async def get_subject(
         title="指定月份",
     ),
     dateutils: DateUtils = Depends(),
-    pagniation: Pagination = Depends(),
+    pagination: Pagination = Depends(),
     *,
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
