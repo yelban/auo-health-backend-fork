@@ -108,6 +108,12 @@ async def get_subject(
             "measure_time__le": end_date,
         },
     )
+    org_fileters = get_filters(
+        {
+            "org_id": current_user.org_id,
+        },
+    )
+    org_expressions = models.MeasureInfo.filter_expr(**org_fileters)
     time_expressions = models.MeasureInfo.filter_expr(**time_filters)
     if specific_months:
         time_expressions.append(
@@ -116,7 +122,7 @@ async def get_subject(
     subquery = (
         select(models.Subject)
         .join(MeasureInfo)
-        .where(*time_expressions)
+        .where(*time_expressions, *org_expressions)
         .distinct()
         .subquery()
     )
@@ -255,6 +261,7 @@ async def get_subject_measures(
             "has_memo__in": has_memos,
             "has_bcq__in": has_bcqs,
             "has_low_pass_rate__in": has_low_pass_rate,
+            "org_id": current_user.org_id,
         },
     )
     print("filters", filters)
