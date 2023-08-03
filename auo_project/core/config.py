@@ -113,6 +113,7 @@ class Settings(BaseSettings):
     USER_DEFAULT_PASSWORD: str
     USER_PASSWORD1: str = ""
     USER_PASSWORD2: str = ""
+    TPH_PASSWORD: str = ""
 
     MAX_SIZE_PER_UPLOAD: int = 20
     MAX_SIZE_PER_FILE: int = 100

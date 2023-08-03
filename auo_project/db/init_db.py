@@ -90,6 +90,7 @@ async def init_db(db_session: AsyncSession) -> None:
         OrgCreate(name="x_medical_center", description="X Medical Center"),
         OrgCreate(name=settings.FIRST_SUPERUSER_ORG_NAME, description="First Org"),
         OrgCreate(name="y_medical_center", description="Y Medical Center"),
+        OrgCreate(name="tph", description="部北醫院"),
     ]
 
     for action in actions:
@@ -246,6 +247,19 @@ async def init_db(db_session: AsyncSession) -> None:
                 full_name="Helen",
                 mobile="",
                 email="helen.hua@auo.com",
+                is_active=True,
+                is_superuser=False,
+            ),
+            "group_name": "manager",
+        },
+        {
+            "data": UserCreate(
+                username="chief@tph.tw",
+                password=settings.TPH_PASSWORD,
+                org_id=current_orgs[4].id,
+                full_name="部北管理員",
+                mobile="",
+                email="chief@tph.tw",
                 is_active=True,
                 is_superuser=False,
             ),
