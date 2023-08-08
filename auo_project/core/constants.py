@@ -40,6 +40,23 @@ class FileStatusType(IntEnum):
     canceled = 4
 
 
+HAND_TYPE_LABEL = {
+    "l": "左",
+    "r": "右",
+}
+
+POSITION_TYPE_LABEL = {
+    "cu": "寸",
+    "qu": "關",
+    "ch": "尺",
+}
+
+RANGE_TYPE_LABEL = {
+    0: "浮",
+    1: "中",
+    2: "沉",
+}
+
 SEX_TYPE_LABEL = {
     0: "男",
     1: "女",

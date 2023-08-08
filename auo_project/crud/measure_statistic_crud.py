@@ -93,9 +93,21 @@ class CRUDMeasureStatistic(
         return MeasureStatisticFlat(**result)
 
     def get_flat_statistic_model2(self, statistic_dict: dict) -> MeasureStatisticFlat:
-        cols = ["h1", "h1_div_t1", "w1", "w1_div_t", "t1_div_t", "pw", "a0", "hr"] + [
-            f"c{i}" for i in range(1, 12)
-        ]
+        cols = (
+            [
+                "pass_rate",
+                "h1",
+                "h1_div_t1",
+                "w1",
+                "w1_div_t",
+                "t1_div_t",
+                "pw",
+                "a0",
+                "hr",
+            ]
+            + [f"c{i}" for i in range(1, 12)]
+            + [f"p{i}" for i in range(1, 12)]
+        )
         result = {}
         for hand_pos, statistic in statistic_dict.items():
             for col in cols:
