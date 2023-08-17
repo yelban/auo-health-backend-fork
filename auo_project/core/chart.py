@@ -152,8 +152,10 @@ def get_random_data(min, max):
 
 
 def get_box_plot_data(data_list):
-    if len(data_list) < 2:
-        return [0, 0, 0, 0, 0]
+    if len(data_list) == 0:
+        return [0] * 5
+    elif len(data_list) < 2:
+        return [data_list[0]] * 5
     q1, q2, q3 = quantiles(data_list, n=4)
     lower = q1 - 1.5 * (q3 - q1)
     upper = q3 + 1.5 * (q3 - q1)
