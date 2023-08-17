@@ -197,7 +197,7 @@ def find_component_path(field, component_name, result_list=[], path="") -> List[
 
 def find_all_component_names(parameter) -> List[str]:
     component_names = []
-    if parameter.get("type") == "group":
+    if parameter.get("type") == "group" and parameter.get("subField"):
         for field in parameter["subField"]:
             component_names += find_all_component_names(field)
     else:
