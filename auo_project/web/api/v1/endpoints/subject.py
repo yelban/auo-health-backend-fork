@@ -1238,3 +1238,418 @@ async def get_multi_measure_summary_data(
             "Content-Type": "application/octet-stream",
         },
     )
+
+
+@router.post(
+    "/multi_measures/export_by_ids",
+    response_model=schemas.MultiMeasureDetailResponse,
+)
+async def get_multi_measure_by_ids(
+    body: MultiMeasuresBody,
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure_ids = body.measure_ids
+    measures_infos = await crud.measure_info.get_by_ids(
+        db_session=db_session,
+        list_ids=measure_ids,
+        relations=["bcq"],
+    )
+    subject_list = [
+        await crud.subject.get(db_session=db_session, id=measure.subject_id)
+        for measure in measures_infos
+    ]
+
+    measures_infos = py_.sort(
+        measures_infos,
+        key=lambda item: item.measure_time,
+        reverse=False,
+    )
+
+    mean_statistic_dict = (
+        await crud.measure_statistic.get_flat_dict_by_ids_and_statistics(
+            db_session=db_session,
+            measure_ids=measure_ids,
+            statistic_name="MEAN",
+        )
+    )
+    # TODO: optimize because only used by pw, CNCV
+    cv_statistic_dict = (
+        await crud.measure_statistic.get_flat_dict_by_ids_and_statistics(
+            db_session=db_session,
+            measure_ids=measure_ids,
+            statistic_name="CV",
+        )
+    )
+    # TODO: optimize because only used by PNSD
+    std_statistic_dict = (
+        await crud.measure_statistic.get_flat_dict_by_ids_and_statistics(
+            db_session=db_session,
+            measure_ids=measure_ids,
+            statistic_name="STD",
+        )
+    )
+
+    mean_statistic_model_dict = {}
+    for key, val in mean_statistic_dict.items():
+        mean_statistic_model_dict[
+            key
+        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+
+    cv_statistic_model_dict = {}
+    for key, val in cv_statistic_dict.items():
+        cv_statistic_model_dict[key] = crud.measure_statistic.get_flat_statistic_model2(
+            val,
+        )
+
+    std_statistic_model_dict = {}
+    for key, val in std_statistic_dict.items():
+        std_statistic_model_dict[
+            key
+        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+
+    hands = ["r", "l"]
+    positions = ["cu", "qu", "ch"]
+
+    file1_records = [
+        schemas.DF1Schema(
+            measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
+            number=subject_list[idx].number,
+            birth_date=subject_list[idx].birth_date.strftime("%Y-%m-%d")
+            if subject_list[idx].birth_date
+            else None,
+            sex_label=SEX_TYPE_LABEL.get(subject_list[idx].sex),
+            bmi=measure.bmi,
+            hand=HAND_TYPE_LABEL.get(hand),
+            position=POSITION_TYPE_LABEL.get(position),
+            pass_rate=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"pass_rate_{hand}_{position}",
+            ),
+            hr=py_.get(measure, f"hr_{hand}"),
+            range=RANGE_TYPE_LABEL.get(
+                py_.get(measure, f"max_amp_depth_of_range_{hand}_{position}"),
+            ),
+            static_max_amp=py_.get(measure, f"max_amp_value_{hand}_{position}"),
+            max_slope_value=py_.get(measure, f"max_slope_value_{hand}_{position}"),
+            width=safe_divide(py_.get(measure, f"xingcheng_{hand}_{position}"), 0.2),
+            h1=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"h1_{hand}_{position}",
+            ),
+            h1_div_t1=safe_divide(
+                py_.get(
+                    mean_statistic_model_dict.get(measure.id),
+                    f"h1_div_t1_{hand}_{position}",
+                ),
+                1000,
+            ),
+            w1=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"w1_{hand}_{position}",
+            ),
+            w1_div_t=safe_divide(
+                py_.get(
+                    mean_statistic_model_dict.get(measure.id),
+                    f"w1_div_t_{hand}_{position}",
+                ),
+                1000,
+            ),
+            t1_div_t=safe_divide(
+                py_.get(
+                    mean_statistic_model_dict.get(measure.id),
+                    f"t1_div_t_{hand}_{position}",
+                ),
+                1000,
+            ),
+            pw=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"pw_{hand}_{position}",
+            ),
+            pwcv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"pw_{hand}_{position}",
+            ),
+            a0=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"a0_{hand}_{position}",
+            ),
+            c1_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c1_{hand}_{position}",
+            ),
+            c2_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c2_{hand}_{position}",
+            ),
+            c3_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c3_{hand}_{position}",
+            ),
+            c4_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c4_{hand}_{position}",
+            ),
+            c5_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c5_{hand}_{position}",
+            ),
+            c6_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c6_{hand}_{position}",
+            ),
+            c7_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c7_{hand}_{position}",
+            ),
+            c8_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c8_{hand}_{position}",
+            ),
+            c9_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c9_{hand}_{position}",
+            ),
+            c10_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c10_{hand}_{position}",
+            ),
+            c11_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c11_{hand}_{position}",
+            ),
+            c12_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"c12_{hand}_{position}",
+            ),
+            c1_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c1_{hand}_{position}",
+            ),
+            c2_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c2_{hand}_{position}",
+            ),
+            c3_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c3_{hand}_{position}",
+            ),
+            c4_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c4_{hand}_{position}",
+            ),
+            c5_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c5_{hand}_{position}",
+            ),
+            c6_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c6_{hand}_{position}",
+            ),
+            c7_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c7_{hand}_{position}",
+            ),
+            c8_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c8_{hand}_{position}",
+            ),
+            c9_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c9_{hand}_{position}",
+            ),
+            c10_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c10_{hand}_{position}",
+            ),
+            c11_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c11_{hand}_{position}",
+            ),
+            c12_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c12_{hand}_{position}",
+            ),
+            p1_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p1_{hand}_{position}",
+            ),
+            p2_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p2_{hand}_{position}",
+            ),
+            p3_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p3_{hand}_{position}",
+            ),
+            p4_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p4_{hand}_{position}",
+            ),
+            p5_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p5_{hand}_{position}",
+            ),
+            p6_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p6_{hand}_{position}",
+            ),
+            p7_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p7_{hand}_{position}",
+            ),
+            p8_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p8_{hand}_{position}",
+            ),
+            p9_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p9_{hand}_{position}",
+            ),
+            p10_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p10_{hand}_{position}",
+            ),
+            p11_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p11_{hand}_{position}",
+            ),
+            p12_mean=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"p12_{hand}_{position}",
+            ),
+            p1_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p1_{hand}_{position}",
+            ),
+            p2_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p2_{hand}_{position}",
+            ),
+            p3_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p3_{hand}_{position}",
+            ),
+            p4_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p4_{hand}_{position}",
+            ),
+            p5_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p5_{hand}_{position}",
+            ),
+            p6_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p6_{hand}_{position}",
+            ),
+            p7_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p7_{hand}_{position}",
+            ),
+            p8_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p8_{hand}_{position}",
+            ),
+            p9_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p9_{hand}_{position}",
+            ),
+            p10_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p10_{hand}_{position}",
+            ),
+            p11_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p11_{hand}_{position}",
+            ),
+            p12_std=py_.get(
+                std_statistic_model_dict.get(measure.id),
+                f"p12_{hand}_{position}",
+            ),
+        )
+        for idx, measure in enumerate(measures_infos)
+        for position in positions
+        for hand in hands
+    ]
+
+    df2_columns = [
+        ("yang", "陰虛", ""),
+        ("yin", "陽虛", ""),
+        ("phlegm", "痰瘀", ""),
+        ("yin_head", "陰虛次因子", "頭部"),
+        ("yin_limbs", "陰虛次因子", "四肢"),
+        ("yin_gt", "陰虛次因子", "腸胃道"),
+        ("yin_surface", "陰虛次因子", "體表"),
+        ("yin_abdomen", "陰虛次因子", "腹腔"),
+        ("yang_head", "陽虛次因子", "頭部"),
+        ("yang_chest", "陽虛次因子", "胸部"),
+        ("yang_limbs", "陽虛次因子", "四肢"),
+        ("yang_abdomen", "陽虛次因子", "腹腔"),
+        ("yang_surface", "陽虛次因子", "體表"),
+        ("phlegm_trunk", "痰瘀次因子", "軀幹"),
+        ("phlegm_surface", "痰瘀次因子", "體表"),
+        ("phlegm_head", "痰瘀次因子", "頭部"),
+        ("phlegm_gt", "痰瘀次因子", "腸胃道"),
+    ]
+
+    file2_records = py_.flatten(
+        [
+            [
+                schemas.DF2Schema(
+                    measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
+                    number=subject_list[idx].number,
+                    item_type=column_pair[1],
+                    position=column_pair[2],
+                    score=py_.get(measure.bcq, f"score_{column_pair[0]}"),
+                    percentage=py_.get(measure.bcq, f"percentage_{column_pair[0]}"),
+                )
+                for column_pair in df2_columns
+            ]
+            for idx, measure in enumerate(measures_infos)
+            if measure.bcq
+        ],
+    )
+
+    from io import BytesIO
+
+    file1_content = BytesIO()
+    file1_utf8_content = BytesIO()
+    file2_content = BytesIO()
+
+    df1 = pd.DataFrame.from_records(jsonable_encoder(file1_records))
+    df1.to_csv(file1_content, index=False, encoding="big5")
+    file1_content.seek(0)
+
+    df1 = pd.DataFrame.from_records(jsonable_encoder(file1_records))
+    df1.to_csv(file1_utf8_content, index=False, encoding="utf8")
+    file1_utf8_content.seek(0)
+
+    df2 = pd.DataFrame.from_records(jsonable_encoder(file2_records))
+    df2.to_csv(file2_content, index=False, encoding="big5")
+    file2_content.seek(0)
+
+    output_zip = BytesIO()
+    with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
+        output_zip_obj.writestr(f"measure.csv", file1_content.getvalue())
+    with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
+        output_zip_obj.writestr(f"measure_utf8.csv", file1_utf8_content.getvalue())
+    with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
+        output_zip_obj.writestr(f"bcq.csv", file2_content.getvalue())
+    output_zip.seek(0)
+
+    today_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"單人多次下載檔案_{today_str}.zip"
+
+    return StreamingResponse(
+        output_zip,
+        media_type="application/x-zip-compressed",
+        headers={
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Content-Disposition": "inline; filename*=utf-8''{}".format(
+                quote(filename),
+            ),
+            "Content-Type": "application/octet-stream",
+        },
+    )
