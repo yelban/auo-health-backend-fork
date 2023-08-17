@@ -35,14 +35,18 @@ def page():
                 if not file_info.is_dir():
                     # TODO
                     # file_info = is_valid_file(file_info)
+                    if (
+                        "__MACOSX" in file_info.filename
+                        or ".DS_Store" in file_info.filename
+                    ):
+                        continue
                     checked_file_list.append(file_info)
 
-            encrypted_suffixes = (".txt", ".ini")
+            encrypted_suffixes = ".txt"
             for file_info in checked_file_list:
                 print("file_info", file_info)
                 file_name_p = Path(file_info.filename)
                 file_name = file_name_p.name
-                print(file_name_p)
                 # TODO
                 # allowed = file_name in allowd_filename_list
                 allowed = True
