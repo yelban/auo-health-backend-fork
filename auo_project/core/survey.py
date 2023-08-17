@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from auo_project import crud
 from auo_project.core.constants import ParameterType
-from auo_project.core.recipe import get_parameters
+from auo_project.core.recipe import find_all_component_names, get_parameters
 from auo_project.core.utils import (
     get_age,
     get_date,
@@ -55,21 +55,23 @@ class SurveyAnswer(BaseModel):
     s002: str = None
     s003: str = None
     s005: str = None
-    s006: str = None
-    s007: str = None
-    s008: str = None
-    s010: str = None
-    s011: str = None
-    s012: str = None
-    s013: str = None
+    office_hours: tuple = None
+    s006: int = None
+    s007: int = None
+    s008: int = None
+    s010: List[str] = None
+    s011: int = None
+    s012: int = None
+    s013: List[str] = None
+    s014: int = None
     s016: str = None
-    s017: str = None
-    s018: str = None
-    s020: str = None
+    s017: int = None
+    s018: int = None
+    s020: int = None
     s021: str = None
-    s024: str = None
+    s024: str = None  # 此問卷沒有：是否熬夜
     s025: str = None
-    s026: str = None
+    s026: str = None  # 額外計算
     s027: str = None
     s028: str = None
     s029: str = None
@@ -86,10 +88,73 @@ class SurveyAnswer(BaseModel):
     s041: str = None
     s042: str = None
     s043: str = None
-    s044: str = None
+    # s044: int = None
+    s045: str = None
 
     a026c056001: str = None  # a026:c056:001
     a026c056002: str = None  # a026:c056:002
+
+    # TODO: fixme
+    eat_at: datetime = None
+    symptom_from: datetime = None
+    covid_from: datetime = None
+    menstruation_from: datetime = None
+
+
+class SingletonSurveyResult:
+    _instance = None
+    survey_result = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self) -> None:
+        # self.survey_result = await process_qa()
+        pass
+
+    async def get_result(self) -> List[SurveyAnswer]:
+        if self.survey_result is None:
+            self.survey_result = await process_qa()
+        return self.survey_result
+
+
+survey_instance = SingletonSurveyResult()
+
+# unit: hour
+def get_time_duration(start: str, end: str):
+    try:
+        start_time = datetime.strptime(start, "%H:%M")
+        end_time = datetime.strptime(end, "%H:%M")
+        return (end_time - start_time).seconds / 3600
+    except:
+        return None
+
+
+def get_days_range(start, end):
+    try:
+        return (end - start).days
+    except:
+        return None
+
+
+def handle_s026(eat_at_time: datetime, measure_time: datetime):
+    try:
+        eat_at_time = eat_at_time.replace(year=1900, month=1, day=1)
+        measure_time = measure_time.replace(year=1900, month=1, day=1)
+        return (eat_at_time - measure_time).seconds / 3600
+    except Exception as e:
+        print(e)
+        return None
+
+
+def handle_s037(days, options):
+    pass
+
+
+def handle_s040(text):
+    pass
 
 
 def extract_number(text):
@@ -207,8 +272,8 @@ def process_a008(row, indices, disease_options_dict):
     return result
 
 
-def process_s044(answers):
-    # TODO: 沒有這題「6. 有過自殺的念頭」
+def process_s045(answers):
+    # 不需要有「6. 有過自殺的念頭」
     if len(answers) != 5:
         raise Exception("心情溫度計應有 5 題")
     option_scores = {"完全沒有": 0, "輕微": 1, "中等程度": 2, "厲害": 3, "非常厲害": 4}
@@ -591,12 +656,14 @@ def match_option(answer, parameter_dict):
 def process_single_row(row, parameter_dict, disease_options_dict):
     answer = {}
     answer["survey_dt"] = get_datetime(row["填答時間"])
+    # answer["p006"] = answer["survey_dt"]
     # index starts from 1
     for question_id, indices in question_mapping.items():
-        if question_id == "p001":
-            answer["p001"] = row[indices[0]]
-            answer["proj_num"] = row[indices[0]]
-        if question_id == "number":
+        if question_id == "p001":  # 計畫編號，和脈診量測資料的 proj_num 不一致，目前不可用
+            # answer["p001"] = row[indices[0]]
+            # answer["proj_num"] = row[indices[0]]
+            pass
+        elif question_id == "number":
             answer["number"] = row[indices[0]]
         elif question_id == "a008":  # 疾病史
             answer["disease"] = process_a008(row, indices, disease_options_dict)
@@ -604,8 +671,24 @@ def process_single_row(row, parameter_dict, disease_options_dict):
                 f"{disease['category_id']}:{disease['value']}"
                 for disease in answer["disease"]
             ]
-        elif question_id == "s044":  # 心情溫度計
-            answer["s044"] = process_s044(row[indices])
+        elif question_id == "s045":  # 心情溫度計
+            answer["s045"] = process_s045(row[indices])
+            options = py_.get(
+                parameter_dict,
+                f"{question_id}.subField.options.1.subField.options",
+                [],
+            )
+            bsrs5 = process_s045(row[indices])
+            if isinstance(bsrs5, int):
+                if bsrs5 >= 0 and bsrs5 <= 5:
+                    answer["s045"] = options[0]["value"]
+                elif bsrs5 >= 6 and bsrs5 <= 9:
+                    answer["s045"] = options[1]["value"]
+                elif bsrs5 >= 10 and bsrs5 <= 14:
+                    answer["s045"] = options[2]["value"]
+                elif bsrs5 >= 15 and bsrs5 <= 19:
+                    answer["s045"] = options[3]["value"]
+
         elif question_id == "a025":  # BCQ體質量表
             bcq_result, has_bcq = process_a025(row, indices)
             answer["a025"] = bcq_result if has_bcq else None
@@ -637,13 +720,13 @@ def process_single_row(row, parameter_dict, disease_options_dict):
                     f'{sleep_result[f"a0{a0num}_score"]}.value',
                 )
 
-        if question_id == "a003":
+        elif question_id == "a003":  # 生理性別
             options = parameter_dict["a003"]["subField"]["options"]
             for option in options:
                 if option["label"] == row[indices[0]]:
                     answer["gender"] = option["label"]
                     answer["a003"] = option["value"]
-        elif question_id == "a004":
+        elif question_id == "a004":  # 年齡
             options = py_.get(
                 parameter_dict,
                 f"{question_id}.subField.options.1.subField.options",
@@ -652,10 +735,8 @@ def process_single_row(row, parameter_dict, disease_options_dict):
             answer["birthday"] = get_date(row[indices[0]])
             answer["age"] = get_age(answer["survey_dt"], answer["birthday"])
             if isinstance(answer["age"], int):
-                # print("options", options)
                 answer["a004"] = get_range_options_value(answer["age"], options)
-            # print(answer["age"], answer.get("a004"))
-        elif question_id == "a005":
+        elif question_id == "a005":  # 身高
             answer["height"] = safe_int(row[indices[0]])
             # TODO: get from question options
             options = py_.get(
@@ -685,8 +766,7 @@ def process_single_row(row, parameter_dict, disease_options_dict):
                 answer["a005"] = options[4]["value"]
             # TODO: fixme
             # answer["a005"] = get_range_options_value(answer["height"], options)
-
-        elif question_id == "a006":
+        elif question_id == "a006":  # 體重
             answer["weight"] = safe_int(row[indices[0]])
             options = py_.get(
                 parameter_dict,
@@ -706,7 +786,8 @@ def process_single_row(row, parameter_dict, disease_options_dict):
                     [],
                 )
                 answer["a007"] = get_range_options_value(answer["bmi"], options)
-        elif question_id == "a024":
+
+        elif question_id == "a024":  # 因上述疾病三個月內持續用藥
             # TODO: check rule
             """
             system:
@@ -729,7 +810,7 @@ def process_single_row(row, parameter_dict, disease_options_dict):
                     answer["a024"] = "c040:002"
                 else:
                     answer["a024"] = "c040:003"
-        elif question_id == "a029":
+        elif question_id == "a029":  # 血型
             options = py_.get(
                 parameter_dict,
                 f"{question_id}.subField.options.1.subField.options",
@@ -738,7 +819,7 @@ def process_single_row(row, parameter_dict, disease_options_dict):
             for option in options:
                 if option["label"] == row[indices[0]]:
                     answer["a029"] = option["value"]
-        elif question_id == "s001":
+        elif question_id == "s001":  # 教育程度
             options = py_.get(
                 parameter_dict,
                 f"{question_id}.subField.options.1.subField.options",
@@ -747,7 +828,10 @@ def process_single_row(row, parameter_dict, disease_options_dict):
             for option in options:
                 if option["label"] == row[indices[0]]:
                     answer["s001"] = option["value"]
-        elif question_id == "s003":
+            if "大學(專)" == row[indices[0]]:
+                answer["s001"] = options[5]["value"]
+
+        elif question_id == "s003":  # 婚姻狀況
             options = py_.get(
                 parameter_dict,
                 f"{question_id}.subField.options.1.subField.options",
@@ -756,7 +840,147 @@ def process_single_row(row, parameter_dict, disease_options_dict):
             for option in options:
                 if option["label"] == row[indices[0]]:
                     answer["s003"] = option["value"]
-        elif question_id == "a030":
+                elif "或" in option["label"] and row[indices[0]] in option["label"]:
+                    answer["s003"] = option["value"]
+
+        elif question_id == "s005":  # 主要工作/上課時間
+            options = py_.get(
+                parameter_dict,
+                f"{question_id}.subField.options.1.subField.options",
+                [],
+            )
+            for option in options:
+                if option["label"] == row[indices[0]]:
+                    answer[question_id] = option["value"]
+                elif option["label"] == process_text(row[indices[0]]):
+                    answer[question_id] = option["value"]
+            if question_id in answer:
+                answer["office_hours"] = (row[indices[1]], row[indices[2]])
+
+        elif question_id == "s025":  # 睡眠時間
+            sleep_at = row[indices[0]]
+            wake_up_at = row[indices[1]]
+            if isinstance(sleep_at, str) and isinstance(wake_up_at, str):
+                answer["sleep_duration"] = get_time_duration(wake_up_at, sleep_at)
+                options = py_.get(
+                    parameter_dict,
+                    f"{question_id}.subField.options",
+                    [],
+                )
+                if answer["sleep_duration"] < 6:
+                    answer["s025"] = options[1]["value"]
+                elif answer["sleep_duration"] >= 6:
+                    answer["s025"] = options[2]["value"]
+                else:
+                    answer["s025"] = options[0]["value"]
+
+        elif question_id == "s026":  # 距最近1次用餐時間 range
+            eat_at = row[indices[0]]
+            answer["eat_at"] = (
+                datetime.strptime(eat_at, "%H:%M")
+                if isinstance(row[indices[0]], str) and ":" in row[indices[0]]
+                else None
+            )
+            # TODO: calculate eat with measure time
+
+        elif question_id == "s030":  # 前4小時內是否有運動
+            """
+            c016	001	無
+            c016	002	有，前2小時內
+            c016	003	有，前2-4小時內
+            """
+
+            options = py_.get(
+                parameter_dict,
+                f"{question_id}.subField.options.1.subField.options",
+                [],
+            )
+            if process_text(row[indices[0]]) == "無":
+                answer["s030"] = options[0]["value"]
+            # 問卷只有問有無，和選項不同，因此都指定 c016:002
+            elif process_text(row[indices[0]]) == "有":
+                answer["s030"] = options[1]["value"]
+
+        elif question_id == "s031":  # 運動時數
+            exercise_from = row[indices[0]]
+            exercise_to = row[indices[1]]
+            exercise_duration_minute = get_time_duration(exercise_from, exercise_to)
+            exercise_duration = (
+                exercise_duration_minute * 60 if exercise_duration_minute else None
+            )
+            options = py_.get(
+                parameter_dict,
+                f"{question_id}.subField.options.1.subField.options",
+                [],
+            )
+            if exercise_duration is None:
+                answer["a031"] = None
+            elif exercise_duration < 30:
+                answer["s031"] = options[0]["value"]
+            elif exercise_duration >= 30 and exercise_duration < 60:
+                answer["s031"] = options[1]["value"]
+            elif exercise_duration >= 60:
+                answer["s031"] = options[2]["value"]
+
+        elif question_id == "s033":  # 距離已感冒的天數
+            symptom_from = row[indices[0]]
+            answer["symptom_from"] = (
+                datetime.strptime(symptom_from, "%Y-%m-%d")
+                if isinstance(row[indices[0]], str) and "-" in row[indices[0]]
+                else None
+            )
+            # TODO: calculate symptom with survey at / measure time
+
+        elif question_id == "s037":  # 確診COVID-19距離測量日天數
+            answer["covid_from"] = (
+                datetime.strptime(row[indices[0]], "%Y-%m-%d")
+                if isinstance(row[indices[0]], str) and "-" in row[indices[0]]
+                else None
+            )
+
+        elif question_id == "s040":  # 距離上次月經天數
+            answer["menstruation_from"] = (
+                datetime.strptime(row[indices[0]], "%Y-%m-%d")
+                if isinstance(row[indices[0]], str) and "-" in row[indices[0]]
+                else None
+            )
+            # TODO: calculate menstruation with survey at / measure time
+
+        elif question_id == "s041":  # 幾歲停經
+            stop_menstruation_year_ago = safe_int(row[indices[0]])
+            options = py_.get(
+                parameter_dict,
+                f"{question_id}.subField.options.1.subField.options",
+                [],
+            )
+            if isinstance(stop_menstruation_year_ago, int) is False:
+                answer["s041"] = None
+            elif stop_menstruation_year_ago < 1:
+                answer["s041"] = options[0]["value"]
+            elif stop_menstruation_year_ago >= 1 and stop_menstruation_year_ago < 3:
+                answer["s041"] = options[1]["value"]
+            elif stop_menstruation_year_ago >= 3 and stop_menstruation_year_ago < 5:
+                answer["s041"] = options[2]["value"]
+            elif stop_menstruation_year_ago >= 5:
+                answer["s041"] = options[3]["value"]
+
+        elif question_id == "s043":  # 懷孕週數
+            pregnant_month = safe_int(row[indices[0]])
+            options = py_.get(
+                parameter_dict,
+                f"{question_id}.subField.options.1.subField.options",
+                [],
+            )
+            if pregnant_month is None:
+                answer[question_id] = None
+            elif pregnant_month < 12:
+                answer[question_id] = options[0]["value"]
+            elif pregnant_month >= 12 and pregnant_month < 24:
+                answer[question_id] = options[1]["value"]
+            elif pregnant_month >= 24:
+                answer[question_id] = options[2]["value"]
+
+        elif question_id == "a030":  # 居住縣/市
             options = py_.get(
                 parameter_dict,
                 f"{question_id}.subField.options.1.subField.options",
@@ -765,6 +989,50 @@ def process_single_row(row, parameter_dict, disease_options_dict):
             for option in options:
                 if option["label"] == row[indices[0]]:
                     answer["a030"] = option["value"]
+
+        else:
+            if not question_id:
+                continue
+            parameter = parameter_dict.get(question_id)
+            if not parameter:
+                continue
+
+            component_names = find_all_component_names(parameter)
+            if "input" in component_names:
+                answer[question_id] = safe_int(row[indices[0]])
+            else:
+                top_level_option_length = len(parameter["subField"]["options"])
+                for i in range(top_level_option_length):
+                    options = py_.get(
+                        parameter_dict,
+                        f"{question_id}.subField.options.{i}.subField.options",
+                        [],
+                    )
+                    # not include disease
+                    multiple_choices_qid = ["s010", "s013"]
+                    if question_id in multiple_choices_qid:
+                        answers = (
+                            row[indices[0]].split("\n")
+                            if isinstance(row[indices[0]], str)
+                            else []
+                        )
+                        answer[question_id] = []
+                        for option in options:
+                            if option["label"] in answers:
+                                answer[question_id].append(option["value"])
+                    else:
+                        for option in options:
+                            if option["label"] == row[indices[0]]:
+                                answer[question_id] = option["value"]
+
+                options = py_.get(
+                    parameter_dict,
+                    f"{question_id}.subField.options",
+                    [],
+                )
+                for option in options:
+                    if option["label"] == row[indices[0]]:
+                        answer[question_id] = option["value"]
 
     return answer
 
@@ -814,12 +1082,8 @@ async def process_qa():
     return rows
 
 
-# TODO 20230703
-# 單人單次 BCQ 換成正規化後的分數
-
-
 async def get_survey_result() -> List[SurveyAnswer]:
-    rows = await process_qa()
+    rows = await survey_instance.get_result()
     survey_result = [SurveyAnswer(**row) for row in rows]
     return survey_result
 
