@@ -4,7 +4,7 @@ services:
   api:
     ports:
       # Exposes application port.
-    - "8000:8000"
+    - "28000:8000"
     volumes:
       # Adds current directory as volume.
     - .:/app/src/
@@ -14,22 +14,22 @@ services:
 
   db:
     ports:
-    - 5432:5432
+    - 25432:5432
+    volumes:
+    - dev-auo_project-db-data:/var/lib/postgresql/data
+
 
   celeryworker:
     volumes:
       # Adds current directory as volume.
     - .:/app/src/
 
-  streamlit:
-    build:
-      context: .
-      dockerfile: ./deploy/Dockerfile
-    restart: always
-    env_file:
-    - .env
-    environment:
-    - PYTHONPATH=/app/src
+  tusd:
+    command: -base-path /files/ -behind-proxy -azure-blob-access-tier hot -azure-storage ${AZURE_STORAGE_CONTAINER} -azure-object-prefix tusd -hooks-enabled-events post-create,post-finish,post-terminate --hooks-http http://${BACKEND_HOST}:${BACKEND_PORT}/api/v1/hooks/tusd --hooks-http-retry 5 --hooks-http-backoff 2
     ports:
-    - 8501:8501
-    command: poetry run streamlit run auo_project/streamlit/web_app.py --server.enableWebsocketCompression=false --global.developmentMode=false --server.headless=true --server.maxUploadSize=100 --browser.serverAddress=tool.auohealth.com --browser.gatherUsageStats=false
+    - "21080:1080"
+
+
+volumes:
+  dev-auo_project-db-data:
+    name: dev-auo_project-db-data

@@ -1,0 +1,64 @@
+version: '3.9'
+
+services:
+  api:
+    ports:
+      # Exposes application port.
+    - "8000:8000"
+    volumes:
+      # Adds current directory as volume.
+    - .:/app/src/
+    environment:
+      # Enables autoreload.
+      RELOAD: "True"
+    env_file:
+    - .env
+    - .env.prod
+
+  db:
+    ports:
+    - 5432:5432
+
+  celeryworker:
+    volumes:
+      # Adds current directory as volume.
+    - .:/app/src/
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    restart: always
+    env_file:
+    - .env
+    environment:
+    - PYTHONPATH=/app/src
+    ports:
+    - 8501:8501
+    command: poetry run streamlit run auo_project/streamlit/web_app.py --server.enableWebsocketCompression=false --global.developmentMode=false --server.headless=true --server.maxUploadSize=100 --browser.serverAddress=tool.auohealth.com --browser.gatherUsageStats=false
+
+  tusd:
+    ports:
+    - "1080:1080"
+
+
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    hostname: example.com # set to fqdn of host
+    ports:
+    - 19999:19999
+    restart: unless-stopped
+    cap_add:
+    - SYS_PTRACE
+    security_opt:
+    - apparmor:unconfined
+    volumes:
+    - netdataconfig:/etc/netdata
+    - netdatalib:/var/lib/netdata
+    - netdatacache:/var/cache/netdata
+    - /etc/passwd:/host/etc/passwd:ro
+    - /etc/group:/host/etc/group:ro
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /etc/os-release:/host/etc/os-release:ro
