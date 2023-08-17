@@ -22,7 +22,13 @@ def mask_credential_name(s: str):
 
 def mask_crediential_sid(s: str):
     wildcard = "*"
-    return f"{s[0:4]}{wildcard * (len(s) - 6)}{s[-2:]}"
+    if len(s) <= 1:
+        return s
+    elif len(s) == 2:
+        return f"{s[0]}{wildcard}"
+    else:
+        one_third_cnt = len(s) // 3
+        return f"{s[0:one_third_cnt]}{wildcard * (len(s) - one_third_cnt*2)}{s[-1*one_third_cnt:]}"
 
 
 def safe_divide(a, b):
