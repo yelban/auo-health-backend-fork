@@ -507,7 +507,7 @@ async def get_multi_measure_summary(
     measures_infos = py_.sort(
         measures_infos,
         key=lambda item: item.measure_time,
-        reverse=True,
+        reverse=False,
     )
 
     mean_statistic_dict = (
