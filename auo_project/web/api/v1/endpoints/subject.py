@@ -598,78 +598,78 @@ async def get_multi_measure_summary(
             xingcheng_r_qu=safe_divide(measure.xingcheng_r_qu, 0.2),
             xingcheng_r_ch=safe_divide(measure.xingcheng_r_ch, 0.2),
             # TODO: add these extra cols to measure.infos
-            h1_l_cu=mean_statistic_model_dict[measure.id].h1_l_cu,
-            h1_l_qu=mean_statistic_model_dict[measure.id].h1_l_qu,
-            h1_l_ch=mean_statistic_model_dict[measure.id].h1_l_ch,
-            h1_r_cu=mean_statistic_model_dict[measure.id].h1_r_cu,
-            h1_r_qu=mean_statistic_model_dict[measure.id].h1_r_qu,
-            h1_r_ch=mean_statistic_model_dict[measure.id].h1_r_ch,
+            h1_l_cu=mean_statistic_model_dict.get(measure.id).h1_l_cu,
+            h1_l_qu=mean_statistic_model_dict.get(measure.id).h1_l_qu,
+            h1_l_ch=mean_statistic_model_dict.get(measure.id).h1_l_ch,
+            h1_r_cu=mean_statistic_model_dict.get(measure.id).h1_r_cu,
+            h1_r_qu=mean_statistic_model_dict.get(measure.id).h1_r_qu,
+            h1_r_ch=mean_statistic_model_dict.get(measure.id).h1_r_ch,
             h1_div_t1_l_cu=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_l_cu,
+                mean_statistic_model_dict.get(measure.id).h1_div_t1_l_cu,
                 1000,
             ),
             h1_div_t1_l_qu=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_l_qu,
+                mean_statistic_model_dict.get(measure.id).h1_div_t1_l_qu,
                 1000,
             ),
             h1_div_t1_l_ch=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_l_ch,
+                mean_statistic_model_dict.get(measure.id).h1_div_t1_l_ch,
                 1000,
             ),
             h1_div_t1_r_cu=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_r_cu,
+                mean_statistic_model_dict.get(measure.id).h1_div_t1_r_cu,
                 1000,
             ),
             h1_div_t1_r_qu=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_r_qu,
+                mean_statistic_model_dict.get(measure.id).h1_div_t1_r_qu,
                 1000,
             ),
             h1_div_t1_r_ch=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_r_ch,
+                mean_statistic_model_dict.get(measure.id).h1_div_t1_r_ch,
                 1000,
             ),
-            pr_l_cu=mean_statistic_model_dict[measure.id].pr_l_cu,
-            pr_l_qu=mean_statistic_model_dict[measure.id].pr_l_qu,
-            pr_l_ch=mean_statistic_model_dict[measure.id].pr_l_ch,
-            pr_r_cu=mean_statistic_model_dict[measure.id].pr_r_cu,
-            pr_r_qu=mean_statistic_model_dict[measure.id].pr_r_qu,
-            pr_r_ch=mean_statistic_model_dict[measure.id].pr_r_ch,
-            w1_l_cu=mean_statistic_model_dict[measure.id].w1_l_cu,
-            w1_l_qu=mean_statistic_model_dict[measure.id].w1_l_qu,
-            w1_l_ch=mean_statistic_model_dict[measure.id].w1_l_ch,
-            w1_r_cu=mean_statistic_model_dict[measure.id].w1_r_cu,
-            w1_r_qu=mean_statistic_model_dict[measure.id].w1_r_qu,
-            w1_r_ch=mean_statistic_model_dict[measure.id].w1_r_ch,
-            w1_div_t_l_cu=mean_statistic_model_dict[measure.id].w1_div_t_l_cu,
-            w1_div_t_l_qu=mean_statistic_model_dict[measure.id].w1_div_t_l_qu,
-            w1_div_t_l_ch=mean_statistic_model_dict[measure.id].w1_div_t_l_ch,
-            w1_div_t_r_cu=mean_statistic_model_dict[measure.id].w1_div_t_r_cu,
-            w1_div_t_r_qu=mean_statistic_model_dict[measure.id].w1_div_t_r_qu,
-            w1_div_t_r_ch=mean_statistic_model_dict[measure.id].w1_div_t_r_ch,
-            t1_div_t_l_cu=mean_statistic_model_dict[measure.id].t1_div_t_l_cu,
-            t1_div_t_l_qu=mean_statistic_model_dict[measure.id].t1_div_t_l_qu,
-            t1_div_t_l_ch=mean_statistic_model_dict[measure.id].t1_div_t_l_ch,
-            t1_div_t_r_cu=mean_statistic_model_dict[measure.id].t1_div_t_r_cu,
-            t1_div_t_r_qu=mean_statistic_model_dict[measure.id].t1_div_t_r_qu,
-            t1_div_t_r_ch=mean_statistic_model_dict[measure.id].t1_div_t_r_ch,
-            pw_l_cu=mean_statistic_model_dict[measure.id].pw_l_cu,
-            pw_l_qu=mean_statistic_model_dict[measure.id].pw_l_qu,
-            pw_l_ch=mean_statistic_model_dict[measure.id].pw_l_ch,
-            pw_r_cu=mean_statistic_model_dict[measure.id].pw_r_cu,
-            pw_r_qu=mean_statistic_model_dict[measure.id].pw_r_qu,
-            pw_r_ch=mean_statistic_model_dict[measure.id].pw_r_ch,
-            pwcv_l_cu=cv_statistic_model_dict[measure.id].pw_l_cu,
-            pwcv_l_qu=cv_statistic_model_dict[measure.id].pw_l_qu,
-            pwcv_l_ch=cv_statistic_model_dict[measure.id].pw_l_ch,
-            pwcv_r_cu=cv_statistic_model_dict[measure.id].pw_r_cu,
-            pwcv_r_qu=cv_statistic_model_dict[measure.id].pw_r_qu,
-            pwcv_r_ch=cv_statistic_model_dict[measure.id].pw_r_ch,
-            a0_l_cu=mean_statistic_model_dict[measure.id].a0_l_cu,
-            a0_l_qu=mean_statistic_model_dict[measure.id].a0_l_qu,
-            a0_l_ch=mean_statistic_model_dict[measure.id].a0_l_ch,
-            a0_r_cu=mean_statistic_model_dict[measure.id].a0_r_cu,
-            a0_r_qu=mean_statistic_model_dict[measure.id].a0_r_qu,
-            a0_r_ch=mean_statistic_model_dict[measure.id].a0_r_ch,
+            pr_l_cu=mean_statistic_model_dict.get(measure.id).pr_l_cu,
+            pr_l_qu=mean_statistic_model_dict.get(measure.id).pr_l_qu,
+            pr_l_ch=mean_statistic_model_dict.get(measure.id).pr_l_ch,
+            pr_r_cu=mean_statistic_model_dict.get(measure.id).pr_r_cu,
+            pr_r_qu=mean_statistic_model_dict.get(measure.id).pr_r_qu,
+            pr_r_ch=mean_statistic_model_dict.get(measure.id).pr_r_ch,
+            w1_l_cu=mean_statistic_model_dict.get(measure.id).w1_l_cu,
+            w1_l_qu=mean_statistic_model_dict.get(measure.id).w1_l_qu,
+            w1_l_ch=mean_statistic_model_dict.get(measure.id).w1_l_ch,
+            w1_r_cu=mean_statistic_model_dict.get(measure.id).w1_r_cu,
+            w1_r_qu=mean_statistic_model_dict.get(measure.id).w1_r_qu,
+            w1_r_ch=mean_statistic_model_dict.get(measure.id).w1_r_ch,
+            w1_div_t_l_cu=mean_statistic_model_dict.get(measure.id).w1_div_t_l_cu,
+            w1_div_t_l_qu=mean_statistic_model_dict.get(measure.id).w1_div_t_l_qu,
+            w1_div_t_l_ch=mean_statistic_model_dict.get(measure.id).w1_div_t_l_ch,
+            w1_div_t_r_cu=mean_statistic_model_dict.get(measure.id).w1_div_t_r_cu,
+            w1_div_t_r_qu=mean_statistic_model_dict.get(measure.id).w1_div_t_r_qu,
+            w1_div_t_r_ch=mean_statistic_model_dict.get(measure.id).w1_div_t_r_ch,
+            t1_div_t_l_cu=mean_statistic_model_dict.get(measure.id).t1_div_t_l_cu,
+            t1_div_t_l_qu=mean_statistic_model_dict.get(measure.id).t1_div_t_l_qu,
+            t1_div_t_l_ch=mean_statistic_model_dict.get(measure.id).t1_div_t_l_ch,
+            t1_div_t_r_cu=mean_statistic_model_dict.get(measure.id).t1_div_t_r_cu,
+            t1_div_t_r_qu=mean_statistic_model_dict.get(measure.id).t1_div_t_r_qu,
+            t1_div_t_r_ch=mean_statistic_model_dict.get(measure.id).t1_div_t_r_ch,
+            pw_l_cu=mean_statistic_model_dict.get(measure.id).pw_l_cu,
+            pw_l_qu=mean_statistic_model_dict.get(measure.id).pw_l_qu,
+            pw_l_ch=mean_statistic_model_dict.get(measure.id).pw_l_ch,
+            pw_r_cu=mean_statistic_model_dict.get(measure.id).pw_r_cu,
+            pw_r_qu=mean_statistic_model_dict.get(measure.id).pw_r_qu,
+            pw_r_ch=mean_statistic_model_dict.get(measure.id).pw_r_ch,
+            pwcv_l_cu=cv_statistic_model_dict.get(measure.id).pw_l_cu,
+            pwcv_l_qu=cv_statistic_model_dict.get(measure.id).pw_l_qu,
+            pwcv_l_ch=cv_statistic_model_dict.get(measure.id).pw_l_ch,
+            pwcv_r_cu=cv_statistic_model_dict.get(measure.id).pw_r_cu,
+            pwcv_r_qu=cv_statistic_model_dict.get(measure.id).pw_r_qu,
+            pwcv_r_ch=cv_statistic_model_dict.get(measure.id).pw_r_ch,
+            a0_l_cu=mean_statistic_model_dict.get(measure.id).a0_l_cu,
+            a0_l_qu=mean_statistic_model_dict.get(measure.id).a0_l_qu,
+            a0_l_ch=mean_statistic_model_dict.get(measure.id).a0_l_ch,
+            a0_r_cu=mean_statistic_model_dict.get(measure.id).a0_r_cu,
+            a0_r_qu=mean_statistic_model_dict.get(measure.id).a0_r_qu,
+            a0_r_ch=mean_statistic_model_dict.get(measure.id).a0_r_ch,
             cn=get_pct_cmp_overall_and_standard(
                 mean_statistic_dict.get(measure.id),
                 means_dict,
@@ -841,12 +841,6 @@ async def get_multi_measure_summary_data(
         )
     # TODO: add current_user permission filter
     subject = await crud.subject.get(db_session=db_session, id=subject_id)
-    standard_cn_dict = {}
-    if subject.standard_measure_id:
-        standard_cn_dict = await crud.measure_statistic.get_means_dict(
-            db_session=db_session,
-            measure_id=subject.standard_measure_id,
-        )
 
     measures_infos = await crud.measure_info.get_by_ids(
         db_session=db_session,
@@ -865,7 +859,7 @@ async def get_multi_measure_summary_data(
     measures_infos = py_.sort(
         measures_infos,
         key=lambda item: item.measure_time,
-        reverse=True,
+        reverse=False,
     )
 
     mean_statistic_dict = (
@@ -910,243 +904,6 @@ async def get_multi_measure_summary_data(
             key
         ] = crud.measure_statistic.get_flat_statistic_model2(val)
 
-    # TODO: add CV and STD
-    means_dict = await crud.measure_cn_mean.get_dict_by_sex(
-        db_session=db_session,
-        sex=subject.sex,
-    )
-
-    measures = [
-        schemas.MultiMeasureDetailRead(
-            id=measure.id,
-            tn=f"T{idx+1}",
-            measure_time=measure.measure_time,
-            hr_l=measure.hr_l,
-            hr_l_type=get_hr_type(measure.hr_l),
-            hr_r=measure.hr_r,
-            hr_r_type=get_hr_type(measure.hr_r),
-            mean_prop_range_max_l_cu=measure.mean_prop_range_max_l_cu,
-            mean_prop_range_max_l_qu=measure.mean_prop_range_max_l_qu,
-            mean_prop_range_max_l_ch=measure.mean_prop_range_max_l_ch,
-            mean_prop_range_max_r_cu=measure.mean_prop_range_max_r_cu,
-            mean_prop_range_max_r_qu=measure.mean_prop_range_max_r_qu,
-            mean_prop_range_max_r_ch=measure.mean_prop_range_max_r_ch,
-            max_amp_depth_of_range_l_cu=measure.max_amp_depth_of_range_l_cu,
-            max_amp_depth_of_range_l_qu=measure.max_amp_depth_of_range_l_qu,
-            max_amp_depth_of_range_l_ch=measure.max_amp_depth_of_range_l_ch,
-            max_amp_depth_of_range_r_cu=measure.max_amp_depth_of_range_r_cu,
-            max_amp_depth_of_range_r_qu=measure.max_amp_depth_of_range_r_qu,
-            max_amp_depth_of_range_r_ch=measure.max_amp_depth_of_range_r_ch,
-            max_amp_value_l_cu=measure.max_amp_value_l_cu,
-            max_amp_value_l_qu=measure.max_amp_value_l_qu,
-            max_amp_value_l_ch=measure.max_amp_value_l_ch,
-            max_amp_value_r_cu=measure.max_amp_value_r_cu,
-            max_amp_value_r_qu=measure.max_amp_value_r_qu,
-            max_amp_value_r_ch=measure.max_amp_value_r_ch,
-            max_slope_value_l_cu=measure.max_slope_value_l_cu,
-            max_slope_value_l_qu=measure.max_slope_value_l_qu,
-            max_slope_value_l_ch=measure.max_slope_value_l_ch,
-            max_slope_value_r_cu=measure.max_slope_value_r_cu,
-            max_slope_value_r_qu=measure.max_slope_value_r_qu,
-            max_slope_value_r_ch=measure.max_slope_value_r_ch,
-            xingcheng_l_cu=safe_divide(measure.xingcheng_l_cu, 0.2),
-            xingcheng_l_qu=safe_divide(measure.xingcheng_l_qu, 0.2),
-            xingcheng_l_ch=safe_divide(measure.xingcheng_l_ch, 0.2),
-            xingcheng_r_cu=safe_divide(measure.xingcheng_r_cu, 0.2),
-            xingcheng_r_qu=safe_divide(measure.xingcheng_r_qu, 0.2),
-            xingcheng_r_ch=safe_divide(measure.xingcheng_r_ch, 0.2),
-            # TODO: add these extra cols to measure.infos
-            h1_l_cu=mean_statistic_model_dict[measure.id].h1_l_cu,
-            h1_l_qu=mean_statistic_model_dict[measure.id].h1_l_qu,
-            h1_l_ch=mean_statistic_model_dict[measure.id].h1_l_ch,
-            h1_r_cu=mean_statistic_model_dict[measure.id].h1_r_cu,
-            h1_r_qu=mean_statistic_model_dict[measure.id].h1_r_qu,
-            h1_r_ch=mean_statistic_model_dict[measure.id].h1_r_ch,
-            h1_div_t1_l_cu=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_l_cu,
-                1000,
-            ),
-            h1_div_t1_l_qu=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_l_qu,
-                1000,
-            ),
-            h1_div_t1_l_ch=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_l_ch,
-                1000,
-            ),
-            h1_div_t1_r_cu=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_r_cu,
-                1000,
-            ),
-            h1_div_t1_r_qu=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_r_qu,
-                1000,
-            ),
-            h1_div_t1_r_ch=safe_divide(
-                mean_statistic_model_dict[measure.id].h1_div_t1_r_ch,
-                1000,
-            ),
-            pr_l_cu=mean_statistic_model_dict[measure.id].pr_l_cu,
-            pr_l_qu=mean_statistic_model_dict[measure.id].pr_l_qu,
-            pr_l_ch=mean_statistic_model_dict[measure.id].pr_l_ch,
-            pr_r_cu=mean_statistic_model_dict[measure.id].pr_r_cu,
-            pr_r_qu=mean_statistic_model_dict[measure.id].pr_r_qu,
-            pr_r_ch=mean_statistic_model_dict[measure.id].pr_r_ch,
-            w1_l_cu=mean_statistic_model_dict[measure.id].w1_l_cu,
-            w1_l_qu=mean_statistic_model_dict[measure.id].w1_l_qu,
-            w1_l_ch=mean_statistic_model_dict[measure.id].w1_l_ch,
-            w1_r_cu=mean_statistic_model_dict[measure.id].w1_r_cu,
-            w1_r_qu=mean_statistic_model_dict[measure.id].w1_r_qu,
-            w1_r_ch=mean_statistic_model_dict[measure.id].w1_r_ch,
-            w1_div_t_l_cu=mean_statistic_model_dict[measure.id].w1_div_t_l_cu,
-            w1_div_t_l_qu=mean_statistic_model_dict[measure.id].w1_div_t_l_qu,
-            w1_div_t_l_ch=mean_statistic_model_dict[measure.id].w1_div_t_l_ch,
-            w1_div_t_r_cu=mean_statistic_model_dict[measure.id].w1_div_t_r_cu,
-            w1_div_t_r_qu=mean_statistic_model_dict[measure.id].w1_div_t_r_qu,
-            w1_div_t_r_ch=mean_statistic_model_dict[measure.id].w1_div_t_r_ch,
-            t1_div_t_l_cu=mean_statistic_model_dict[measure.id].t1_div_t_l_cu,
-            t1_div_t_l_qu=mean_statistic_model_dict[measure.id].t1_div_t_l_qu,
-            t1_div_t_l_ch=mean_statistic_model_dict[measure.id].t1_div_t_l_ch,
-            t1_div_t_r_cu=mean_statistic_model_dict[measure.id].t1_div_t_r_cu,
-            t1_div_t_r_qu=mean_statistic_model_dict[measure.id].t1_div_t_r_qu,
-            t1_div_t_r_ch=mean_statistic_model_dict[measure.id].t1_div_t_r_ch,
-            pw_l_cu=mean_statistic_model_dict[measure.id].pw_l_cu,
-            pw_l_qu=mean_statistic_model_dict[measure.id].pw_l_qu,
-            pw_l_ch=mean_statistic_model_dict[measure.id].pw_l_ch,
-            pw_r_cu=mean_statistic_model_dict[measure.id].pw_r_cu,
-            pw_r_qu=mean_statistic_model_dict[measure.id].pw_r_qu,
-            pw_r_ch=mean_statistic_model_dict[measure.id].pw_r_ch,
-            pwcv_l_cu=cv_statistic_model_dict[measure.id].pw_l_cu,
-            pwcv_l_qu=cv_statistic_model_dict[measure.id].pw_l_qu,
-            pwcv_l_ch=cv_statistic_model_dict[measure.id].pw_l_ch,
-            pwcv_r_cu=cv_statistic_model_dict[measure.id].pw_r_cu,
-            pwcv_r_qu=cv_statistic_model_dict[measure.id].pw_r_qu,
-            pwcv_r_ch=cv_statistic_model_dict[measure.id].pw_r_ch,
-            a0_l_cu=mean_statistic_model_dict[measure.id].a0_l_cu,
-            a0_l_qu=mean_statistic_model_dict[measure.id].a0_l_qu,
-            a0_l_ch=mean_statistic_model_dict[measure.id].a0_l_ch,
-            a0_r_cu=mean_statistic_model_dict[measure.id].a0_r_cu,
-            a0_r_qu=mean_statistic_model_dict[measure.id].a0_r_qu,
-            a0_r_ch=mean_statistic_model_dict[measure.id].a0_r_ch,
-            cn=get_pct_cmp_overall_and_standard(
-                mean_statistic_dict.get(measure.id),
-                means_dict,
-                standard_cn_dict,
-                "c",
-            ),
-            # TODO: changeme
-            cncv=get_pct_cmp_base(
-                cv_statistic_dict.get(measure.id),
-                "c",
-            ),
-            # TODO: changeme
-            pn=get_pct_cmp_overall_and_standard(
-                mean_statistic_dict.get(measure.id),
-                means_dict,
-                standard_cn_dict,
-                "p",
-            ),
-            # TODO: changeme
-            pnsd=get_pct_cmp_base(
-                std_statistic_dict.get(measure.id),
-                "p",
-            ),
-            # TODO: remove me
-            bcq=schemas.BCQ(
-                exist=measure.has_bcq,
-                score_yang=measure.bcq.percentage_yang if measure.bcq else None,
-                score_yin=measure.bcq.percentage_yin if measure.bcq else None,
-                score_phlegm=measure.bcq.percentage_phlegm if measure.bcq else None,
-                score_yang_head=measure.bcq.percentage_yang_head
-                if measure.bcq
-                else None,
-                score_yang_chest=measure.bcq.percentage_yang_chest
-                if measure.bcq
-                else None,
-                score_yang_limbs=measure.bcq.percentage_yang_limbs
-                if measure.bcq
-                else None,
-                score_yang_abdomen=measure.bcq.percentage_yang_abdomen
-                if measure.bcq
-                else None,
-                score_yang_surface=measure.bcq.percentage_yang_surface
-                if measure.bcq
-                else None,
-                score_yin_head=measure.bcq.percentage_yin_head if measure.bcq else None,
-                score_yin_limbs=measure.bcq.percentage_yin_limbs
-                if measure.bcq
-                else None,
-                score_yin_gt=measure.bcq.percentage_yin_gt if measure.bcq else None,
-                score_yin_surface=measure.bcq.percentage_yin_surface
-                if measure.bcq
-                else None,
-                score_yin_abdomen=measure.bcq.percentage_yin_abdomen
-                if measure.bcq
-                else None,
-                score_phlegm_trunk=measure.bcq.percentage_phlegm_trunk
-                if measure.bcq
-                else None,
-                score_phlegm_surface=measure.bcq.percentage_phlegm_surface
-                if measure.bcq
-                else None,
-                score_phlegm_head=measure.bcq.percentage_phlegm_head
-                if measure.bcq
-                else None,
-                score_phlegm_gt=measure.bcq.percentage_phlegm_gt
-                if measure.bcq
-                else None,
-                percentage_yang=measure.bcq.percentage_yang if measure.bcq else None,
-                percentage_yin=measure.bcq.percentage_yin if measure.bcq else None,
-                percentage_phlegm=measure.bcq.percentage_phlegm
-                if measure.bcq
-                else None,
-                percentage_yang_head=measure.bcq.percentage_yang_head
-                if measure.bcq
-                else None,
-                percentage_yang_chest=measure.bcq.percentage_yang_chest
-                if measure.bcq
-                else None,
-                percentage_yang_limbs=measure.bcq.percentage_yang_limbs
-                if measure.bcq
-                else None,
-                percentage_yang_abdomen=measure.bcq.percentage_yang_abdomen
-                if measure.bcq
-                else None,
-                percentage_yang_surface=measure.bcq.percentage_yang_surface
-                if measure.bcq
-                else None,
-                percentage_yin_head=measure.bcq.percentage_yin_head
-                if measure.bcq
-                else None,
-                percentage_yin_limbs=measure.bcq.percentage_yin_limbs
-                if measure.bcq
-                else None,
-                percentage_yin_gt=measure.bcq.percentage_yin_gt
-                if measure.bcq
-                else None,
-                percentage_yin_surface=measure.bcq.percentage_yin_surface
-                if measure.bcq
-                else None,
-                percentage_yin_abdomen=measure.bcq.percentage_yin_abdomen
-                if measure.bcq
-                else None,
-                percentage_phlegm_trunk=measure.bcq.percentage_phlegm_trunk
-                if measure.bcq
-                else None,
-                percentage_phlegm_surface=measure.bcq.percentage_phlegm_surface
-                if measure.bcq
-                else None,
-                percentage_phlegm_head=measure.bcq.percentage_phlegm_head
-                if measure.bcq
-                else None,
-                percentage_phlegm_gt=measure.bcq.percentage_phlegm_gt
-                if measure.bcq
-                else None,
-            ),
-        )
-        for idx, measure in enumerate(measures_infos)
-    ]
-
     hands = ["r", "l"]
     positions = ["cu", "qu", "ch"]
 
@@ -1162,7 +919,7 @@ async def get_multi_measure_summary_data(
             hand=HAND_TYPE_LABEL.get(hand),
             position=POSITION_TYPE_LABEL.get(position),
             pass_rate=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"pass_rate_{hand}_{position}",
             ),
             hr=py_.get(measure, f"hr_{hand}"),
@@ -1172,195 +929,237 @@ async def get_multi_measure_summary_data(
             static_max_amp=py_.get(measure, f"max_amp_value_{hand}_{position}"),
             max_slope_value=py_.get(measure, f"max_slope_value_{hand}_{position}"),
             width=safe_divide(py_.get(measure, f"xingcheng_{hand}_{position}"), 0.2),
-            h1=py_.get(mean_statistic_model_dict[measure.id], f"h1_{hand}_{position}"),
+            h1=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"h1_{hand}_{position}",
+            ),
             h1_div_t1=safe_divide(
                 py_.get(
-                    mean_statistic_model_dict[measure.id],
+                    mean_statistic_model_dict.get(measure.id),
                     f"h1_div_t1_{hand}_{position}",
                 ),
                 1000,
             ),
-            w1=py_.get(mean_statistic_model_dict[measure.id], f"w1_{hand}_{position}"),
+            w1=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"w1_{hand}_{position}",
+            ),
             w1_div_t=safe_divide(
                 py_.get(
-                    mean_statistic_model_dict[measure.id],
+                    mean_statistic_model_dict.get(measure.id),
                     f"w1_div_t_{hand}_{position}",
                 ),
                 1000,
             ),
             t1_div_t=safe_divide(
                 py_.get(
-                    mean_statistic_model_dict[measure.id],
+                    mean_statistic_model_dict.get(measure.id),
                     f"t1_div_t_{hand}_{position}",
                 ),
                 1000,
             ),
-            pw=py_.get(mean_statistic_model_dict[measure.id], f"pw_{hand}_{position}"),
-            pwcv=py_.get(cv_statistic_model_dict[measure.id], f"pw_{hand}_{position}"),
-            a0=py_.get(mean_statistic_model_dict[measure.id], f"a0_{hand}_{position}"),
+            pw=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"pw_{hand}_{position}",
+            ),
+            pwcv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"pw_{hand}_{position}",
+            ),
+            a0=py_.get(
+                mean_statistic_model_dict.get(measure.id),
+                f"a0_{hand}_{position}",
+            ),
             c1_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c1_{hand}_{position}",
             ),
             c2_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c2_{hand}_{position}",
             ),
             c3_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c3_{hand}_{position}",
             ),
             c4_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c4_{hand}_{position}",
             ),
             c5_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c5_{hand}_{position}",
             ),
             c6_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c6_{hand}_{position}",
             ),
             c7_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c7_{hand}_{position}",
             ),
             c8_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c8_{hand}_{position}",
             ),
             c9_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c9_{hand}_{position}",
             ),
             c10_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c10_{hand}_{position}",
             ),
             c11_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c11_{hand}_{position}",
             ),
             c12_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"c12_{hand}_{position}",
             ),
-            c1_cv=py_.get(cv_statistic_model_dict[measure.id], f"c1_{hand}_{position}"),
-            c2_cv=py_.get(cv_statistic_model_dict[measure.id], f"c2_{hand}_{position}"),
-            c3_cv=py_.get(cv_statistic_model_dict[measure.id], f"c3_{hand}_{position}"),
-            c4_cv=py_.get(cv_statistic_model_dict[measure.id], f"c4_{hand}_{position}"),
-            c5_cv=py_.get(cv_statistic_model_dict[measure.id], f"c5_{hand}_{position}"),
-            c6_cv=py_.get(cv_statistic_model_dict[measure.id], f"c6_{hand}_{position}"),
-            c7_cv=py_.get(cv_statistic_model_dict[measure.id], f"c7_{hand}_{position}"),
-            c8_cv=py_.get(cv_statistic_model_dict[measure.id], f"c8_{hand}_{position}"),
-            c9_cv=py_.get(cv_statistic_model_dict[measure.id], f"c9_{hand}_{position}"),
+            c1_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c1_{hand}_{position}",
+            ),
+            c2_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c2_{hand}_{position}",
+            ),
+            c3_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c3_{hand}_{position}",
+            ),
+            c4_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c4_{hand}_{position}",
+            ),
+            c5_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c5_{hand}_{position}",
+            ),
+            c6_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c6_{hand}_{position}",
+            ),
+            c7_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c7_{hand}_{position}",
+            ),
+            c8_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c8_{hand}_{position}",
+            ),
+            c9_cv=py_.get(
+                cv_statistic_model_dict.get(measure.id),
+                f"c9_{hand}_{position}",
+            ),
             c10_cv=py_.get(
-                cv_statistic_model_dict[measure.id],
+                cv_statistic_model_dict.get(measure.id),
                 f"c10_{hand}_{position}",
             ),
             c11_cv=py_.get(
-                cv_statistic_model_dict[measure.id],
+                cv_statistic_model_dict.get(measure.id),
                 f"c11_{hand}_{position}",
             ),
             c12_cv=py_.get(
-                cv_statistic_model_dict[measure.id],
+                cv_statistic_model_dict.get(measure.id),
                 f"c12_{hand}_{position}",
             ),
             p1_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p1_{hand}_{position}",
             ),
             p2_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p2_{hand}_{position}",
             ),
             p3_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p3_{hand}_{position}",
             ),
             p4_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p4_{hand}_{position}",
             ),
             p5_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p5_{hand}_{position}",
             ),
             p6_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p6_{hand}_{position}",
             ),
             p7_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p7_{hand}_{position}",
             ),
             p8_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p8_{hand}_{position}",
             ),
             p9_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p9_{hand}_{position}",
             ),
             p10_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p10_{hand}_{position}",
             ),
             p11_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p11_{hand}_{position}",
             ),
             p12_mean=py_.get(
-                mean_statistic_model_dict[measure.id],
+                mean_statistic_model_dict.get(measure.id),
                 f"p12_{hand}_{position}",
             ),
             p1_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p1_{hand}_{position}",
             ),
             p2_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p2_{hand}_{position}",
             ),
             p3_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p3_{hand}_{position}",
             ),
             p4_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p4_{hand}_{position}",
             ),
             p5_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p5_{hand}_{position}",
             ),
             p6_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p6_{hand}_{position}",
             ),
             p7_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p7_{hand}_{position}",
             ),
             p8_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p8_{hand}_{position}",
             ),
             p9_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p9_{hand}_{position}",
             ),
             p10_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p10_{hand}_{position}",
             ),
             p11_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p11_{hand}_{position}",
             ),
             p12_std=py_.get(
-                std_statistic_model_dict[measure.id],
+                std_statistic_model_dict.get(measure.id),
                 f"p12_{hand}_{position}",
             ),
         )
