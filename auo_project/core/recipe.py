@@ -755,6 +755,7 @@ async def get_parameters(
     db_session: AsyncSession,
     p_types: List[ParameterType],
     process_child_parent: bool = True,
+    specific_options_dict: dict = {},
 ):
     if not all([isinstance(e, ParameterType) for e in p_types]):
         raise HTTPException(
@@ -852,6 +853,26 @@ async def get_parameters(
                     new_option["subField"]["title"] = parent_parameter.label
 
         parameter_options_dict[option.parent_id].append(new_option)
+
+    for key in specific_options_dict.keys():
+        if key in parameter_options_dict:
+            specific_options_set = specific_options_dict[key]
+            old_options = py_.get(
+                parameter_options_dict,
+                f"{key}.1.subField.options",
+                [],
+            )
+            new_options = [
+                option
+                for option in old_options
+                if option["value"] in specific_options_set
+            ]
+            if new_options:
+                py_.set_(
+                    parameter_options_dict,
+                    f"{key}.1.subField.options",
+                    new_options,
+                )
 
     if process_child_parent:
         new_output_result = await process_child_parents(
