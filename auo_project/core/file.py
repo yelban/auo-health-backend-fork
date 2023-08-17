@@ -116,8 +116,8 @@ def clean_extra_comma(content):
 
 def is_valid_file(file_info):
     # single file limit 10MB
-    if file_info.file_size > 10 * 1024**2:
-        raise Exception(f"{file_info.filename} file size should not exceed 10 MB")
+    if file_info.file_size > 20 * 1024**2:
+        raise Exception(f"{file_info.filename} file size should not exceed 20 MB")
 
     base = resolved("/tmp")
     if badpath(file_info.filename, base):
