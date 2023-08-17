@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 import pydash as py_
@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, schemas
 from auo_project.core.constants import AdvanceChartType, ParameterType
+from auo_project.web.api import deps
 
 disease_value_pattern = re.compile(r"^d[0-9]{3}:[0-9]{3}$")
 
@@ -1258,3 +1259,14 @@ def get_labels(options):
             labels.append(getattr(option, "label"))
 
     return labels
+
+
+async def remove_inactive_recipes():
+    async with deps.get_db2() as db_session:
+        created_at = datetime.utcnow() - timedelta(days=7)
+        recipes = await crud.recipe.get_inactive_by_created_at(
+            db_session=db_session,
+            created_at=created_at,
+        )
+        for recipe in recipes:
+            await crud.recipe.remove(db_session=db_session, id=recipe.id)

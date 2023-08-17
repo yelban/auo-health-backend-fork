@@ -2,7 +2,7 @@ from asgiref.sync import async_to_sync
 from celery.schedules import crontab
 
 from auo_project.core.measure import update_measure_cn_means
-from auo_project.core.recipe import remove_inactive_reipes
+from auo_project.core.recipe import remove_inactive_recipes
 from auo_project.core.upload import post_finish, update_uploading_upload_status
 from auo_project.services.celery import celery_app
 
@@ -51,7 +51,7 @@ def task_update_measure_cn_means():
 
 @celery_app.task()
 def task_cleanup_inactive_recipes():
-    async_to_sync(remove_inactive_reipes)()
+    async_to_sync(remove_inactive_recipes)()
 
 
 @celery_app.task()
