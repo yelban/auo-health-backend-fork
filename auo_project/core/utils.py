@@ -52,7 +52,7 @@ def get_filters(f):
 def get_hr_type(n):
     if not n:
         return n
-    if n >= 90:
+    if n > 90:
         return 2
     elif n < 50:
         return 0
