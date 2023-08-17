@@ -1,5 +1,5 @@
 from datetime import datetime
-from io import BytesIO, StringIO
+from io import BytesIO
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 from uuid import UUID
@@ -1407,15 +1407,15 @@ async def get_multi_measure_summary_data(
         ],
     )
 
-    file1_content = StringIO()
-    file2_content = StringIO()
+    file1_content = BytesIO()
+    file2_content = BytesIO()
 
     df1 = pd.DataFrame.from_records(jsonable_encoder(file1_records))
-    df1.to_csv(file1_content, index=False)
+    df1.to_csv(file1_content, index=False, encoding="big5")
     file1_content.seek(0)
 
     df2 = pd.DataFrame.from_records(jsonable_encoder(file2_records))
-    df2.to_csv(file2_content, index=False)
+    df2.to_csv(file2_content, index=False, encoding="big5")
     file2_content.seek(0)
 
     output_zip = BytesIO()
