@@ -52,6 +52,16 @@ from auo_project.schemas.measure_statistic_schema import (
     MeasureStatisticRead,
     MeasureStatisticUpdate,
 )
+from auo_project.schemas.measure_survey_result_schema import (
+    MeasureSurveyResultCreate,
+    MeasureSurveyResultRead,
+    MeasureSurveyResultUpdate,
+)
+from auo_project.schemas.measure_survey_schema import (
+    MeasureSurveyCreate,
+    MeasureSurveyRead,
+    MeasureSurveyUpdate,
+)
 from auo_project.schemas.measure_tongue_schema import (
     MeasureTongueCreate,
     MeasureTongueRead,
@@ -163,4 +173,15 @@ SubjectSecretRead.update_forward_refs(SimpleMeasureInfo=SimpleMeasureInfo)
 
 RecipeListResponse.update_forward_refs(
     RecipeRead=RecipeRead,
+)
+
+
+MeasureSurveyRead.update_forward_refs(
+    Org=OrgRead,
+)
+
+MeasureSurveyResultRead.update_forward_refs(
+    Survey=MeasureSurveyRead,
+    Subkect=SubjectRead,
+    MeasureInfo=MeasureInfoRead,
 )

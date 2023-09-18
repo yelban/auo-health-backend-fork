@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from sqlmodel import Field, Relationship, UniqueConstraint
@@ -366,6 +367,13 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
         },
     )
     org: "Org" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={
+            "lazy": "select",
+            "uselist": False,
+        },
+    )
+    measure_survey_result: Optional["MeasureSurveyResult"] = Relationship(
         back_populates="measure_info",
         sa_relationship_kwargs={
             "lazy": "select",

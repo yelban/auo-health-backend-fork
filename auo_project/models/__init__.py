@@ -13,6 +13,8 @@ from auo_project.models.measure_info_model import MeasureInfo
 from auo_project.models.measure_mean_model import MeasureMean
 from auo_project.models.measure_raw_model import MeasureRaw
 from auo_project.models.measure_statistic_model import MeasureStatistic
+from auo_project.models.measure_survey_model import MeasureSurvey
+from auo_project.models.measure_survey_result_model import MeasureSurveyResult
 from auo_project.models.measure_tongue_model import MeasureTongue
 from auo_project.models.org_model import Org
 from auo_project.models.role_model import Role
