@@ -1,15 +1,20 @@
 import json
 from datetime import datetime, time
+from io import BytesIO
 from typing import Any, List, Optional
+from urllib.parse import quote
 from uuid import UUID
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import dateutil.parser
+import pandas as pd
 import pydash as py_
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.param_functions import Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import selectinload
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
@@ -34,8 +39,23 @@ from auo_project.core.recipe import (
     validate_value,
     validate_values,
 )
-from auo_project.core.survey import get_days_range, get_survey_result, handle_s026
-from auo_project.core.utils import safe_int, time_in_range
+from auo_project.core.survey import (
+    get_blood_pressure,
+    get_blood_pressure_option,
+    get_days_range,
+    get_eat_to_measure_diff_hours,
+    get_p008_pass_rate,
+    get_survey_result,
+    handle_s033_options,
+    handle_s037_options,
+    handle_s040_options,
+)
+from auo_project.core.utils import (
+    get_date,
+    normalize_parameter_name,
+    safe_int,
+    time_in_range,
+)
 from auo_project.web.api import deps
 
 router = APIRouter()
@@ -54,6 +74,13 @@ class ExportCSVInput(BaseModel):
 
 class RecipeChartDataInput(schemas.RecipeAnalyticalParamsInput, schemas.ChartSetting):
     pass
+
+
+# # TODO: check whether filter pass rate
+# def normalize_parameter_name(name):
+#     # replace ':' for a026:c056:001 and a026:c056:002
+#     if isinstance(name, str):
+#         return name.replace(":", "")
 
 
 def is_input_and_options_c006_match(survey_measure_answer, input_options):
@@ -242,26 +269,6 @@ def is_need_to_filter(measure: dict, key: str, val: dict):
     return True
 
 
-def get_blood_pressure_option(sbp: int, dbp: int):
-    if sbp is None or dbp is None:
-        return None
-    if sbp < 90 and dbp < 60:
-        return "c029:005"
-    elif sbp < 130 and dbp < 85:
-        return "c029:001"
-    elif sbp >= 130 and sbp < 140 and dbp < 90:
-        return "c029:002"
-    elif sbp >= 140 and sbp < 160 and dbp < 100:
-        return "c029:003"
-    elif sbp >= 160 and dbp >= 100:
-        return "c029:004"
-    return None
-
-
-def get_blood_pressure(measure_info):
-    return get_blood_pressure_option(measure_info.sbp, measure_info.dbp)
-
-
 async def get_z_options_dict(
     db_session: AsyncSession,
     parameters_input: schemas.RecipeAnalyticalParamsInput,
@@ -324,7 +331,7 @@ async def get_z_options_dict(
             if options:
                 z_options_dict[key] = options
 
-    print("z_options_dict", z_options_dict)
+    # print("z_options_dict", z_options_dict)
     for key, val in z_options_dict.items():
         parameter_id = key.split(":")[0]
         if hasattr(parameters_input, parameter_id):
@@ -353,16 +360,12 @@ async def get_z_options_dict(
     return z_options_dict
 
 
-async def get_filtered_measure_infos(
+async def get_filtered_measure_infos_old(
     db_session: AsyncSession,
     input_parameter_dict: dict,
     infos_dict: dict,
 ):
-    import time
-
-    start_time = time.time()
     survey_result = await get_survey_result()
-    print(f"get_survey_result: {time.time() - start_time}")
     survey_dict_by_number = {x.number: x for x in survey_result}
     survey_number_list = [x.number for x in survey_result]
     measures = await crud.measure_info.get_by_numbers(
@@ -388,7 +391,7 @@ async def get_filtered_measure_infos(
         # TODO: advanced filter
         measure_time = dateutil.parser.isoparse(new_measure["measure_time"])
         new_measure["p005"] = new_measure["measure_time"]
-        new_measure["p006"] = new_measure["survey_dt"]
+        new_measure["p006"] = new_measure["survey_at"]
         # TODO: fix 自訂 filter & add 區段 & 十二時成
         new_measure["p007"] = measure_time.time()
         # TODO: 新增欄位脈波通過率
@@ -399,7 +402,131 @@ async def get_filtered_measure_infos(
         else:
             new_measure["s022"] = "c050:001"
 
-        s026 = handle_s026(new_measure["eat_at"], measure_time)
+        s026 = get_eat_to_measure_diff_hours(new_measure["eat_at"], measure_time)
+        if s026 is None:
+            pass
+        elif s026 < 2:
+            new_measure["s026"] = "c033:001"
+        elif s026 >= 2 and s026 < 4:
+            new_measure["s026"] = "c033:002"
+        elif s026 >= 4 and s026 < 7:
+            new_measure["s026"] = "c033:003"
+        elif s026 >= 7:
+            new_measure["s026"] = "c033:004"
+
+        if pd.isnull(new_measure.get("s033")):
+            s033 = get_days_range(new_measure["symptom_from"], measure_time)
+            new_measure["s033"] = handle_s033_options(s033)
+
+        if pd.isnull(new_measure.get("s037")):
+            s037 = get_days_range(new_measure["covid_from"], measure_time)
+            new_measure["s037"] = handle_s037_options(s037)
+
+        if pd.isnull(new_measure.get("s040")):
+            s040 = get_days_range(new_measure["menstruation_from"], measure_time)
+            new_measure["s040"] = handle_s040_options(s040)
+
+        if pd.isnull(new_measure.get("a028")):
+            a028 = get_blood_pressure(measure_info=measure)
+            new_measure["a028"] = a028
+
+        new_measures.append(new_measure)
+    # TODO: filter measure & survey
+    filtered_measures = []
+
+    for measure in new_measures:
+        need_to_filter = False
+        for key, val in infos_dict.items():
+            if is_need_to_filter(measure, key, val):
+                print("filter", measure[key], val)
+                need_to_filter = True
+                break
+        if need_to_filter is False:
+            filtered_measures.append(measure)
+
+    print("length", len(new_measures), len(filtered_measures))
+    return filtered_measures
+
+
+async def get_filtered_measure_infos_new(
+    db_session: AsyncSession,
+    org_id: UUID,
+    filter_infos_dict: dict,
+):
+    # TODO: measure.info 的 number 有小寫問題，看起來也有填錯成 name 的問題
+    # survey_result = await crud.measure_survey_result.get_by_org_id(
+    #     db_session=db_session, org_id=org_id
+    # )
+
+    consult_drs = []
+    if filter_infos_dict["p002"]["result"] != "all":
+        consult_drs = get_loaded_value(filter_infos_dict["p002"]["result"])
+
+    measure_operators = []
+    if filter_infos_dict["p004"]["result"] != "all":
+        measure_operators = get_loaded_value(filter_infos_dict["p004"]["result"])
+
+    measure_time = []
+    if filter_infos_dict["p005"]["result"] != "all":
+        p005_loaded = get_loaded_value(filter_infos_dict["p005"]["result"])
+        start = get_date(p005_loaded["start"])
+        end = get_date(p005_loaded["end"])
+        measure_time.append(start)
+        measure_time.append(end)
+
+    survey_at = []
+    if filter_infos_dict["p006"]["result"] != "all":
+        p006_loaded = get_loaded_value(filter_infos_dict["p006"]["result"])
+        start = get_date(p006_loaded["start"])
+        end = get_date(p006_loaded["end"])
+        measure_time.append(start)
+        measure_time.append(end)
+
+    # TODO: 脈診量測時間
+
+    survey_results = await crud.measure_survey_result.get_by_condition(
+        db_session=db_session,
+        org_id=org_id,
+        measure_time=measure_time,
+        survey_at=survey_at,
+        measure_operators=measure_operators,
+        consult_drs=consult_drs,
+        relations=[selectinload(models.MeasureInfo)],
+    )
+
+    survey_results = [x for x in survey_results if x.measure_info is not None]
+    new_measures = []
+    # add measure info
+    for survey_record in survey_results:
+        # add additional columns
+        new_measure = {
+            **survey_record.value,
+            **jsonable_encoder(survey_record.measure_info),
+            "survey_id": survey_record.survey_id,
+            "id": survey_record.id,
+            "measure_id": survey_record.measure_id,
+            "subject_id": survey_record.subject_id,
+        }
+        # 新的資料都為空
+        new_measure["p001"] = new_measure["proj_num"]
+        new_measure["p002"] = new_measure["judge_dr"]
+        # TODO: add 檢測單位
+        # new_measure["p003"] =
+        new_measure["p004"] = new_measure["measure_operator"]
+        # TODO: advanced filter
+        measure_time = dateutil.parser.isoparse(new_measure["measure_time"])
+        new_measure["p005"] = new_measure["measure_time"]
+        new_measure["p006"] = new_measure["survey_at"]
+        # TODO: fix 自訂 filter & add 區段 & 十二時程
+        new_measure["p007"] = measure_time.time()
+
+        if new_measure["irregular_hr"] is True:
+            new_measure["s022"] = "c050:002"
+        else:
+            new_measure["s022"] = "c050:001"
+
+        # TODO: KeyError: 'eat_at'
+        s026 = get_eat_to_measure_diff_hours(new_measure.get("eat_at"), measure_time)
         if s026 is None:
             pass
         elif s026 < 2:
@@ -447,19 +574,20 @@ async def get_filtered_measure_infos(
         elif s040 >= 21 and s040 < 29:
             new_measure["s040"] = "c036:004"
 
-        a028 = get_blood_pressure(measure_info=measure)
-        new_measure["a028"] = a028
-
+        # TODO: check a028 need or not
+        if new_measure.get("a028") is None:
+            a028 = get_blood_pressure_option(
+                new_measure.get("sbp"),
+                new_measure.get("dbp"),
+            )
+            new_measure["a028"] = a028
         new_measures.append(new_measure)
     # TODO: filter measure & survey
     filtered_measures = []
 
     for measure in new_measures:
         need_to_filter = False
-        for key, val in infos_dict.items():
-            # if key == "p007":
-            # if key == "s001":
-            #     print("debug", measure[key], val, input_parameter_dict[key])
+        for key, val in filter_infos_dict.items():
             if is_need_to_filter(measure, key, val):
                 print("filter", measure[key], val)
                 need_to_filter = True
@@ -471,33 +599,534 @@ async def get_filtered_measure_infos(
     return filtered_measures
 
 
-async def get_filtered_measure_statistics(db_session: AsyncSession):
-    survey_result = await get_survey_result()
-    survey_dict_by_number = {x.number: x for x in survey_result}
-    survey_number_list = [x.number for x in survey_result]
-    measures = await crud.measure_info.get_by_numbers(
+async def get_filtered_measure_statistics(
+    db_session: AsyncSession,
+    org_id: UUID,
+    filter_infos_dict: dict,
+):
+    consult_drs = []
+    if filter_infos_dict["p002"]["result"] != "all":
+        consult_drs = json.loads(filter_infos_dict["p002"]["result"])
+
+    measure_operators = []
+    if filter_infos_dict["p004"]["result"] != "all":
+        measure_operators = json.loads(filter_infos_dict["p004"]["result"])
+
+    measure_time = []
+    if filter_infos_dict["p005"]["result"] != "all":
+        p005_loaded = json.loads(filter_infos_dict["p005"]["result"])
+        start = get_date(p005_loaded["start"])
+        end = get_date(p005_loaded["end"])
+        measure_time.append(start)
+        measure_time.append(end)
+
+    survey_at = []
+    if filter_infos_dict["p006"]["result"] != "all":
+        p006_loaded = json.loads(filter_infos_dict["p006"]["result"])
+        start = get_date(p006_loaded["start"])
+        end = get_date(p006_loaded["end"])
+        survey_at.append(start)
+        survey_at.append(end)
+
+    # TODO: filter 脈診量測時間
+
+    from sqlalchemy.orm import selectinload
+
+    survey_results = await crud.measure_survey_result.get_by_condition(
         db_session=db_session,
-        list_ids=survey_number_list,
-        relations=["statistics"],
+        org_id=org_id,
+        measure_time=measure_time,
+        survey_at=survey_at,
+        measure_operators=measure_operators,
+        consult_drs=consult_drs,
+        relations=[selectinload(models.MeasureInfo)],
     )
-    # TODO: filter measures by 主要特徵, 次要特徵 (measure or survey)
-    measure_id_number_dict = {measure.id: measure.number for measure in measures}
-    measure_id_dict = {measure.id: measure for measure in measures}
-    measure_statistics = py_.flatten([measure.statistics for measure in measures])
+    print("survey_result_length", len(survey_results))
+
+    measure_statistics = await crud.measure_statistic.get_by_measure_id_list(
+        db_session=db_session,
+        measure_id_list=[x.measure_id for x in survey_results],
+    )
+
+    survey_result_by_measure_id = {
+        survey_result.measure_id: survey_result for survey_result in survey_results
+    }
+
+    # filter 脈波通過率
+    if filter_infos_dict["p008"]["result"] != "all":
+        min_pass_rate = get_p008_pass_rate(filter_infos_dict["p008"]["result"])
+        measure_statistics = [
+            x
+            for x in measure_statistics
+            if isinstance(x.pass_rate, (int, float)) and x.pass_rate >= min_pass_rate
+        ]
+
     measure_statistics = [
         {
-            **survey_dict_by_number.get(
-                measure_id_number_dict.get(statistic.measure_id),
-            ).dict(),
             **statistic.dict(),
-            "a028": get_blood_pressure(measure_id_dict[statistic.measure_id]),
+            **survey_result_by_measure_id.get(statistic.measure_id).value,
+            # TODO: eat_at
             "statistic_id": statistic.id,
             "measure_id": statistic.measure_id,
-            "number": measure_id_number_dict.get(statistic.measure_id),
+            "number": survey_result_by_measure_id.get(statistic.measure_id).number,
+            "measure_time": survey_result_by_measure_id.get(
+                statistic.measure_id,
+            ).measure_info.measure_time,
         }
         for statistic in measure_statistics
     ]
+
     return measure_statistics
+
+
+# def get_enriched_filtered_measure_statistics():
+#     measure_statistics = [
+#         {
+#             **statistic,
+#             "x_label": hand_map.get(py_.get(statistic, "hand"), "")
+#             + position_map.get(py_.get(statistic, "position"), ""),
+#             "x": f"{ py_.get(statistic, 'hand').lower()[0]}_{py_.get(statistic, 'position').lower()}",
+#             "y": py_.get(statistic, table_column),
+#         }
+#         for statistic in measure_statistics
+#         if py_.get(statistic, "statistic").upper() == statisitc_filter.upper()
+#     ]
+
+
+async def get_chart_result_data(
+    measure_statistics: list,
+    chart_input: RecipeChartDataInput,
+    z_options_dict: dict,
+):
+    # print("z_options_dict", z_options_dict)
+    result = None
+    if chart_input.chart_type == AdvanceChartType.parameter_six_pulse:
+        x_options = "l_cu,l_qu,l_ch,r_cu,r_qu,r_ch".split(",")
+        z_options = z_options_dict.get(chart_input.z, [])
+        domain = chart_input.y.get("domain")
+
+        table_column = chart_input.y["domain"][-1].lower()
+        if "/" in table_column:
+            table_column = table_column.replace("/", "_div_")
+        elif ":" in table_column:
+            table_column = table_column.split(":")[-1]
+
+        statisitc_filter = "MEAN"
+        if "cv" in table_column:
+            statisitc_filter = "CV"
+            table_column = table_column.replace("cv", "")
+        if table_column == "pr":
+            table_column = "hr"
+
+        hand_map = {"Left": "左", "Right": "右"}
+        position_map = {"Cu": "寸", "Qu": "關", "Ch": "尺"}
+
+        measure_statistics = [
+            {
+                **statistic,
+                "x_label": hand_map.get(py_.get(statistic, "hand"), "")
+                + position_map.get(py_.get(statistic, "position"), ""),
+                "x": f"{ py_.get(statistic, 'hand').lower()[0]}_{py_.get(statistic, 'position').lower()}",
+                "y": py_.get(statistic, table_column),
+            }
+            for statistic in measure_statistics
+            if py_.get(statistic, "statistic").upper() == statisitc_filter.upper()
+        ]
+
+        result = get_chart_type1_data(
+            x_options,
+            chart_input.y["domain"][-1],
+            chart_input.z,
+            z_options,
+            sdata=measure_statistics,
+        )
+
+    elif chart_input.chart_type == AdvanceChartType.parameter_cross:
+        six_pulse = chart_input.y.get("six_pulse")
+        table_column = chart_input.y["domain"][-1].lower()
+        if "/" in table_column:
+            table_column = table_column.replace("/", "_div_")
+        elif ":" in table_column:
+            table_column = table_column.split(":")[-1]
+
+        statisitc_filter = "MEAN"
+        if "cv" in table_column:
+            statisitc_filter = "CV"
+            table_column = table_column.replace("cv", "")
+        if table_column == "pr":
+            table_column = "hr"
+
+        measure_statistics = [
+            {
+                **statistic,
+                "x": py_.get(
+                    statistic,
+                    normalize_parameter_name(chart_input.x),
+                ),
+                "y": py_.get(statistic, table_column),
+                "hand_position": f"{py_.get(statistic, 'hand').lower()[0]}_{py_.get(statistic, 'position').lower()}",
+            }
+            for statistic in measure_statistics
+            if py_.get(statistic, "statistic") == statisitc_filter
+        ]
+
+        x_options = z_options_dict.get(chart_input.x, [])
+        z_options = z_options_dict.get(chart_input.z, [])
+        domain = chart_input.y.get("domain")
+        six_pulse = chart_input.y.get("six_pulse")
+        domain_last = domain[-1]
+        result = get_chart_type2_data(
+            chart_input.x,
+            x_options,
+            domain_last,
+            six_pulse,
+            chart_input.z,
+            z_options,
+            sdata=measure_statistics,
+        )
+
+    elif chart_input.chart_type == AdvanceChartType.six_pulse_cn:
+        x_options = [f"C{i}" for i in range(1, 12)]
+        z_options = z_options_dict.get(chart_input.z, [])
+        six_pulse = chart_input.y.get("six_pulse")
+        hand_lc = six_pulse.split("_")[0]
+        position_lc = six_pulse.split("_")[1]
+        statistics = chart_input.y.get("statistics")
+        statisitc_filter = statistics.upper()
+
+        measure_statistics = [
+            statistic
+            for statistic in measure_statistics
+            if py_.get(statistic, "statistic") == statisitc_filter
+            and py_.get(statistic, "hand").lower()[0] == hand_lc
+            and py_.get(statistic, "position").lower() == position_lc
+        ]
+
+        result = get_chart_type3_data(
+            x_options,
+            six_pulse,
+            statistics,
+            chart_input.z,
+            z_options,
+            sdata=measure_statistics,
+        )
+
+    return result
+
+
+async def get_chart_export_data(
+    measure_statistics: list,
+    chart_input: RecipeChartDataInput,
+    z_options_dict: dict,
+    parameter_labels_dict: dict,
+) -> schemas.MultiExportFile:
+
+    hand_map = {"Left": "左", "Right": "右"}
+    position_map = {"Cu": "寸", "Qu": "關", "Ch": "尺"}
+
+    result = {}
+    if chart_input.chart_type == AdvanceChartType.parameter_six_pulse:
+        x_options = "l_cu,l_qu,l_ch,r_cu,r_qu,r_ch".split(",")
+        z_options = z_options_dict.get(chart_input.z, [])
+        domain = chart_input.y.get("domain")
+
+        table_column = chart_input.y["domain"][-1].lower()
+        if "/" in table_column:
+            table_column = table_column.replace("/", "_div_")
+        elif ":" in table_column:
+            table_column = table_column.split(":")[-1]
+
+        statisitc_filter = "MEAN"
+        if "cv" in table_column:
+            statisitc_filter = "CV"
+            table_column = table_column.replace("cv", "")
+        if table_column == "pr":
+            table_column = "hr"
+
+        measure_statistics = [
+            {
+                **statistic,
+                "x_label": hand_map.get(py_.get(statistic, "hand"), "")
+                + position_map.get(py_.get(statistic, "position"), ""),
+                "x": f"{ py_.get(statistic, 'hand').lower()[0]}_{py_.get(statistic, 'position').lower()}",
+                "y": py_.get(statistic, table_column),
+            }
+            for statistic in measure_statistics
+        ]
+
+        result = {}
+        for measure_statistic in measure_statistics:
+            # TODO: is_disease_match(e, z, z_option["value"])
+            z_value = py_.get(
+                measure_statistic,
+                normalize_parameter_name(chart_input.z),
+            )
+            z_label = [
+                z_option["label"]
+                for z_option in z_options
+                if z_option["value"] == z_value
+            ]
+            z_label = z_label[0] if z_label else ""
+            key = f'{measure_statistic["number"]}_{measure_statistic["measure_time"]}_{measure_statistic["x"]}_{chart_input.z}'
+            result.setdefault(
+                key,
+                {
+                    "number": measure_statistic["number"],
+                    "measure_time": measure_statistic["measure_time"],
+                    "X-六部": measure_statistic["x_label"],
+                    "類別": parameter_labels_dict.get(chart_input.z),
+                    "參數": z_label,
+                },
+            )
+            if measure_statistic["statistic"] == "MEAN":
+                result[key].update(
+                    {
+                        "h1": measure_statistic["h1"],
+                        "t1": measure_statistic["t1"],
+                        "h1/t1": measure_statistic["h1_div_t1"],
+                        "w1": measure_statistic["w1"],
+                        "w1/t": measure_statistic["w1_div_t"],
+                        "t1/t": measure_statistic["t1_div_t"],
+                        "pw": measure_statistic["pw"],
+                        "a0": measure_statistic["a0"],
+                        "c1": measure_statistic["c1"],
+                        "c2": measure_statistic["c2"],
+                        "c3": measure_statistic["c3"],
+                        "c4": measure_statistic["c4"],
+                        "c5": measure_statistic["c5"],
+                        "c6": measure_statistic["c6"],
+                        "c7": measure_statistic["c7"],
+                        "c8": measure_statistic["c8"],
+                        "c9": measure_statistic["c9"],
+                        "c10": measure_statistic["c10"],
+                        "c11": measure_statistic["c11"],
+                        "p1": measure_statistic["p1"],
+                        "p2": measure_statistic["p2"],
+                        "p3": measure_statistic["p3"],
+                        "p4": measure_statistic["p4"],
+                        "p5": measure_statistic["p5"],
+                        "p6": measure_statistic["p6"],
+                        "p7": measure_statistic["p7"],
+                        "p8": measure_statistic["p8"],
+                        "p9": measure_statistic["p9"],
+                        "p10": measure_statistic["p10"],
+                        "p11": measure_statistic["p11"],
+                    },
+                )
+            elif measure_statistic["statistic"] == "CV":
+                result[key].update(
+                    {
+                        "c1cv": measure_statistic["c1"],
+                        "c2cv": measure_statistic["c2"],
+                        "c3cv": measure_statistic["c3"],
+                        "c4cv": measure_statistic["c4"],
+                        "c5cv": measure_statistic["c5"],
+                        "c6cv": measure_statistic["c6"],
+                        "c7cv": measure_statistic["c7"],
+                        "c8cv": measure_statistic["c8"],
+                        "c9cv": measure_statistic["c9"],
+                        "c10cv": measure_statistic["c10"],
+                        "c11cv": measure_statistic["c11"],
+                        "pwcv": measure_statistic["pw"],
+                    },
+                )
+            elif measure_statistic["statistic"] == "STD":
+                pass
+
+        result = list(result.values())
+        return schemas.MultiExportFile(
+            filename=f"參數與六部比較_{parameter_labels_dict.get(chart_input.z)}",
+            rows=result,
+        )
+
+    elif chart_input.chart_type == AdvanceChartType.parameter_cross:
+        table_column = chart_input.y["domain"][-1].lower()
+        if "/" in table_column:
+            table_column = table_column.replace("/", "_div_")
+        elif ":" in table_column:
+            table_column = table_column.split(":")[-1]
+
+        statisitc_filter = "MEAN"
+        if "cv" in table_column:
+            statisitc_filter = "CV"
+            table_column = table_column.replace("cv", "")
+        if table_column == "pr":
+            table_column = "hr"
+
+        measure_statistics = [
+            {
+                **statistic,
+                "x": py_.get(
+                    statistic,
+                    normalize_parameter_name(chart_input.x),
+                ),
+                "y": py_.get(statistic, table_column),
+            }
+            for statistic in measure_statistics
+        ]
+
+        x_options = z_options_dict.get(chart_input.x, [])
+        z_options = z_options_dict.get(chart_input.z, [])
+        domain = chart_input.y.get("domain")
+        six_pulse = chart_input.y.get("six_pulse")
+        domain_last = domain[-1]
+
+        result = {}
+        for measure_statistic in measure_statistics:
+            x_value = py_.get(
+                measure_statistic,
+                normalize_parameter_name(chart_input.x),
+            )
+            x_label = [
+                x_option["label"]
+                for x_option in x_options
+                if x_option["value"] == x_value
+            ]
+            x_label = x_label[0] if x_label else ""
+            z_value = py_.get(
+                measure_statistic,
+                normalize_parameter_name(chart_input.z),
+            )
+            z_label = [
+                z_option["label"]
+                for z_option in z_options
+                if z_option["value"] == z_value
+            ]
+            z_label = z_label[0] if z_label else ""
+
+            key = f'{measure_statistic["number"]}_{measure_statistic["measure_time"]}_{measure_statistic["x"]}_{chart_input.z}'
+            result.setdefault(
+                key,
+                {
+                    "number": measure_statistic["number"],
+                    "measure_time": measure_statistic["measure_time"],
+                    f"X-{parameter_labels_dict.get(chart_input.x)}": x_label,
+                    "類別": parameter_labels_dict.get(chart_input.z),
+                    "參數": z_label,
+                },
+            )
+            hand = hand_map.get(py_.get(measure_statistic, "hand"), "")
+            position = position_map.get(py_.get(measure_statistic, "position"), "")
+            column_prefix = f"{hand}{position}"
+            if measure_statistic["statistic"] == "MEAN":
+                tmp_data = {
+                    "h1": measure_statistic["h1"],
+                    "t1": measure_statistic["t1"],
+                    "h1/t1": measure_statistic["h1_div_t1"],
+                    "w1": measure_statistic["w1"],
+                    "w1/t": measure_statistic["w1_div_t"],
+                    "t1/t": measure_statistic["t1_div_t"],
+                    "pw": measure_statistic["pw"],
+                    "a0": measure_statistic["a0"],
+                    "c1": measure_statistic["c1"],
+                    "c2": measure_statistic["c2"],
+                    "c3": measure_statistic["c3"],
+                    "c4": measure_statistic["c4"],
+                    "c5": measure_statistic["c5"],
+                    "c6": measure_statistic["c6"],
+                    "c7": measure_statistic["c7"],
+                    "c8": measure_statistic["c8"],
+                    "c9": measure_statistic["c9"],
+                    "c10": measure_statistic["c10"],
+                    "c11": measure_statistic["c11"],
+                    "p1": measure_statistic["p1"],
+                    "p2": measure_statistic["p2"],
+                    "p3": measure_statistic["p3"],
+                    "p4": measure_statistic["p4"],
+                    "p5": measure_statistic["p5"],
+                    "p6": measure_statistic["p6"],
+                    "p7": measure_statistic["p7"],
+                    "p8": measure_statistic["p8"],
+                    "p9": measure_statistic["p9"],
+                    "p10": measure_statistic["p10"],
+                    "p11": measure_statistic["p11"],
+                }
+                measure_data = {
+                    f"{column_prefix}{key}": value for key, value in tmp_data.items()
+                }
+                result[key].update(measure_data)
+            elif measure_statistic["statistic"] == "CV":
+                tmp_data = {
+                    "c1cv": measure_statistic["c1"],
+                    "c2cv": measure_statistic["c2"],
+                    "c3cv": measure_statistic["c3"],
+                    "c4cv": measure_statistic["c4"],
+                    "c5cv": measure_statistic["c5"],
+                    "c6cv": measure_statistic["c6"],
+                    "c7cv": measure_statistic["c7"],
+                    "c8cv": measure_statistic["c8"],
+                    "c9cv": measure_statistic["c9"],
+                    "c10cv": measure_statistic["c10"],
+                    "c11cv": measure_statistic["c11"],
+                    "pwcv": measure_statistic["pw"],
+                }
+                measure_data = {
+                    f"{column_prefix}{key}": value for key, value in tmp_data.items()
+                }
+                result[key].update(measure_data)
+            elif measure_statistic["statistic"] == "STD":
+                pass
+
+        result = list(result.values())
+        return schemas.MultiExportFile(
+            filename=f"參數與篩選特徵比較_{parameter_labels_dict.get(chart_input.x)}_{parameter_labels_dict.get(chart_input.z)}",
+            rows=result,
+        )
+
+    elif chart_input.chart_type == AdvanceChartType.six_pulse_cn:
+        x_options = [f"C{i}" for i in range(1, 12)]
+        z_options = z_options_dict.get(chart_input.z, [])
+        six_pulse = chart_input.y.get("six_pulse")
+        hand_lc = six_pulse.split("_")[0]
+        position_lc = six_pulse.split("_")[1]
+        statistics = chart_input.y.get("statistics")
+        statisitc_filter = statistics.upper()
+
+        measure_statistics = [statistic for statistic in measure_statistics]
+        result = {}
+        for measure_statistic in measure_statistics:
+            hand = hand_map.get(py_.get(measure_statistic, "hand"), "")
+            position = position_map.get(py_.get(measure_statistic, "position"), "")
+            column_prefix = f"{hand}{position}"
+            # iterate c1-c11 keys
+            for cn in range(1, 12):
+                z_value = py_.get(
+                    measure_statistic,
+                    normalize_parameter_name(chart_input.z),
+                )
+                z_label = [
+                    z_option["label"]
+                    for z_option in z_options
+                    if z_option["value"] == z_value
+                ]
+                z_label = z_label[0] if z_label else ""
+
+                key = f'{measure_statistic["number"]}_{measure_statistic["measure_time"]}_{chart_input.z}_c{cn}'
+                result.setdefault(
+                    key,
+                    {
+                        "number": measure_statistic["number"],
+                        "measure_time": measure_statistic["measure_time"],
+                        "X-CN": f"C{cn}",
+                        "類別": parameter_labels_dict.get(chart_input.z),
+                        "參數": z_label,
+                    },
+                )
+                result[key].update(
+                    {
+                        f'{column_prefix}{measure_statistic["statistic"]}': measure_statistic[
+                            f"c{cn}"
+                        ],
+                    },
+                )
+
+        result = list(result.values())
+        return schemas.MultiExportFile(
+            filename=f"六部與CN比較_{parameter_labels_dict.get(chart_input.z)}",
+            rows=result,
+        )
+
+    return result
 
 
 @router.get("/parameter/basic")
@@ -508,14 +1137,18 @@ async def get_basic_parameter(
     """
     Get basic parameters
     """
-    if current_user.org.name != "x_medical_center":
-        return {
-            ParameterType.primary: [],
-            ParameterType.secondary: [],
-        }
+    # if current_user.org.name != "x_medical_center":
+    #     return {
+    #         ParameterType.primary: [],
+    #         ParameterType.secondary: [],
+    #     }
 
     p_types = [ParameterType.primary, ParameterType.secondary]
-    parameters = await get_parameters(db_session=db_session, p_types=p_types)
+    parameters = await get_parameters(
+        db_session=db_session,
+        p_types=p_types,
+        user=current_user,
+    )
     for p_type in p_types:
         parameters[p_type.value] = add_default_value_to_parameter(
             parameters[p_type.value],
@@ -595,10 +1228,11 @@ async def set_basic_parameter(
 
     # TODO: run analytical preview
     # TODO: optimize save cache
-    filtered_measure_infos = await get_filtered_measure_infos(
+
+    filtered_measure_infos = await get_filtered_measure_infos_new(
         db_session=db_session,
-        input_parameter_dict=parameters_dict,
-        infos_dict=infos_dict,
+        org_id=current_user.org_id,
+        filter_infos_dict=infos_dict,
     )
 
     # multiple select
@@ -649,7 +1283,7 @@ async def set_basic_parameter(
     recipe_in = schemas.RecipeUpdate(
         subject_num_snapshot=len(filtered_measure_infos),
         analytical_unique_options=specific_options_dict,
-        snapshot_at=datetime.now(),
+        snapshot_at=datetime.utcnow(),
     )
     recipe = await crud.recipe.update(
         db_session=db_session,
@@ -662,6 +1296,7 @@ async def set_basic_parameter(
         db_session=db_session,
         p_types=p_types,
         specific_options_dict=specific_options_dict,
+        user=current_user,
     )
 
     parameters_group["analytical"] = add_default_value_to_parameter(
@@ -735,7 +1370,11 @@ async def get_recipe(
         db_session=db_session,
         recipe_id=recipe_id,
     )
-    parameters = await get_parameters(db_session=db_session, p_types=p_types)
+    parameters = await get_parameters(
+        db_session=db_session,
+        p_types=p_types,
+        user=current_user,
+    )
     for p_type in p_types:
         parameters[p_type.value] = add_recipe_value_to_parameter(
             parameters[p_type.value],
@@ -1022,6 +1661,16 @@ async def get_chart_data(
     if not recipe:
         raise Exception(f"Recipe {recipe_id} not found")
 
+    # TODO: get required parameters for filtering
+    recipe_parameters = await crud.recipe_parameter.get_dict_by_recipe_id(
+        db_session=db_session,
+        recipe_id=recipe.id,
+    )
+    filter_infos_dict = {}
+    for key, val in recipe_parameters.items():
+        filter_infos_dict.setdefault(key, {})
+        filter_infos_dict[key].setdefault("result", val.value)
+
     parameters_input = schemas.RecipeAnalyticalParamsInput(**chart_input.dict())
     error_dict, infos_dict = await validate_values(
         db_session=db_session,
@@ -1045,149 +1694,20 @@ async def get_chart_data(
         ),
     )
 
-    result = None
-    if chart_input.chart_type == AdvanceChartType.parameter_six_pulse:
-        x_options = "l_cu,l_qu,l_ch,r_cu,r_qu,r_ch".split(",")
-        z_options = z_options_dict.get(chart_input.z, [])
-        # z_labels = get_labels(z_options)
-        domain = chart_input.y.get("domain")
+    start_time = datetime.now()
+    measure_statistics = await get_filtered_measure_statistics(
+        db_session=db_session,
+        org_id=current_user.org_id,
+        filter_infos_dict=filter_infos_dict,
+    )
+    end_time = datetime.now()
+    print("prepare measure_statistics cost time:", end_time - start_time, "s")
 
-        # TODO: filter primary and secondary
-        table_column = chart_input.y["domain"][-1].lower()
-        if "/" in table_column:
-            table_column = table_column.replace("/", "_div_")
-        elif ":" in table_column:
-            table_column = table_column.split(":")[-1]
-
-        statisitc_filter = "MEAN"
-        if "cv" in table_column:
-            statisitc_filter = "CV"
-            table_column = table_column.replace("cv", "")
-        if table_column == "pr":
-            table_column = "hr"
-
-        hand_map = {"Left": "左", "Right": "右"}
-        position_map = {"Cu": "寸", "Qu": "關", "Ch": "尺"}
-
-        # TODO: change get_filtered_measure_infos
-        measure_statistics = await get_filtered_measure_statistics(
-            db_session=db_session,
-        )
-        measure_statistics = [
-            {
-                **statistic,
-                "x_label": hand_map.get(py_.get(statistic, "hand"), "")
-                + position_map.get(py_.get(statistic, "position"), ""),
-                "x": f"{ py_.get(statistic, 'hand').lower()[0]}_{py_.get(statistic, 'position').lower()}",
-                "y": py_.get(statistic, table_column),
-            }
-            for statistic in measure_statistics
-            if py_.get(statistic, "statistic").upper() == statisitc_filter.upper()
-        ]
-        # print("measure_statistics", measure_statistics)
-        test = py_.group_by(
-            [
-                {
-                    "y": e["y"],
-                    "measure_id": e["measure_id"],
-                    "a026c056001": e["a026c056001"],
-                }
-                for e in measure_statistics
-            ],
-            "a026c056001",
-        )
-
-        print("test", type(test), test.keys(), test)
-
-        result = get_chart_type1_data(
-            x_options,
-            chart_input.y["domain"][-1],
-            chart_input.z,
-            z_options,
-            sdata=measure_statistics,
-        )
-
-    elif chart_input.chart_type == AdvanceChartType.parameter_cross:
-        table_column = chart_input.y["domain"][-1].lower()
-        if "/" in table_column:
-            table_column = table_column.replace("/", "_div_")
-        elif ":" in table_column:
-            table_column = table_column.split(":")[-1]
-
-        statisitc_filter = "MEAN"
-        if "cv" in table_column:
-            statisitc_filter = "CV"
-            table_column = table_column.replace("cv", "")
-        if table_column == "pr":
-            table_column = "hr"
-
-        # TODO: check whether filter pass rate
-        def normalize_parameter_name(name):
-            # replace ':' for a026:c056:001 and a026:c056:002
-            if isinstance(name, str):
-                return name.replace(":", "")
-
-        measure_statistics = await get_filtered_measure_statistics(
-            db_session=db_session,
-        )
-        measure_statistics = [
-            {
-                **statistic,
-                "x": py_.get(
-                    statistic,
-                    normalize_parameter_name(chart_input.x),
-                ),
-                "y": py_.get(statistic, table_column),
-            }
-            for statistic in measure_statistics
-            if py_.get(statistic, "statistic") == statisitc_filter
-        ]
-
-        x_options = z_options_dict.get(chart_input.x, [])
-        z_options = z_options_dict.get(chart_input.z, [])
-        # z_labels = get_labels(z_options)
-        domain = chart_input.y.get("domain")
-        six_pulse = chart_input.y.get("six_pulse")
-        domain_last = domain[-1]
-        result = get_chart_type2_data(
-            chart_input.x,
-            x_options,
-            domain_last,
-            six_pulse,
-            chart_input.z,
-            z_options,
-            sdata=measure_statistics,
-        )
-
-    elif chart_input.chart_type == AdvanceChartType.six_pulse_cn:
-        x_options = [f"C{i}" for i in range(1, 12)]
-        z_options = z_options_dict.get(chart_input.z, [])
-        # z_labels = get_labels(z_options)
-        six_pulse = chart_input.y.get("six_pulse")
-        hand_lc = six_pulse.split("_")[0]
-        position_lc = six_pulse.split("_")[1]
-        statistics = chart_input.y.get("statistics")
-        statisitc_filter = statistics.upper()
-
-        measure_statistics = await get_filtered_measure_statistics(
-            db_session=db_session,
-        )
-        measure_statistics = [
-            statistic
-            for statistic in measure_statistics
-            if py_.get(statistic, "statistic") == statisitc_filter
-            and py_.get(statistic, "hand").lower()[0] == hand_lc
-            and py_.get(statistic, "position").lower() == position_lc
-        ]
-
-        result = get_chart_type3_data(
-            x_options,
-            six_pulse,
-            statistics,
-            chart_input.z,
-            z_options,
-            sdata=measure_statistics,
-        )
+    result = await get_chart_result_data(
+        measure_statistics=measure_statistics,
+        chart_input=chart_input,
+        z_options_dict=z_options_dict,
+    )
 
     return result
 
@@ -1204,6 +1724,15 @@ async def export_csv(
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
 
+    recipe_parameters = await crud.recipe_parameter.get_dict_by_recipe_id(
+        db_session=db_session,
+        recipe_id=recipe.id,
+    )
+    filter_infos_dict = {}
+    for key, val in recipe_parameters.items():
+        filter_infos_dict.setdefault(key, {})
+        filter_infos_dict[key].setdefault("result", val.value)
+
     parameters_input = body.analytical_params
     error_dict, _ = await validate_values(
         db_session=db_session,
@@ -1217,11 +1746,68 @@ async def export_csv(
             chart_setting=schemas.ChartSetting(**chart_setting.dict()),
         )
 
+    measure_statistics = await get_filtered_measure_statistics(
+        db_session=db_session,
+        org_id=current_user.org_id,
+        filter_infos_dict=filter_infos_dict,
+    )
     chart_settings = [setting for setting in body.chart_settings if setting]
-    return FileResponse(
-        path="/app/src/多人多次下載檔案範例.zip",
-        filename="多人多次下載檔案範例.zip",
-        headers={"Access-Control-Expose-Headers": "Content-Disposition"},
+    z_options_dict = await get_z_options_dict(
+        db_session,
+        parameters_input,
+        recipe.analytical_unique_options or {},
+    )
+
+    parameter_labels_dict = await crud.measure_parameter.get_labels_dict(
+        db_session=db_session,
+    )
+
+    file_list = []
+    for chart_setting in chart_settings:
+        file_info = await get_chart_export_data(
+            measure_statistics=measure_statistics,
+            chart_input=chart_setting,
+            z_options_dict=z_options_dict,
+            parameter_labels_dict=parameter_labels_dict,
+        )
+
+        result_list = jsonable_encoder(file_info.rows)
+
+        file_content = BytesIO()
+        file_content_utf8 = BytesIO()
+        if result_list:
+            df = pd.DataFrame.from_records(result_list)
+            print("df length", len(df))
+            df.to_csv(file_content, index=False, encoding="big5", errors="ignore")
+            df.to_csv(file_content_utf8, index=False, encoding="utf8", errors="ignore")
+            file_content.seek(0)
+            file_content_utf8.seek(0)
+            filename = f"{file_info.filename}.csv"
+            filename_utf8 = f"{file_info.filename}_utf8.csv"
+            file_list.append([filename, file_content])
+            file_list.append([filename_utf8, file_content_utf8])
+        else:
+            print("NoNONONOOON")
+
+    print("file_list", len(file_list))
+    output_zip = BytesIO()
+    for file_info in file_list:
+        with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
+            output_zip_obj.writestr(file_info[0], file_info[1].getvalue())
+    output_zip.seek(0)
+
+    today_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"多人多次下載檔案_{today_str}.zip"
+    return StreamingResponse(
+        output_zip,
+        media_type="application/x-zip-compressed",
+        headers={
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Content-Disposition": "inline; filename*=utf-8''{}".format(
+                quote(filename),
+            ),
+            "Content-Type": "application/octet-stream",
+        },
     )
 
 
