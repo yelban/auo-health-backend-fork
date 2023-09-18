@@ -14,6 +14,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
 from auo_project.core.config import settings
+from auo_project.core.constants import MAX_DEPTH_RATIO
+from auo_project.core.file import get_max_amp_depth_of_range
 from auo_project.core.utils import (
     compare_cn_diff,
     get_hr_type,
@@ -161,7 +163,14 @@ async def get_measure_summary(
     measure = await crud.measure_info.get(
         db_session=db_session,
         id=measure_id,
-        relations=["bcq", "statistics", "tongue", "raw", "subject"],
+        relations=[
+            "bcq",
+            "statistics",
+            "tongue",
+            "raw",
+            "subject",
+            "measure_survey_result",
+        ],
     )
     if not measure:
         raise HTTPException(
@@ -199,7 +208,7 @@ async def get_measure_summary(
         if tongue.up_img_uri:
             container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
             file_path = tongue.up_img_uri
-            expiry = datetime.now() + timedelta(minutes=15)
+            expiry = datetime.utcnow() + timedelta(minutes=15)
             sas_token = generate_blob_sas(
                 account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
                 container_name=container_name,
@@ -214,7 +223,7 @@ async def get_measure_summary(
         if tongue.down_img_uri:
             container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
             file_path = tongue.down_img_uri
-            expiry = datetime.now() + timedelta(minutes=15)
+            expiry = datetime.utcnow() + timedelta(minutes=15)
             sas_token = generate_blob_sas(
                 account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
                 container_name=container_name,
@@ -299,8 +308,18 @@ async def get_measure_summary(
     width_value_r_qu = safe_divide(measure.range_length_r_qu, 0.2)
     width_value_r_ch = safe_divide(measure.range_length_r_ch, 0.2)
 
+    # TODO: remove me
+    sbp = measure.sbp
+    dbp = measure.dbp
+    if (sbp is None or dbp is None) and measure.measure_survey_result is not None:
+        survey_result_value = measure.measure_survey_result.value
+        if sbp is None:
+            sbp = survey_result_value.get("sbp", None)
+        if dbp is None:
+            dbp = survey_result_value.get("dbp", None)
+
     return schemas.MeasureDetailResponse(
-        subject=schemas.SubjectRead(
+        subject=schemas.SubjectSecretRead(
             **jsonable_encoder(subject),
             standard_measure_info=standard_measure_info,
         ),
@@ -308,8 +327,8 @@ async def get_measure_summary(
             measure_time=measure.measure_time,
             measure_operator=measure.measure_operator,
             proj_num=measure.proj_num,
-            sbp=measure.sbp,
-            dbp=measure.dbp,
+            sbp=sbp,
+            dbp=dbp,
             memo=measure.memo,
             age=measure.age,
             height=measure.height,
@@ -320,9 +339,9 @@ async def get_measure_summary(
             irregular_hr_r=measure.irregular_hr_r,
             irregular_hr_type_r=measure.irregular_hr_type_r,
             hr_l=measure.hr_l,
-            hr_l_type=get_hr_type(measure.hr_l),
+            hr_l_type=get_hr_type(measure.hr_l, measure.hr_r),
             hr_r=measure.hr_r,
-            hr_r_type=get_hr_type(measure.hr_r),
+            hr_r_type=get_hr_type(measure.hr_r, measure.hr_l),
             mean_prop_range_1_l_cu=measure.mean_prop_range_1_l_cu,
             mean_prop_range_2_l_cu=measure.mean_prop_range_2_l_cu,
             mean_prop_range_3_l_cu=measure.mean_prop_range_3_l_cu,
@@ -341,18 +360,78 @@ async def get_measure_summary(
             mean_prop_range_1_r_ch=measure.mean_prop_range_1_r_ch,
             mean_prop_range_2_r_ch=measure.mean_prop_range_2_r_ch,
             mean_prop_range_3_r_ch=measure.mean_prop_range_3_r_ch,
-            mean_prop_range_max_l_cu=measure.mean_prop_range_max_l_cu,
-            mean_prop_range_max_l_qu=measure.mean_prop_range_max_l_qu,
-            mean_prop_range_max_l_ch=measure.mean_prop_range_max_l_ch,
-            mean_prop_range_max_r_cu=measure.mean_prop_range_max_r_cu,
-            mean_prop_range_max_r_qu=measure.mean_prop_range_max_r_qu,
-            mean_prop_range_max_r_ch=measure.mean_prop_range_max_r_ch,
-            max_amp_depth_of_range_l_cu=measure.max_amp_depth_of_range_l_cu,
-            max_amp_depth_of_range_l_qu=measure.max_amp_depth_of_range_l_qu,
-            max_amp_depth_of_range_l_ch=measure.max_amp_depth_of_range_l_ch,
-            max_amp_depth_of_range_r_cu=measure.max_amp_depth_of_range_r_cu,
-            max_amp_depth_of_range_r_qu=measure.max_amp_depth_of_range_r_qu,
-            max_amp_depth_of_range_r_ch=measure.max_amp_depth_of_range_r_ch,
+            mean_prop_range_max_l_cu=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_l_cu,
+                static_range_end_hand_position=measure.static_range_end_l_cu,
+                static_max_amp_hand_position=measure.static_max_amp_l_cu,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            mean_prop_range_max_l_qu=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_l_qu,
+                static_range_end_hand_position=measure.static_range_end_l_qu,
+                static_max_amp_hand_position=measure.static_max_amp_l_qu,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            mean_prop_range_max_l_ch=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_l_ch,
+                static_range_end_hand_position=measure.static_range_end_l_ch,
+                static_max_amp_hand_position=measure.static_max_amp_l_ch,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            mean_prop_range_max_r_cu=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_r_cu,
+                static_range_end_hand_position=measure.static_range_end_r_cu,
+                static_max_amp_hand_position=measure.static_max_amp_r_cu,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            mean_prop_range_max_r_qu=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_r_qu,
+                static_range_end_hand_position=measure.static_range_end_r_qu,
+                static_max_amp_hand_position=measure.static_max_amp_r_qu,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            mean_prop_range_max_r_ch=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_r_ch,
+                static_range_end_hand_position=measure.static_range_end_r_ch,
+                static_max_amp_hand_position=measure.static_max_amp_r_ch,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            max_amp_depth_of_range_l_cu=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_l_cu,
+                static_range_end_hand_position=measure.static_range_end_l_cu,
+                static_max_amp_hand_position=measure.static_max_amp_l_cu,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            max_amp_depth_of_range_l_qu=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_l_qu,
+                static_range_end_hand_position=measure.static_range_end_l_qu,
+                static_max_amp_hand_position=measure.static_max_amp_l_qu,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            max_amp_depth_of_range_l_ch=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_l_ch,
+                static_range_end_hand_position=measure.static_range_end_l_ch,
+                static_max_amp_hand_position=measure.static_max_amp_l_ch,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            max_amp_depth_of_range_r_cu=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_r_cu,
+                static_range_end_hand_position=measure.static_range_end_r_cu,
+                static_max_amp_hand_position=measure.static_max_amp_r_cu,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            max_amp_depth_of_range_r_qu=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_r_qu,
+                static_range_end_hand_position=measure.static_range_end_r_qu,
+                static_max_amp_hand_position=measure.static_max_amp_r_qu,
+                ratio=MAX_DEPTH_RATIO,
+            ),
+            max_amp_depth_of_range_r_ch=get_max_amp_depth_of_range(
+                static_range_start_hand_position=measure.static_range_start_r_ch,
+                static_range_end_hand_position=measure.static_range_end_r_ch,
+                static_max_amp_hand_position=measure.static_max_amp_r_ch,
+                ratio=MAX_DEPTH_RATIO,
+            ),
             max_amp_value_l_cu=measure.max_amp_value_l_cu,
             max_amp_value_l_qu=measure.max_amp_value_l_qu,
             max_amp_value_l_ch=measure.max_amp_value_l_ch,
@@ -392,26 +471,32 @@ async def get_measure_summary(
             width_l_cu=get_measure_width(
                 measure.range_length_l_cu,
                 measure.max_amp_value_l_cu,
+                measure.max_slope_value_l_cu,
             ),
             width_l_qu=get_measure_width(
                 measure.range_length_l_qu,
                 measure.max_amp_value_l_qu,
+                measure.max_slope_value_l_qu,
             ),
             width_l_ch=get_measure_width(
                 measure.range_length_l_ch,
                 measure.max_amp_value_l_ch,
+                measure.max_slope_value_l_ch,
             ),
             width_r_cu=get_measure_width(
                 measure.range_length_r_cu,
                 measure.max_amp_value_r_cu,
+                measure.max_slope_value_r_cu,
             ),
             width_r_qu=get_measure_width(
                 measure.range_length_r_qu,
                 measure.max_amp_value_r_qu,
+                measure.max_slope_value_r_qu,
             ),
             width_r_ch=get_measure_width(
                 measure.range_length_r_ch,
                 measure.max_amp_value_r_ch,
+                measure.max_slope_value_r_ch,
             ),
             width_value_l_cu=round(width_value_l_cu, 1) if width_value_l_cu else None,
             width_value_l_qu=round(width_value_l_qu, 1) if width_value_l_qu else None,

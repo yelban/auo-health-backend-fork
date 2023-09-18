@@ -24,6 +24,7 @@ from auo_project.core.azure import (
 from auo_project.core.config import settings
 from auo_project.core.constants import (
     LOW_PASS_RATE_THRESHOLD,
+    MAX_DEPTH_RATIO,
     FileStatusType,
     UploadStatusType,
 )
@@ -170,25 +171,72 @@ def get_mean_prop_range_123(infos_analyze, hand, position):
 
 
 def get_range_idx(v, values):
+    # 浮2;中1;沉0
     if v < values[0]:
         # TODO
         # raise Exception("max depth should not less than start", v, values)
         print("max depth should not less than start", v, values)
     elif v < values[1]:
-        return 0
+        return 2
     elif v < values[2]:
         return 1
     elif v <= values[3]:
-        return 2
+        return 0
     else:
         # raise Exception("max depth should not more than end", v, values)
         print("max depth should not more than end", v, values)
     return
 
 
-def get_max_amp_depth_of_range(infos_analyze, hand, position):
+def get_max_amp_depth_of_range(
+    static_range_start_hand_position: float,
+    static_range_end_hand_position: float,
+    static_max_amp_hand_position: float,
+    ratio: tuple,
+):
+    if (
+        all(
+            [
+                x is not None
+                for x in [
+                    static_range_start_hand_position,
+                    static_range_end_hand_position,
+                    static_max_amp_hand_position,
+                ]
+            ],
+        )
+        is False
+    ):
+        return None
+    static_range_1_3_adjust = (
+        static_range_start_hand_position
+        + (static_range_end_hand_position - static_range_start_hand_position)
+        * ratio[0]
+        / 10
+    )
+    static_range_2_3_adjust = (
+        static_range_start_hand_position
+        + (static_range_end_hand_position - static_range_start_hand_position)
+        * (ratio[0] + ratio[1])
+        / 10
+    )
+    values = [
+        static_range_start_hand_position,
+        static_range_1_3_adjust,
+        static_range_2_3_adjust,
+        static_range_end_hand_position,
+    ]
+
+    if not all([v is not None for v in values]) or static_max_amp_hand_position is None:
+        return None
+
+    return get_range_idx(static_max_amp_hand_position, values)
+
+
+def get_max_amp_depth_of_range_from_file(infos_analyze, hand, position):
     default_value = {f"max_amp_depth_of_range_{hand}_{position}": None}
-    # 未來可能調整算法，目前為 3:4:3
+    # 未來可能調整算法，2023/09/10 改為 2:6:2
+    ratio = MAX_DEPTH_RATIO
     start_end_keys = [
         f"static_range_start_{hand}_{position}",
         f"static_range_end_{hand}_{position}",
@@ -198,12 +246,14 @@ def get_max_amp_depth_of_range(infos_analyze, hand, position):
         for key in start_end_keys
     ]
     static_range_1_3_adjust = (
-        start_end_values[0] + (start_end_values[1] - start_end_values[0]) * 3 / 10
+        start_end_values[0]
+        + (start_end_values[1] - start_end_values[0]) * ratio[0] / 10
         if all([x is not None for x in start_end_values])
         else None
     )
     static_range_2_3_adjust = (
-        start_end_values[0] + (start_end_values[1] - start_end_values[0]) * 7 / 10
+        start_end_values[0]
+        + (start_end_values[1] - start_end_values[0]) * (ratio[0] + ratio[1]) / 10
         if all([x is not None for x in start_end_values])
         else None
     )
@@ -232,7 +282,7 @@ def cal_extra_measure_info(infos_analyze):
             result = {
                 **result,
                 **get_mean_prop_range_123(infos_analyze, hand, position),
-                **get_max_amp_depth_of_range(infos_analyze, hand, position),
+                **get_max_amp_depth_of_range_from_file(infos_analyze, hand, position),
             }
     return result
 

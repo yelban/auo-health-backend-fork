@@ -2,6 +2,9 @@ from enum import Enum, IntEnum
 
 LOW_PASS_RATE_THRESHOLD = 50
 
+# 浮沉最大值落點前中後段比例
+MAX_DEPTH_RATIO = (2, 6, 2)
+
 
 class UploadStatusType(IntEnum):
     """

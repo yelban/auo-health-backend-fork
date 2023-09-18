@@ -1,8 +1,9 @@
 from datetime import date, datetime, time
 from random import randrange
-from typing import Union
+from typing import Optional, Union
 
 import dateutil.parser
+import pydash as py_
 from dateutil.relativedelta import relativedelta
 
 from auo_project import schemas
@@ -49,12 +50,14 @@ def get_filters(f):
     return dict([(k, v) for k, v in f.items() if v is not None and v != []])
 
 
-def get_hr_type(n):
-    if not n:
-        return n
-    if n > 90:
+def get_hr_type(hr, other_hand_hr):
+    if not hr:
+        return hr
+    if hr > 90:
         return 2
-    elif n < 50:
+    elif hr > 85 and other_hand_hr > 90:
+        return 2
+    elif hr < 60:
         return 0
     return 1
 
@@ -192,6 +195,13 @@ def safe_int(v):
         return None
 
 
+def safe_float(v):
+    try:
+        return float(v)
+    except Exception:
+        return None
+
+
 def safe_parse_dt(s):
     try:
         return dateutil.parser.parse(s)
@@ -201,13 +211,22 @@ def safe_parse_dt(s):
 
 
 def get_date(text):
+    if isinstance(text, date):
+        return text
+    if isinstance(text, datetime):
+        return text.date()
     try:
-        return datetime.strptime(text, "%Y-%m-%d").date()
+        if "-" in text:
+            return datetime.strptime(text, "%Y-%m-%d").date()
+        elif "/" in text:
+            return datetime.strptime(text, "%Y/%m/%d").date()
     except:
         return None
 
 
 def get_time(text):
+    if isinstance(text, datetime):
+        return text.time()
     try:
         return datetime.strptime(text, "%H:%M").time()
     except:
@@ -215,8 +234,13 @@ def get_time(text):
 
 
 def get_datetime(text):
+    if isinstance(text, datetime):
+        return text
     try:
-        return datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
+        if "-" in text:
+            return datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
+        elif "/" in text:
+            return datetime.strptime(text, "%Y/%m/%d %H:%M:%S")
     except:
         return None
 
@@ -235,23 +259,31 @@ def time_in_range(start, end, x):
         print("error", e)
 
 
+def get_bmi(height: Union[int, float], weight: Union[int, float]) -> Optional[float]:
+    bmi = None
+    if isinstance(height, (int, float)) and isinstance(weight, (int, float)):
+        bmi = safe_divide(weight, (height / 100) ** 2)
+    return bmi
+
+
 def get_measure_strength(max_slop, max_amp_value):
     if max_slop is None or max_amp_value is None:
         return None
-    if max_slop > 199 and max_amp_value > 34:
+    if max_slop > 199 or max_amp_value > 33:
         return 2
-    elif max_slop < 100 and max_amp_value < 10:
+    elif max_amp_value < 10:
         return 0
     else:
         return 1
 
 
-def get_measure_width(range_length, max_amp_value):
+# 大細類型
+def get_measure_width(range_length, max_amp_value, max_slop):
     if range_length is None or max_amp_value is None:
         return None
-    if range_length / 0.2 < 15 and max_amp_value < 10:
+    if range_length / 0.2 < 25 and (max_amp_value >= 20 or max_slop > 180):
         return 0
-    elif range_length / 0.2 > 24 and max_amp_value > 34:
+    elif range_length / 0.2 < 25 and (max_amp_value < 20 or max_slop < 100):
         return 2
     else:
         return 1
