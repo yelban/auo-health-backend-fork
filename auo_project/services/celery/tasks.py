@@ -1,7 +1,10 @@
 from asgiref.sync import async_to_sync
 from celery.schedules import crontab
 
-from auo_project.core.measure import update_measure_cn_means
+from auo_project.core.measure import (
+    update_measure_cn_means,
+    update_measure_cn_means_by_human,
+)
 from auo_project.core.recipe import remove_inactive_recipes
 from auo_project.core.upload import post_finish, update_uploading_upload_status
 from auo_project.services.celery import celery_app
@@ -47,6 +50,7 @@ def tusd_post_finish(arbitrary_json):
 @celery_app.task()
 def task_update_measure_cn_means():
     async_to_sync(update_measure_cn_means)()
+    async_to_sync(update_measure_cn_means_by_human)()
 
 
 @celery_app.task()

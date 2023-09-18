@@ -80,3 +80,72 @@ async def update_measure_cn_means():
         await db_session.commit()
 
         return True
+
+
+async def update_measure_cn_means_by_human():
+    async with deps.get_db2() as db_session:
+        stat = """
+update
+    measure.overall_means set cnt = t1.cnt,
+    a0 = t1.a0,
+    c1 = t1.c1,
+    c2 = t1.c2,
+    c3 = t1.c3,
+    c4 = t1.c4,
+    c5 = t1.c5,
+    c6 = t1.c6,
+    c7 = t1.c7,
+    c8 = t1.c8,
+    c9 = t1.c9,
+    c10 = t1.c10,
+    c11 = t1.c11,
+    p1 = t1.p1,
+    p2 = t1.p2,
+    p3 = t1.p3,
+    p4 = t1.p4,
+    p5 = t1.p5,
+    p6 = t1.p6,
+    p7 = t1.p7,
+    p8 = t1.p8,
+    p9 = t1.p9,
+    p10 = t1.p10,
+    p11 = t1.p11,
+    updated_at = current_timestamp(0)
+from
+    (
+        select
+            1 as cnt,
+            a0,
+            c1,
+            c2,
+            c3,
+            c4,
+            c5,
+            c6,
+            c7,
+            c8,
+            c9,
+            c10,
+            c11,
+            p1,
+            p2,
+            p3,
+            p4,
+            p5,
+            p6,
+            p7,
+            p8,
+            p9,
+            p10,
+            p11
+        from
+            measure.statistics
+        where
+            measure_id = '86eacaf9-5109-47e8-be41-45fe823a1a29'
+            and hand = 'Left'
+            and position = 'Qu'
+            and statistic = 'MEAN'
+    ) as t1;
+"""
+        await db_session.execute(stat)
+        await db_session.commit()
