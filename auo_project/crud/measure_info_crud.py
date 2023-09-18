@@ -15,9 +15,13 @@ from auo_project.schemas.measure_info_schema import MeasureInfoCreate, MeasureIn
 
 class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate]):
     async def get_exist_measure(
-        self, db_session, *, sid: str, measure_time: datetime
+        self, db_session, *, org_id: UUID, sid: str, measure_time: datetime
     ) -> Optional[MeasureInfo]:
-        subject = await crud.subject.get_by_sid(db_session=db_session, sid=sid)
+        subject = await crud.subject.get_by_sid(
+            db_session=db_session,
+            org_id=org_id,
+            sid=sid,
+        )
         if not subject:
             return
         measure = await db_session.execute(
@@ -57,7 +61,9 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
         user=None,
     ) -> List[str]:
         base_query = select(MeasureInfo)
-        proj_nums_query = select(func.distinct(MeasureInfo.proj_num)).select_from(
+        if user:
+            base_query = select(MeasureInfo).where(MeasureInfo.org_id == user.org_id)
+        proj_nums_query = select(func.distinct(base_query.c.proj_num)).select_from(
             base_query.subquery(),
         )
         proj_nums_result = await db_session.execute(proj_nums_query)
@@ -74,7 +80,9 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
         user=None,
     ) -> List[str]:
         base_query = select(MeasureInfo)
-        query = select(func.distinct(MeasureInfo.judge_dr)).select_from(
+        if user:
+            base_query = select(MeasureInfo).where(MeasureInfo.org_id == user.org_id)
+        query = select(func.distinct(base_query.c.judge_dr)).select_from(
             base_query.subquery(),
         )
         result = await db_session.execute(query)
@@ -87,7 +95,9 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
         user=None,
     ) -> List[str]:
         base_query = select(MeasureInfo)
-        query = select(func.distinct(MeasureInfo.measure_operator)).select_from(
+        if user:
+            base_query = select(MeasureInfo).where(MeasureInfo.org_id == user.org_id)
+        query = select(func.distinct(base_query.c.measure_operator)).select_from(
             base_query.subquery(),
         )
         result = await db_session.execute(query)
@@ -100,7 +110,9 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
         user=None,
     ) -> List[str]:
         base_query = select(MeasureInfo)
-        org_id_query = select(func.distinct(MeasureInfo.org_id)).select_from(
+        if user:
+            base_query = select(MeasureInfo).where(MeasureInfo.org_id == user.org_id)
+        org_id_query = select(func.distinct(base_query.c.org_id)).select_from(
             base_query.subquery(),
         )
         query = select(Org).where(Org.id.in_(org_id_query))
@@ -131,7 +143,7 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
         return response.scalars().all()
 
     async def get_all_by_measure_time(
-        self, db_session, *, measure_time: datetime
+        self, db_session: AsyncSession, *, measure_time: datetime
     ) -> Optional[List[MeasureInfo]]:
         response = await db_session.execute(
             select(MeasureInfo).where(
