@@ -470,11 +470,13 @@ async def process_file(
 
     subject = await crud.subject.get_by_sid_and_proj_num(
         db_session=db_session,
+        org_id=file.owner.org_id,
         sid=infos.id,
         proj_num=report.proj_num if report else None,
     )
     if not subject:
         subject_in = schemas.SubjectCreate(
+            org_id=file.owner.org_id,
             sid=infos.id,
             name=infos.name,
             birth_date=infos.birth_date,
@@ -500,9 +502,10 @@ async def process_file(
             obj_new=subject_in,
         )
 
-    # TODO: check sid + measure_time as unique key ok
+    # unique key: check subject_id (org_id, sid) + measure_time
     measure_info = await crud.measure_info.get_exist_measure(
         db_session=db_session,
+        org_id=file.owner.org_id,
         sid=subject.sid,
         measure_time=infos.measure_time,
     ) or await crud.measure_info.get_by_file_id(db_session=db_session, file_id=file.id)
