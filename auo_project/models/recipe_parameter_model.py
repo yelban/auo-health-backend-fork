@@ -39,5 +39,8 @@ class RecipeParameter(
     )
     recipe: Optional["Recipe"] = Relationship(
         back_populates="parameters",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={
+            "lazy": "select",
+            "cascade": "all, delete",
+        },
     )
