@@ -120,7 +120,7 @@ async def post_finish(arbitrary_json):
             if is_all_files_success:
                 upload_in = UploadUpdate(
                     upload_status=UploadStatusType.success.value,
-                    end_to=datetime.now(),
+                    end_to=datetime.utcnow(),
                     file_number=file.upload.file_number + (1 if file.is_dup else 0),
                     display_file_number=file.upload.display_file_number
                     + (1 if file.is_dup else 0),

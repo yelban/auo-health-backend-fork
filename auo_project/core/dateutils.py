@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from dateutil.relativedelta import relativedelta
@@ -23,7 +23,7 @@ class DateUtils:
         self.end_date = end_date
 
     def get_dates_by_time_unit(self, time_unit):
-        today = datetime.today()
+        today = datetime.utcnow() + timedelta(hours=8)
         if time_unit == "1w":
             return today - relativedelta(weeks=1), today
         elif time_unit == "1m":
