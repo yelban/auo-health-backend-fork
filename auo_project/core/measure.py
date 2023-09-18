@@ -37,6 +37,7 @@ async def update_measure_cn_means():
         inner join measure.infos as info on info.id = stat.measure_id
         inner join measure.subjects as sub on sub.id = info.subject_id
         where sub.sex is not null
+        and stat.statistic = 'MEAN'
         group by
             stat.hand,
             stat.position,
