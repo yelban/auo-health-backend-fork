@@ -596,7 +596,7 @@ async def process_file(
             file_id=file.id,
             org_id=file.owner.org_id,
             uid=infos.uid,
-            number=infos.name,
+            number=infos.number,
             has_measure=True,
             has_bcq="BCQ.txt" in result_dict,
             has_tongue="T_up.jpg" in result_dict or "T_down.jpg" in result_dict,
