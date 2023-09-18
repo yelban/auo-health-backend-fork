@@ -7,7 +7,7 @@ import pydash as py_
 from fastapi import HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from auo_project import crud, schemas
+from auo_project import crud, models, schemas
 from auo_project.core.constants import AdvanceChartType, ParameterType
 from auo_project.web.api import deps
 
@@ -757,6 +757,7 @@ async def get_parameters(
     p_types: List[ParameterType],
     process_child_parent: bool = True,
     specific_options_dict: dict = {},
+    user: models.User = None,
 ):
     if not all([isinstance(e, ParameterType) for e in p_types]):
         raise HTTPException(
@@ -782,16 +783,28 @@ async def get_parameters(
     for option in question_options:
         question_options_dict.setdefault(option.category_id, [])
         if "column:infos.proj_num" == option.value:
-            values = await crud.measure_info.get_proj_num(db_session=db_session)
+            values = await crud.measure_info.get_proj_num(
+                db_session=db_session,
+                user=user,
+            )
             question_options_dict[option.category_id] = values
         elif "column:infos.cusult_dr" == option.value:
-            values = await crud.measure_info.get_consult_dr(db_session=db_session)
+            values = await crud.measure_info.get_consult_dr(
+                db_session=db_session,
+                user=user,
+            )
             question_options_dict[option.category_id] = values
         elif "column:auth_orgs.name" == option.value:
-            values = await crud.measure_info.get_org_name(db_session=db_session)
+            values = await crud.measure_info.get_org_name(
+                db_session=db_session,
+                user=user,
+            )
             question_options_dict[option.category_id] = values
         elif "column:infos.measure_operator" == option.value:
-            values = await crud.measure_info.get_measure_operator(db_session=db_session)
+            values = await crud.measure_info.get_measure_operator(
+                db_session=db_session,
+                user=user,
+            )
             question_options_dict[option.category_id] = values
         else:
             real_component, other_constraint = process_option_component(
@@ -1264,9 +1277,25 @@ def get_labels(options):
 async def remove_inactive_recipes():
     async with deps.get_db2() as db_session:
         created_at = datetime.utcnow() - timedelta(days=7)
-        recipes = await crud.recipe.get_inactive_by_created_at(
+        recipes = await crud.recipe.get_inactive_by_datetime(
             db_session=db_session,
             created_at=created_at,
         )
         for recipe in recipes:
-            await crud.recipe.remove(db_session=db_session, id=recipe.id)
+            recipe_parameters = await crud.recipe_parameter.get_by_recipe_id(
+                db_session=db_session,
+                recipe_id=recipe.id,
+            )
+            for recipe_parameter in recipe_parameters:
+                await crud.recipe_parameter.remove(
+                    db_session=db_session,
+                    id=recipe_parameter.id,
+                    autocommit=False,
+                )
+            await crud.recipe.remove(
+                db_session=db_session,
+                id=recipe.id,
+                autocommit=False,
+            )
+            await db_session.commit()
+        print(f"deleted recipes number: {len(recipes)}")
