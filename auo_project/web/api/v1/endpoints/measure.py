@@ -574,7 +574,7 @@ async def get_mock_measure_summary(
 
     container_name = "image"
     file_path = "tongue-front-sample.png"
-    expiry = datetime.now() + timedelta(minutes=15)
+    expiry = datetime.utcnow() + timedelta(minutes=15)
     sas_token = generate_blob_sas(
         account_name=settings.AZURE_STORAGE_ACCOUNT,
         container_name=container_name,

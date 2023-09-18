@@ -1256,7 +1256,7 @@ async def get_multi_measure_summary_data(
         output_zip_obj.writestr(f"bcq.csv", file2_content.getvalue())
     output_zip.seek(0)
 
-    today_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    today_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     filename = f"單人多次下載檔案_{today_str}.zip"
 
     return StreamingResponse(
@@ -1671,7 +1671,7 @@ async def get_multi_measure_by_ids(
         output_zip_obj.writestr(f"bcq.csv", file2_content.getvalue())
     output_zip.seek(0)
 
-    today_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    today_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     filename = f"單人多次下載檔案_{today_str}.zip"
 
     return StreamingResponse(
