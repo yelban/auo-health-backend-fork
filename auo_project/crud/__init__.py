@@ -10,6 +10,8 @@ from auo_project.crud.measure_parameter_option_curd import measure_parameter_opt
 from auo_project.crud.measure_question_option_crud import measure_question_option
 from auo_project.crud.measure_raw_crud import measure_raw
 from auo_project.crud.measure_statistic_crud import measure_statistic
+from auo_project.crud.measure_survey_crud import measure_survey
+from auo_project.crud.measure_survey_result_crud import measure_survey_result
 from auo_project.crud.measure_tongue_crud import measure_tongue
 from auo_project.crud.org_crud import org
 from auo_project.crud.recipe_crud import recipe
