@@ -8,7 +8,7 @@ from auo_project.core.security import decrypt
 
 
 def page():
-    st.subheader("解密")
+    st.subheader("解密壓縮檔")
     st.info(
         """
 說明：將加密檔案讀入並產出解密檔案，解密檔案檔名以 _decrypted 結尾。

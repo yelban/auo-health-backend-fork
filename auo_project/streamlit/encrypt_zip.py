@@ -8,7 +8,7 @@ from auo_project.core.security import encrypt
 
 
 def page():
-    st.subheader("加密")
+    st.subheader("加密壓縮檔")
     st.info(
         """
 說明：將壓縮檔中檔名有 _decrypted 的檔案重新加密。
