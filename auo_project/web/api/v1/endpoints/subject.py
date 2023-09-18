@@ -19,6 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from auo_project import crud, models, schemas
 from auo_project.core.constants import (
     HAND_TYPE_LABEL,
+    MAX_DEPTH_RATIO,
     MEASURE_TIMES,
     POSITION_TYPE_LABEL,
     RANGE_TYPE_LABEL,
@@ -26,6 +27,7 @@ from auo_project.core.constants import (
     SexType,
 )
 from auo_project.core.dateutils import DateUtils
+from auo_project.core.file import get_max_amp_depth_of_range
 from auo_project.core.pagination import Pagination
 from auo_project.core.utils import (
     get_filters,
