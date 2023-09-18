@@ -1,79 +1,12 @@
 from math import ceil, floor
 from random import randint, uniform
 from statistics import mean, quantiles, stdev
-from typing import Union
 
 import numpy as np
 import pydash as py_
 from fastapi import HTTPException
 
-
-def normalize_parameter_name(name):
-    # replace ':' for a026:c056:001 and a026:c056:002
-    if isinstance(name, str):
-        return name.replace(":", "")
-
-
-def is_disease_include_option(answer: str, input_option: str) -> bool:
-    if answer == input_option:
-        return True
-    answer_category_id, answer_disease_id = answer.split(":")
-    option_category_id, option_disease_id = input_option.split(":")
-    # TODO: answer without :000?
-    if answer_category_id == option_category_id and (
-        answer_disease_id == "000" or option_disease_id == "000"
-    ):
-        return True
-    return False
-
-
-def is_disease_match(data: dict, qid: str, input_option: Union[str, dict]):
-    if qid != "a008":
-        return False
-    survey_answers = py_.get(data, "a008", [])
-    if not survey_answers:
-        return False
-
-    if isinstance(input_option, str):
-        if any(
-            [
-                is_disease_include_option(answer, input_option)
-                for answer in survey_answers
-            ],
-        ):
-            return True
-
-    elif isinstance(input_option, dict):
-        includes = input_option.get("include", [])
-        excludes = input_option.get("exclude", [])
-        is_all_include = all(
-            [
-                any(
-                    [
-                        is_disease_include_option(answer, include_option)
-                        for answer in survey_answers
-                    ],
-                )
-                for include_option in includes
-            ],
-        )
-        is_all_exclude = (
-            any(
-                [
-                    any(
-                        [
-                            is_disease_include_option(answer, exclude_option)
-                            for answer in survey_answers
-                        ],
-                    )
-                    for exclude_option in excludes
-                ],
-            )
-            is False
-        )
-        if is_all_include and is_all_exclude:
-            return True
-    return False
+from auo_project.core.utils import is_disease_match, normalize_parameter_name
 
 
 def get_data_range():
@@ -352,6 +285,7 @@ def get_chart_type2_data(x, x_options, domain_last, six_pulse, z, z_options, sda
                     py_.get(e, normalize_parameter_name(z)) == z_option["value"]
                     or is_disease_match(e, z, z_option["value"])
                 )
+                and e["hand_position"] == six_pulse
             ]
             statistics_data = get_box_plot_data(match_data)
             data.append(
