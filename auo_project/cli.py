@@ -108,6 +108,16 @@ async def rewrite_file_by_measure_time(
         typer.echo(f"rewrite file id {file_id}")
 
 
+@cli.async_command()
+async def delete_measure_related_data(
+    measure_id: UUID,
+):
+    """Delete measure info and related data"""
+    db_session = SessionLocal()
+    await crud.measure_info.remove(db_session=db_session, id=measure_id)
+    typer.echo(f"delete measure info id {measure_id}")
+
+
 @cli.command()
 def shell():  # pragma: no cover
     """Opens an interactive shell with objects auto imported"""
@@ -124,6 +134,7 @@ def shell():  # pragma: no cover
         "SessionLocal": SessionLocal,
         "create_user": create_user,
         "rewrite_file": rewrite_file,
+        "delete_measure_related_data": delete_measure_related_data,
     }
     typer.echo(f"Auto imports: {list(_vars.keys())}")
     try:
