@@ -11,6 +11,7 @@ from auo_project.models.subject_model import SubjectBase
 
 class SubjectReadBase(SubjectBase):
     id: UUID = Field(title="編號")
+    org_id: UUID = Field(title="組織編號")
     sex_label: Optional[str] = Field(default=None, title="性別")
     standard_measure_info: Optional["SimpleMeasureInfo"] = Field(
         title="基準值檢測",
@@ -55,7 +56,7 @@ class MeasureListPage(BaseModel):
 
 
 class SubjectReadWithMeasures(BaseModel):
-    subject: SubjectRead
+    subject: SubjectSecretRead
     measure: MeasureListPage
     measure_times: List[Dict[str, Any]] = Field([], title="選項：檢測時間")
     org_names: List[Dict[str, Any]] = Field([], title="選項：檢測單位")

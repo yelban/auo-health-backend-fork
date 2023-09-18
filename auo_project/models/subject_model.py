@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import List
 from uuid import UUID
 
 from sqlmodel import Field, Relationship
@@ -7,6 +8,7 @@ from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUI
 
 
 class SubjectBase(BaseModel):
+    org_id: UUID = Field(index=True, nullable=False, title="組織編號")
     sid: str = Field(index=True, unique=True, nullable=False, title="身分證字號")
     name: str = Field(max_length=128, index=True, nullable=True, title="姓名")
     birth_date: date = Field(default=None, index=True, nullable=True, title="出生年月日")
@@ -39,4 +41,8 @@ class Subject(BaseUUIDModel, BaseTimestampModel, SubjectBase, table=True):
             "uselist": False,
             "foreign_keys": "[Subject.standard_measure_id]",
         },
+    )
+    measure_survey_result: List["MeasureSurveyResult"] = Relationship(
+        back_populates="subject",
+        sa_relationship_kwargs={"lazy": "select"},
     )
