@@ -140,5 +140,20 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
         )
         return response.scalars().all()
 
+    async def get_closest_by_survey_at(
+        self, db_session: AsyncSession, *, subject_id: UUID, survey_at: datetime
+    ) -> Optional[MeasureInfo]:
+        response = await db_session.execute(
+            select(MeasureInfo)
+            .where(MeasureInfo.subject_id == subject_id)
+            .order_by(
+                func.abs(
+                    func.extract("epoch", MeasureInfo.measure_time - survey_at),
+                ).asc(),
+            )
+            .limit(1),
+        )
+        return response.scalar_one_or_none()
+
 
 measure_info = CRUDMeasureInfo(MeasureInfo)

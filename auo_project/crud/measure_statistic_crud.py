@@ -46,6 +46,16 @@ class CRUDMeasureStatistic(
         )
         return statistics.scalars().all()
 
+    async def get_by_measure_id_list(
+        self, db_session: AsyncSession, *, measure_id_list: List[UUID]
+    ) -> List[MeasureStatistic]:
+        statistics = await db_session.execute(
+            select(MeasureStatistic).where(
+                MeasureStatistic.measure_id.in_(measure_id_list),
+            ),
+        )
+        return statistics.scalars().all()
+
     async def get_by_id_and_statistic(
         self, db_session: AsyncSession, *, measure_id: UUID, statistic: str
     ) -> List[MeasureStatistic]:

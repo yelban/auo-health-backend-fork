@@ -13,6 +13,16 @@ from auo_project.schemas.measure_parameter_schema import (
 class CRUDMeasureParameter(
     CRUDBase[MeasureParameter, MeasureParameterCreate, MeasureParameterUpdate],
 ):
+    async def get_labels_dict(
+        self,
+        db_session: AsyncSession,
+    ):
+        response = await db_session.execute(
+            select(self.model),
+        )
+        labels_dict = {e.id: e.label for e in response.scalars().all()}
+        return labels_dict
+
     async def get_options_by_p_type(
         self, db_session: AsyncSession, *, p_type: ParameterType
     ):
