@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import BaseModel, Field
 
 
@@ -82,3 +84,8 @@ class DF2Schema(BaseModel):
 
     class Config:
         allow_population_by_field_name = True
+
+
+class MultiExportFile(BaseModel):
+    filename: str
+    rows: List[dict]
