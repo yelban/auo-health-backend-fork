@@ -51,6 +51,16 @@ class CRUDMeasureSurveyResult(
         )
         return measure_survey_result.scalars().all()
 
+    async def get_by_survey_ids(
+        self, db_session: AsyncSession, *, survey_ids: List[UUID]
+    ) -> List[MeasureSurveyResult]:
+        measure_survey_result = await db_session.execute(
+            select(MeasureSurveyResult).where(
+                MeasureSurveyResult.survey_id.in_(survey_ids),
+            ),
+        )
+        return measure_survey_result.scalars().all()
+
     async def get_by_condition(
         self,
         db_session: AsyncSession,
@@ -60,6 +70,7 @@ class CRUDMeasureSurveyResult(
         survey_at: List[str],
         measure_operators: List[str],
         consult_drs: List[str],
+        # survey_ids: List[UUID],
         **kwargs,
     ) -> List[MeasureSurveyResult]:
         conditions = []
@@ -88,6 +99,8 @@ class CRUDMeasureSurveyResult(
             conditions.append(MeasureInfo.measure_operator.in_(measure_operators))
         if consult_drs:
             conditions.append(MeasureInfo.judge_dr.in_(consult_drs))
+        # if survey_ids:
+        #     conditions.append(MeasureSurveyResult.survey_id.in_(survey_ids))
 
         print("conditions", conditions)
         relations = kwargs.get("relations", [])

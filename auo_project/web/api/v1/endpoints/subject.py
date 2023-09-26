@@ -63,7 +63,8 @@ class SubjectListResponse(BaseModel):
 
 
 class MultiMeasuresBody(BaseModel):
-    measure_ids: List[UUID]
+    measure_ids: List[UUID] = []
+    survey_names: List[str] = []
 
 
 @router.get("/", response_model=SubjectListResponse)
@@ -1260,7 +1261,7 @@ async def get_multi_measure_summary_data(
             [
                 schemas.DF2Schema(
                     measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
-                    number=subject.number,
+                    number=subject.number.upper(),
                     item_type=column_pair[1],
                     position=column_pair[2],
                     score=py_.get(measure.bcq, f"score_{column_pair[0]}"),
@@ -1286,9 +1287,9 @@ async def get_multi_measure_summary_data(
 
     output_zip = BytesIO()
     with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
-        output_zip_obj.writestr(f"measure.csv", file1_content.getvalue())
+        output_zip_obj.writestr(f"量測資料.csv", file1_content.getvalue())
     with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
-        output_zip_obj.writestr(f"bcq.csv", file2_content.getvalue())
+        output_zip_obj.writestr(f"BCQ.csv", file2_content.getvalue())
     output_zip.seek(0)
 
     today_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -1308,17 +1309,49 @@ async def get_multi_measure_summary_data(
 
 
 @router.post(
-    "/multi_measures/export_by_ids",
+    "/multi_measures/export_by_conditions",
     response_model=schemas.MultiMeasureDetailResponse,
 )
-async def get_multi_measure_by_ids(
+async def get_multi_measure_by_conditions(
     body: MultiMeasuresBody,
     *,
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
-    measure_ids = body.measure_ids
+    if body.measure_ids != [] and body.survey_names != []:
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot provide measure_ids and survey_names together",
+        )
+    if body.measure_ids:
+        measure_ids = body.measure_ids
+    elif body.survey_names:
+        measure_ids = []
+        survey_ids = []
+        for survey_name in body.survey_names:
+            survey = await crud.measure_survey.get_by_name(
+                db_session=db_session,
+                name=survey_name,
+            )
+            if survey is not None:
+                survey_ids.append(survey.id)
+        survey_results = await crud.measure_survey_result.get_by_survey_ids(
+            db_session=db_session,
+            survey_ids=survey_ids,
+        )
+        measure_ids.extend(
+            [
+                survey_result.measure_id
+                for survey_result in survey_results
+                if survey_result.measure_id
+            ],
+        )
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail="Please provide measure_ids or survey_names",
+        )
     measures_infos = await crud.measure_info.get_by_ids(
         db_session=db_session,
         list_ids=measure_ids,
@@ -1328,6 +1361,7 @@ async def get_multi_measure_by_ids(
         await crud.subject.get(db_session=db_session, id=measure.subject_id)
         for measure in measures_infos
     ]
+    subject_dict = {subject.id: subject for subject in subject_list}
 
     measures_infos = py_.sort(
         measures_infos,
@@ -1383,11 +1417,11 @@ async def get_multi_measure_by_ids(
     file1_records = [
         schemas.DF1Schema(
             measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
-            number=subject_list[idx].number,
-            birth_date=subject_list[idx].birth_date.strftime("%Y-%m-%d")
-            if subject_list[idx].birth_date
+            number=subject_dict[measure.subject_id].number.upper(),
+            birth_date=subject_dict[measure.subject_id].birth_date.strftime("%Y-%m-%d")
+            if subject_dict[measure.subject_id].birth_date
             else None,
-            sex_label=SEX_TYPE_LABEL.get(subject_list[idx].sex),
+            sex_label=SEX_TYPE_LABEL.get(subject_dict[measure.subject_id].sex),
             bmi=measure.bmi,
             hand=HAND_TYPE_LABEL.get(hand),
             position=POSITION_TYPE_LABEL.get(position),
@@ -1671,7 +1705,7 @@ async def get_multi_measure_by_ids(
             [
                 schemas.DF2Schema(
                     measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
-                    number=subject_list[idx].number,
+                    number=subject_dict[measure.subject_id].number.upper(),
                     item_type=column_pair[1],
                     position=column_pair[2],
                     score=py_.get(measure.bcq, f"score_{column_pair[0]}"),
@@ -1684,8 +1718,6 @@ async def get_multi_measure_by_ids(
         ],
     )
 
-    from io import BytesIO
-
     file1_content = BytesIO()
     file1_utf8_content = BytesIO()
     file2_content = BytesIO()
@@ -1694,7 +1726,6 @@ async def get_multi_measure_by_ids(
     df1.to_csv(file1_content, index=False, encoding="big5")
     file1_content.seek(0)
 
-    df1 = pd.DataFrame.from_records(jsonable_encoder(file1_records))
     df1.to_csv(file1_utf8_content, index=False, encoding="utf8")
     file1_utf8_content.seek(0)
 
@@ -1702,16 +1733,21 @@ async def get_multi_measure_by_ids(
     df2.to_csv(file2_content, index=False, encoding="big5")
     file2_content.seek(0)
 
+    now_ts = datetime.utcnow()
+    today_str = now_ts.strftime("%Y%m%d_%H%M%S")
+
     output_zip = BytesIO()
     with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
-        output_zip_obj.writestr(f"measure.csv", file1_content.getvalue())
+        output_zip_obj.writestr(f"量測資料_{today_str}.csv", file1_content.getvalue())
     with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
-        output_zip_obj.writestr(f"measure_utf8.csv", file1_utf8_content.getvalue())
+        output_zip_obj.writestr(
+            f"量測資料_utf8_{today_str}.csv",
+            file1_utf8_content.getvalue(),
+        )
     with ZipFile(output_zip, "a", ZIP_DEFLATED, compresslevel=9) as output_zip_obj:
-        output_zip_obj.writestr(f"bcq.csv", file2_content.getvalue())
+        output_zip_obj.writestr(f"BCQ_{today_str}.csv", file2_content.getvalue())
     output_zip.seek(0)
 
-    today_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     filename = f"單人多次下載檔案_{today_str}.zip"
 
     return StreamingResponse(

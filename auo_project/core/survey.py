@@ -2068,12 +2068,26 @@ async def save_survey_result():
             subject_id = None
             measure_id = None
             print("survey_result.number", survey_result.number)
+            if survey_result.number.upper() in ("KA014"):
+                continue
             subject = await crud.subject.get_by_number_and_org_id(
                 db_session=db_session,
                 org_id=org.id,
                 number=survey_result.number,
             )
-            if subject is not None:
+            if subject is None:
+                continue
+            subject_id = subject.id
+            measure = await crud.measure_info.get_closest_by_survey_at(
+                db_session=db_session,
+                subject_id=subject_id,
+                survey_at=survey_result.survey_at,
+            )
+            if subject is not None and measure is not None:
+                if abs((measure.measure_time - survey_result.survey_at).days) > 7:
+                    print("ignore diff day more than 7 days")
+                    continue
+
                 sex_type_label_map = {
                     value: key for key, value in SEX_TYPE_LABEL.items()
                 }
@@ -2088,28 +2102,21 @@ async def save_survey_result():
                     obj_new=subject_in.dict(exclude_none=True),
                 )
 
-                subject_id = subject.id
-                measure = await crud.measure_info.get_closest_by_survey_at(
-                    db_session=db_session,
-                    subject_id=subject_id,
-                    survey_at=survey_result.survey_at,
+                measure_id = measure.id
+                measure_in = schemas.MeasureInfoUpdate(
+                    sex=sex_value,
+                    age=get_age(measure.measure_time, survey_result.birth_date),
+                    height=survey_result.height,
+                    weight=survey_result.weight,
+                    bmi=get_bmi(survey_result.height, survey_result.weight),
+                    sbp=survey_result.sbp,
+                    dbp=survey_result.dbp,
                 )
-                if measure is not None:
-                    measure_id = measure.id
-                    measure_in = schemas.MeasureInfoUpdate(
-                        sex=sex_value,
-                        age=get_age(measure.measure_time, survey_result.birth_date),
-                        height=survey_result.height,
-                        weight=survey_result.weight,
-                        bmi=get_bmi(survey_result.height, survey_result.weight),
-                        sbp=survey_result.sbp,
-                        dbp=survey_result.dbp,
-                    )
-                    await crud.measure_info.update(
-                        db_session=db_session,
-                        obj_current=measure,
-                        obj_new=measure_in.dict(exclude_none=True),
-                    )
+                await crud.measure_info.update(
+                    db_session=db_session,
+                    obj_current=measure,
+                    obj_new=measure_in.dict(exclude_none=True),
+                )
             else:
                 print(f"cannot find subject/measure number {survey_result.number}")
 
