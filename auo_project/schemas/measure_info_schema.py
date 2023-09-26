@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, validator
 
 from auo_project.models.measure_info_model import MeasureInfoBase
-from auo_project.schemas.subject_schema import SubjectRead
+from auo_project.schemas.subject_schema import SubjectSecretRead
 
 
 class SideType(IntEnum):
@@ -803,11 +803,11 @@ class MeasureInfoExtraInfo(BaseModel):
 
 
 class MeasureDetailResponse(BaseModel):
-    subject: SubjectRead
+    subject: SubjectSecretRead
     measure: MeasureDetailRead
 
 
 class MultiMeasureDetailResponse(BaseModel):
-    subject: SubjectRead
+    subject: SubjectSecretRead
     measures: List[MultiMeasureDetailRead]
     normal_spec: MeasureNormalRange

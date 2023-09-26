@@ -182,6 +182,6 @@ MeasureSurveyRead.update_forward_refs(
 
 MeasureSurveyResultRead.update_forward_refs(
     Survey=MeasureSurveyRead,
-    Subkect=SubjectRead,
+    Subject=SubjectRead,
     MeasureInfo=MeasureInfoRead,
 )

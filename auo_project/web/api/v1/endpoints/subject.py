@@ -875,7 +875,7 @@ async def get_multi_measure_summary(
     )
 
     return schemas.MultiMeasureDetailResponse(
-        subject=schemas.SubjectRead(
+        subject=schemas.SubjectSecretRead(
             **jsonable_encoder(subject),
             standard_measure_info=standard_measure_info,
         ),
