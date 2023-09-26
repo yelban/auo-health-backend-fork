@@ -55,9 +55,9 @@ POSITION_TYPE_LABEL = {
 }
 
 RANGE_TYPE_LABEL = {
-    0: "浮",
+    0: "沉",
     1: "中",
-    2: "沉",
+    2: "浮",
 }
 
 SEX_TYPE_LABEL = {

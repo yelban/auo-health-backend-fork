@@ -73,51 +73,51 @@ class MeasureInfoBase(BaseModel):
     mean_prop_range_3_r_ch: float = Field(default=None, title="右尺沉振幅平均值佔比")
     mean_prop_range_max_l_cu: int = Field(
         default=None,
-        title="左寸浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+        title="左寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
     )
     mean_prop_range_max_l_qu: int = Field(
         default=None,
-        title="左關浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+        title="左關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
     )
     mean_prop_range_max_l_ch: int = Field(
         default=None,
-        title="左尺浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+        title="左尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
     )
     mean_prop_range_max_r_cu: int = Field(
         default=None,
-        title="右寸浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+        title="右寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
     )
     mean_prop_range_max_r_qu: int = Field(
         default=None,
-        title="右關浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+        title="右關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
     )
     mean_prop_range_max_r_ch: int = Field(
         default=None,
-        title="右尺浮沉振幅平均佔比最大值區塊; 浮:0/中:1/沉:2",
+        title="右尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
     )
     max_amp_depth_of_range_l_cu: int = Field(
         default=None,
-        title="左寸浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+        title="左寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
     )
     max_amp_depth_of_range_l_qu: int = Field(
         default=None,
-        title="左關浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+        title="左關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
     )
     max_amp_depth_of_range_l_ch: int = Field(
         default=None,
-        title="左尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+        title="左尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
     )
     max_amp_depth_of_range_r_cu: int = Field(
         default=None,
-        title="右寸浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+        title="右寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
     )
     max_amp_depth_of_range_r_qu: int = Field(
         default=None,
-        title="右關浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+        title="右關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
     )
     max_amp_depth_of_range_r_ch: int = Field(
         default=None,
-        title="右尺浮沉振幅最大值落點區塊; 浮:0/中:1/沉:2",
+        title="右尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
     )
     max_amp_value_l_cu: float = Field(
         default=None,
