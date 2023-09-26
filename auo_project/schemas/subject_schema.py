@@ -81,4 +81,4 @@ class SubjectUpdate(BaseModel):
         default=None,
     )
     last_measure_time: datetime = Field(default=None, title="最後檢測時間")
-    number: str = Field(default=None, title="")
+    sid: str = Field(default=None, title="身分證字號")

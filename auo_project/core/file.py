@@ -518,11 +518,10 @@ async def process_file(
     bcq = result_dict.get("BCQ.txt", {})
     ver = result_dict.get("ver.ini")
 
-    subject = await crud.subject.get_by_sid_and_proj_num(
+    subject = await crud.subject.get_by_number_and_org_id(
         db_session=db_session,
+        number=infos.number,
         org_id=file.owner.org_id,
-        sid=infos.id,
-        proj_num=report.proj_num if report else None,
     )
     if not subject:
         subject_in = schemas.SubjectCreate(
@@ -544,7 +543,7 @@ async def process_file(
             last_measure_time=max(infos.measure_time, subject.last_measure_time)
             if subject.last_measure_time
             else infos.measure_time,
-            number=infos.number,
+            sid=infos.id,
         )
         subject = await crud.subject.update(
             db_session=db_session,
