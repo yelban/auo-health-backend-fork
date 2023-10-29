@@ -75,16 +75,37 @@ class Settings(BaseSettings):
     RABBITMQ_DEFAULT_PASS: str
     RABBITMQ_DEFAULT_VHOST: str
 
+    STREAMLIT_PASSWORD: Optional[str] = None
+
     DB_POOL_SIZE = 83
     POOL_SIZE = max(DB_POOL_SIZE // WORKERS_COUNT, 5)
     ASYNC_DATABASE_URI: Optional[str]
 
     @validator("ASYNC_DATABASE_URI", pre=True)
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    def assemble_async_db_connection(
+        cls,
+        v: Optional[str],
+        values: Dict[str, Any],
+    ) -> Any:
         if isinstance(v, str):
             return v
         return PostgresDsn.build(
             scheme="postgresql+asyncpg",
+            user=values.get("DATABASE_USER"),
+            password=values.get("DATABASE_PASSWORD"),
+            host=values.get("DATABASE_HOST"),
+            port=str(values.get("DATABASE_PORT")),
+            path=f"/{values.get('DATABASE_NAME') or ''}",
+        )
+
+    DATABASE_URI: Optional[str]
+
+    @validator("DATABASE_URI", pre=True, allow_reuse=True, check_fields=False)
+    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+        if isinstance(v, str):
+            return v
+        return PostgresDsn.build(
+            scheme="postgresql+psycopg2",
             user=values.get("DATABASE_USER"),
             password=values.get("DATABASE_PASSWORD"),
             host=values.get("DATABASE_HOST"),
