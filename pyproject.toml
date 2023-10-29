@@ -59,6 +59,7 @@ pandas = "^1.5.2"
 sqlalchemy-mixins = "^1.5.3"
 streamlit = "^1.19.0"
 openpyxl = "^3.1.2"
+psycopg2-binary = "^2.9.9"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
