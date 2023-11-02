@@ -178,5 +178,58 @@ class CRUDMeasureStatistic(
             result2[key] = self.get_flat_statistic_model(val)
         return result2
 
+    async def get_mean_statistics_dict_by_human(self, db_session: AsyncSession):
+        fixed_measure_id = "86eacaf9-5109-47e8-be41-45fe823a1a29"
+        fixed_hand = "Left"
+        fixed_position = "Qu"
+        res = await db_session.execute(
+            select(MeasureStatistic).where(
+                MeasureStatistic.measure_id == fixed_measure_id,
+                MeasureStatistic.hand == fixed_hand,
+                MeasureStatistic.position == fixed_position,
+            ),
+        )
+        measure_statistics = res.scalars().all()
+        statistic_dict = {
+            "mean": dict(
+                [
+                    (
+                        f'{"l" if hand == "Left" else "r"}_{position_lc}',
+                        x,
+                    )
+                    for position_lc in ("cu", "qu", "ch")
+                    for hand in ("Left", "Right")
+                    for x in measure_statistics
+                    if x.statistic == "MEAN"
+                ],
+            ),
+            "std": dict(
+                [
+                    (
+                        f'{"l" if hand == "Left" else "r"}_{position_lc}',
+                        x,
+                    )
+                    for position_lc in ("cu", "qu", "ch")
+                    for hand in ("Left", "Right")
+                    for x in measure_statistics
+                    if x.statistic == "STD"
+                ],
+            ),
+            "cv": dict(
+                [
+                    (
+                        f'{"l" if hand == "Left" else "r"}_{position_lc}',
+                        x,
+                    )
+                    for position_lc in ("cu", "qu", "ch")
+                    for hand in ("Left", "Right")
+                    for x in measure_statistics
+                    if x.statistic == "CV"
+                ],
+            ),
+        }
+
+        return statistic_dict
+
 
 measure_statistic = CRUDMeasureStatistic(MeasureStatistic)

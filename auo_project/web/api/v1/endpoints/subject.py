@@ -63,6 +63,7 @@ class SubjectListResponse(BaseModel):
 
 
 class MultiMeasuresBody(BaseModel):
+    org_id: UUID = None
     measure_ids: List[UUID] = []
     survey_names: List[str] = []
 
@@ -981,10 +982,7 @@ async def get_multi_measure_summary_data(
             bmi=measure.bmi,
             hand=HAND_TYPE_LABEL.get(hand),
             position=POSITION_TYPE_LABEL.get(position),
-            pass_rate=py_.get(
-                mean_statistic_model_dict.get(measure.id),
-                f"pass_rate_{hand}_{position}",
-            ),
+            pass_rate=py_.get(measure, f"pass_rate_{hand}_{position}"),
             hr=py_.get(measure, f"hr_{hand}"),
             range=RANGE_TYPE_LABEL.get(
                 get_max_amp_depth_of_range(
@@ -1347,6 +1345,13 @@ async def get_multi_measure_by_conditions(
                 if survey_result.measure_id
             ],
         )
+    elif body.org_id:
+        result = await db_session.execute(
+            select(models.MeasureInfo.id).where(
+                models.MeasureInfo.org_id == body.org_id,
+            ),
+        )
+        measure_ids = result.scalars().all()
     else:
         raise HTTPException(
             status_code=422,
@@ -1425,10 +1430,7 @@ async def get_multi_measure_by_conditions(
             bmi=measure.bmi,
             hand=HAND_TYPE_LABEL.get(hand),
             position=POSITION_TYPE_LABEL.get(position),
-            pass_rate=py_.get(
-                mean_statistic_model_dict.get(measure.id),
-                f"pass_rate_{hand}_{position}",
-            ),
+            pass_rate=py_.get(measure, f"pass_rate_{hand}_{position}"),
             hr=py_.get(measure, f"hr_{hand}"),
             range=RANGE_TYPE_LABEL.get(
                 get_max_amp_depth_of_range(
@@ -1748,7 +1750,7 @@ async def get_multi_measure_by_conditions(
         output_zip_obj.writestr(f"BCQ_{today_str}.csv", file2_content.getvalue())
     output_zip.seek(0)
 
-    filename = f"單人多次下載檔案_{today_str}.zip"
+    filename = f"量測資料_{today_str}.zip"
 
     return StreamingResponse(
         output_zip,

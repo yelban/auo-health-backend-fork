@@ -1,8 +1,10 @@
 from datetime import date, datetime, time
+from io import StringIO
 from random import randrange
 from typing import Optional, Union
 
 import dateutil.parser
+import pandas as pd
 import pydash as py_
 from dateutil.relativedelta import relativedelta
 
@@ -396,3 +398,53 @@ def is_disease_match(data: dict, qid: str, input_option: Union[str, dict]):
         if is_all_include and is_all_exclude:
             return True
     return False
+
+
+def get_pass_rate_from_statistics(records) -> tuple:
+    pass_rate_l_cu = None
+    pass_rate_l_qu = None
+    pass_rate_l_ch = None
+    pass_rate_r_cu = None
+    pass_rate_r_qu = None
+    pass_rate_r_ch = None
+
+    for record in records:
+        if record.hand == "Left" and record.position == "Cu":
+            pass_rate_l_cu = record.pass_rate
+        elif record.hand == "Left" and record.position == "Qu":
+            pass_rate_l_qu = record.pass_rate
+        elif record.hand == "Left" and record.position == "Ch":
+            pass_rate_l_ch = record.pass_rate
+        elif record.hand == "Right" and record.position == "Cu":
+            pass_rate_r_cu = record.pass_rate
+        elif record.hand == "Right" and record.position == "Qu":
+            pass_rate_r_qu = record.pass_rate
+        elif record.hand == "Right" and record.position == "Ch":
+            pass_rate_r_ch = record.pass_rate
+
+    return (
+        pass_rate_l_cu,
+        pass_rate_l_qu,
+        pass_rate_l_ch,
+        pass_rate_r_cu,
+        pass_rate_r_qu,
+        pass_rate_r_ch,
+    )
+
+
+def get_max_amp_value(select_static: float, analyze_raw_file_content: str) -> float:
+    if (
+        select_static is None
+        or analyze_raw_file_content is None
+        or analyze_raw_file_content == ""
+    ):
+        return None
+    try:
+        df = pd.read_csv(StringIO(analyze_raw_file_content), header=None, sep="\t")
+        idx_min = (df[3] - select_static).abs().idxmin()
+        if pd.isnull(idx_min):
+            return None
+        found = df.iloc[idx_min, 0]
+        return found
+    except Exception as e:
+        print(f"get_max_amp_value error: {e}")

@@ -53,7 +53,9 @@ from auo_project.core.survey import (
 from auo_project.core.utils import (
     get_date,
     normalize_parameter_name,
+    safe_divide,
     safe_int,
+    safe_substract,
     time_in_range,
 )
 from auo_project.web.api import deps
@@ -630,8 +632,6 @@ async def get_filtered_measure_statistics(
 
     # TODO: filter 脈診量測時間
 
-    from sqlalchemy.orm import selectinload
-
     survey_results = await crud.measure_survey_result.get_by_condition(
         db_session=db_session,
         org_id=org_id,
@@ -697,8 +697,8 @@ async def get_chart_result_data(
     measure_statistics: list,
     chart_input: RecipeChartDataInput,
     z_options_dict: dict,
+    statistic_dict: dict,
 ):
-    # print("z_options_dict", z_options_dict)
     result = None
     if chart_input.chart_type == AdvanceChartType.parameter_six_pulse:
         x_options = "l_cu,l_qu,l_ch,r_cu,r_qu,r_ch".split(",")
@@ -726,12 +726,35 @@ async def get_chart_result_data(
                 **statistic,
                 "x_label": hand_map.get(py_.get(statistic, "hand"), "")
                 + position_map.get(py_.get(statistic, "position"), ""),
-                "x": f"{ py_.get(statistic, 'hand').lower()[0]}_{py_.get(statistic, 'position').lower()}",
+                "x": f"{py_.get(statistic, 'hand').lower()[0]}_{py_.get(statistic, 'position').lower()}",
                 "y": py_.get(statistic, table_column),
             }
             for statistic in measure_statistics
             if py_.get(statistic, "statistic").upper() == statisitc_filter.upper()
         ]
+
+        def convert_diff_pct1(measure_statistics):
+            if domain[1].lower() not in ("cn", "cncv", "pn", "pncv"):
+                return measure_statistics
+            for measure_statistic in measure_statistics:
+                hand_position = f"{measure_statistic['hand'].lower()[0]}_{measure_statistic['position'].lower()}"
+                mean_value = py_.get(
+                    statistic_dict,
+                    f"{statisitc_filter.lower()}.{hand_position}.{table_column}",
+                    0,
+                )
+                measure_statistic["y"] = safe_divide(
+                    safe_substract(measure_statistic["y"], mean_value),
+                    mean_value,
+                )
+                measure_statistic["y"] = (
+                    round(measure_statistic["y"] * 100)
+                    if measure_statistic["y"] is not None
+                    else None
+                )
+            return measure_statistics
+
+        measure_statistics = convert_diff_pct1(measure_statistics)
 
         result = get_chart_type1_data(
             x_options,
@@ -770,6 +793,29 @@ async def get_chart_result_data(
             if py_.get(statistic, "statistic") == statisitc_filter
         ]
 
+        def convert_diff_pct2(measure_statistics):
+            if chart_input.y["domain"][1].lower() not in ("cn", "cncv", "pn", "pncv"):
+                return measure_statistics
+            for measure_statistic in measure_statistics:
+                hand_position = f"{measure_statistic['hand'].lower()[0]}_{measure_statistic['position'].lower()}"
+                mean_value = py_.get(
+                    statistic_dict,
+                    f"{statisitc_filter.lower()}.{hand_position}.{table_column}",
+                    0,
+                )
+                measure_statistic["y"] = safe_divide(
+                    safe_substract(measure_statistic["y"], mean_value),
+                    mean_value,
+                )
+                measure_statistic["y"] = (
+                    round(measure_statistic["y"] * 100)
+                    if measure_statistic["y"] is not None
+                    else None
+                )
+            return measure_statistics
+
+        measure_statistics = convert_diff_pct2(measure_statistics)
+
         x_options = z_options_dict.get(chart_input.x, [])
         z_options = z_options_dict.get(chart_input.z, [])
         domain = chart_input.y.get("domain")
@@ -802,6 +848,27 @@ async def get_chart_result_data(
             and py_.get(statistic, "position").lower() == position_lc
         ]
 
+        def convert_diff_pct3(measure_statistics):
+            for measure_statistic in measure_statistics:
+                for i in range(1, 12):
+                    mean_value = py_.get(
+                        statistic_dict,
+                        f"{statistics.lower()}.{six_pulse}.c{i}",
+                        0,
+                    )
+                    measure_statistic[f"c{i}"] = safe_divide(
+                        safe_substract(measure_statistic[f"c{i}"], mean_value),
+                        mean_value,
+                    )
+                    measure_statistic[f"c{i}"] = (
+                        round(measure_statistic[f"c{i}"] * 100)
+                        if measure_statistic[f"c{i}"] is not None
+                        else None
+                    )
+            return measure_statistics
+
+        measure_statistics = convert_diff_pct3(measure_statistics)
+
         result = get_chart_type3_data(
             x_options,
             six_pulse,
@@ -819,6 +886,7 @@ async def get_chart_export_data(
     chart_input: RecipeChartDataInput,
     z_options_dict: dict,
     parameter_labels_dict: dict,
+    statistic_dict: dict,
 ) -> schemas.MultiExportFile:
 
     hand_map = {"Left": "左", "Right": "右"}
@@ -854,9 +922,29 @@ async def get_chart_export_data(
             for statistic in measure_statistics
         ]
 
+        def get_diff_pct(
+            measure_statistic,
+            statistic_dict,
+            hand_position,
+            table_column,
+        ):
+            hand_position = f"{ py_.get(measure_statistic, 'hand').lower()[0]}_{py_.get(measure_statistic, 'position').lower()}"
+            mean_val = py_.get(
+                statistic_dict,
+                f"{measure_statistic['statistic'].lower()}.{hand_position}.{table_column}",
+                0,
+            )
+            return (
+                safe_divide(
+                    safe_substract(measure_statistic[table_column], mean_val),
+                    mean_val,
+                ),
+            )
+
         result = {}
         for measure_statistic in measure_statistics:
             # TODO: is_disease_match(e, z, z_option["value"])
+            hand_position = f"{ py_.get(measure_statistic, 'hand').lower()[0]}_{py_.get(measure_statistic, 'position').lower()}"
             z_value = py_.get(
                 measure_statistic,
                 normalize_parameter_name(chart_input.z),
@@ -889,17 +977,72 @@ async def get_chart_export_data(
                         "t1/t": measure_statistic["t1_div_t"],
                         "pw": measure_statistic["pw"],
                         "a0": measure_statistic["a0"],
-                        "c1": measure_statistic["c1"],
-                        "c2": measure_statistic["c2"],
-                        "c3": measure_statistic["c3"],
-                        "c4": measure_statistic["c4"],
-                        "c5": measure_statistic["c5"],
-                        "c6": measure_statistic["c6"],
-                        "c7": measure_statistic["c7"],
-                        "c8": measure_statistic["c8"],
-                        "c9": measure_statistic["c9"],
-                        "c10": measure_statistic["c10"],
-                        "c11": measure_statistic["c11"],
+                        "c1": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c1",
+                        ),
+                        "c2": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c2",
+                        ),
+                        "c3": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c3",
+                        ),
+                        "c4": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c4",
+                        ),
+                        "c5": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c5",
+                        ),
+                        "c6": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c6",
+                        ),
+                        "c7": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c7",
+                        ),
+                        "c8": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c8",
+                        ),
+                        "c9": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c9",
+                        ),
+                        "c10": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c10",
+                        ),
+                        "c11": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "c11",
+                        ),
                         "p1": measure_statistic["p1"],
                         "p2": measure_statistic["p2"],
                         "p3": measure_statistic["p3"],
@@ -1703,10 +1846,16 @@ async def get_chart_data(
     end_time = datetime.now()
     print("prepare measure_statistics cost time:", end_time - start_time, "s")
 
+    # TODO: choose sex 0 or 1
+    # TODO: mean, std, cv
+    statistic_dict = await crud.measure_statistic.get_mean_statistics_dict_by_human(
+        db_session=db_session,
+    )
     result = await get_chart_result_data(
         measure_statistics=measure_statistics,
         chart_input=chart_input,
         z_options_dict=z_options_dict,
+        statistic_dict=statistic_dict,
     )
 
     return result
@@ -1762,6 +1911,9 @@ async def export_csv(
         db_session=db_session,
     )
 
+    statistic_dict = await crud.measure_statistic.get_mean_statistics_dict_by_human(
+        db_session=db_session,
+    )
     file_list = []
     for chart_setting in chart_settings:
         file_info = await get_chart_export_data(
@@ -1769,6 +1921,7 @@ async def export_csv(
             chart_input=chart_setting,
             z_options_dict=z_options_dict,
             parameter_labels_dict=parameter_labels_dict,
+            statistic_dict=statistic_dict,
         )
 
         result_list = jsonable_encoder(file_info.rows)

@@ -333,6 +333,36 @@ class MeasureInfoUpdate(BaseModel):
         nullable=True,
         title="右尺-有效範圍內最大振幅值",
     )
+    select_static_l_cu: float = Field(
+        default=None,
+        nullable=True,
+        title="左寸-點選的靜態壓值(單位:mmHg)",
+    )
+    select_static_l_qu: float = Field(
+        default=None,
+        nullable=True,
+        title="左關-點選的靜態壓值(單位:mmHg)",
+    )
+    select_static_l_ch: float = Field(
+        default=None,
+        nullable=True,
+        title="左尺-點選的靜態壓值(單位:mmHg)",
+    )
+    select_static_r_cu: float = Field(
+        default=None,
+        nullable=True,
+        title="右寸-點選的靜態壓值(單位:mmHg)",
+    )
+    select_static_r_qu: float = Field(
+        default=None,
+        nullable=True,
+        title="右關-點選的靜態壓值(單位:mmHg)",
+    )
+    select_static_r_ch: float = Field(
+        default=None,
+        nullable=True,
+        title="右尺-點選的靜態壓值(單位:mmHg)",
+    )
     irregular_hr_l_cu: bool = Field(default=None, nullable=True, title="左寸-有無脈律不整")
     irregular_hr_l_qu: bool = Field(default=None, nullable=True, title="左關-有無脈律不整")
     irregular_hr_l_ch: bool = Field(default=None, nullable=True, title="左尺-有無脈律不整")
@@ -461,6 +491,13 @@ class MeasureInfoUpdate(BaseModel):
     xingcheng_r_cu: float = Field(default=None, title="行程-右寸-起點終點相差深度(單位:mm)")
     xingcheng_r_qu: float = Field(default=None, title="行程-右關-起點終點相差深度(單位:mm)")
     xingcheng_r_ch: float = Field(default=None, title="行程-右尺-起點終點相差深度(單位:mm)")
+
+    pass_rate_l_cu: float = Field(default=None, title="左寸-通過率 0-100")
+    pass_rate_l_qu: float = Field(default=None, title="左關-通過率 0-100")
+    pass_rate_l_ch: float = Field(default=None, title="左尺-通過率 0-100")
+    pass_rate_r_cu: float = Field(default=None, title="右寸-通過率 0-100")
+    pass_rate_r_qu: float = Field(default=None, title="右關-通過率 0-100")
+    pass_rate_r_ch: float = Field(default=None, title="右尺-通過率 0-100")
 
     sex: int = Field(default=None, nullable=True, title="性別")
     age: int = Field(default=None, nullable=True, title="檢測時年齡")

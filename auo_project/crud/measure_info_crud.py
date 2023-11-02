@@ -15,12 +15,12 @@ from auo_project.schemas.measure_info_schema import MeasureInfoCreate, MeasureIn
 
 class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate]):
     async def get_exist_measure(
-        self, db_session, *, org_id: UUID, sid: str, measure_time: datetime
+        self, db_session, *, org_id: UUID, number: str, measure_time: datetime
     ) -> Optional[MeasureInfo]:
-        subject = await crud.subject.get_by_sid(
+        subject = await crud.subject.get_by_number_and_org_id(
             db_session=db_session,
             org_id=org_id,
-            sid=sid,
+            number=number,
         )
         if not subject:
             return

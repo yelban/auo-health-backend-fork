@@ -135,6 +135,9 @@ class Settings(BaseSettings):
     USER_PASSWORD1: str = ""
     USER_PASSWORD2: str = ""
     TPH_PASSWORD: str = ""
+    TONGUE_LABEL_PASSWORD1: str = ""
+    TONGUE_LABEL_PASSWORD2: str = ""
+    TONGUE_LABEL_PASSWORD3: str = ""
 
     MAX_SIZE_PER_UPLOAD: int = 20
     MAX_SIZE_PER_FILE: int = 100

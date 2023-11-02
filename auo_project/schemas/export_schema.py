@@ -69,6 +69,7 @@ class DF1Schema(BaseModel):
     p9_std: float = Field(default=None, alias="p9_std")
     p10_std: float = Field(default=None, alias="p10_std")
     p11_std: float = Field(default=None, alias="p11_std")
+    pass_rate: float = Field(default=None, alias="通過率")
 
     class Config:
         allow_population_by_field_name = True

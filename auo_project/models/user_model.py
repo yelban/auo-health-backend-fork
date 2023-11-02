@@ -81,5 +81,5 @@ class User(BaseUUIDModel, BaseTimestampModel, UserBase, table=True):
     )
     recipes: List["Recipe"] = Relationship(
         back_populates="owner",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "select"},
     )

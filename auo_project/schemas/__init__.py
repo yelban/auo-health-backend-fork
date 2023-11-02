@@ -14,6 +14,11 @@ from auo_project.schemas.file_schema import (
     FileUpdate,
 )
 from auo_project.schemas.group_schema import GroupCreate, GroupRead, GroupUpdate
+from auo_project.schemas.measure_advanced_tongue_schema import (
+    MeasureAdvancedTongueCreate,
+    MeasureAdvancedTongueRead,
+    MeasureAdvancedTongueUpdate,
+)
 from auo_project.schemas.measure_bcq_schema import BCQCreate, BCQRead, BCQUpdate
 from auo_project.schemas.measure_disease_option_schema import MeasureDiseaseOption
 from auo_project.schemas.measure_info_schema import (

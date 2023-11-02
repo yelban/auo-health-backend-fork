@@ -1,6 +1,7 @@
 from auo_project.crud.action_crud import action
 from auo_project.crud.file_crud import file
 from auo_project.crud.group_crud import group
+from auo_project.crud.measure_advanced_tongue_crud import measure_advanced_tongue
 from auo_project.crud.measure_bcq_crud import measure_bcq
 from auo_project.crud.measure_disease_option_crud import measure_disease_option
 from auo_project.crud.measure_info_crud import measure_info

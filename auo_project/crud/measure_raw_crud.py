@@ -14,7 +14,7 @@ class CRUDMeasureRaw(CRUDBase[MeasureRaw, MeasureRawCreate, MeasureRawUpdate]):
         self, db_session: AsyncSession, *, measure_id: UUID
     ) -> Optional[MeasureRaw]:
         measure_raw = await db_session.execute(
-            select(MeasureRaw.id).where(MeasureRaw.measure_id == measure_id),
+            select(MeasureRaw).where(MeasureRaw.measure_id == measure_id),
         )
         return measure_raw.scalar_one_or_none()
 

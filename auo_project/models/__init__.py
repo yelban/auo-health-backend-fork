@@ -8,6 +8,7 @@ from auo_project.models.links_model import (
     LinkUserAction,
     LinkUserRole,
 )
+from auo_project.models.measure_advanced_tongue_model import MeasureAdvancedTongue
 from auo_project.models.measure_bcq_model import BCQ
 from auo_project.models.measure_info_model import MeasureInfo
 from auo_project.models.measure_mean_model import MeasureMean

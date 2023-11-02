@@ -91,6 +91,7 @@ async def init_db(db_session: AsyncSession) -> None:
         OrgCreate(name=settings.FIRST_SUPERUSER_ORG_NAME, description="First Org"),
         OrgCreate(name="y_medical_center", description="Y Medical Center"),
         OrgCreate(name="tph", description="部北醫院"),
+        OrgCreate(name="tongue_label", description="舌象標記專用"),
     ]
 
     for action in actions:
@@ -260,6 +261,45 @@ async def init_db(db_session: AsyncSession) -> None:
                 full_name="部北管理員",
                 mobile="",
                 email="chief@tph.tw",
+                is_active=True,
+                is_superuser=False,
+            ),
+            "group_name": "manager",
+        },
+        {
+            "data": UserCreate(
+                username="user1@tonguelabel.tw",
+                password=settings.TONGUE_LABEL_PASSWORD1,
+                org_id=current_orgs[5].id,
+                full_name="舌象標記人員1",
+                mobile="",
+                email="user1@tonguelabel.tw",
+                is_active=True,
+                is_superuser=False,
+            ),
+            "group_name": "manager",
+        },
+        {
+            "data": UserCreate(
+                username="user2@tonguelabel.tw",
+                password=settings.TONGUE_LABEL_PASSWORD2,
+                org_id=current_orgs[5].id,
+                full_name="舌象標記人員2",
+                mobile="",
+                email="user2@tonguelabel.tw",
+                is_active=True,
+                is_superuser=False,
+            ),
+            "group_name": "manager",
+        },
+        {
+            "data": UserCreate(
+                username="user3@tonguelabel.tw",
+                password=settings.TONGUE_LABEL_PASSWORD3,
+                org_id=current_orgs[5].id,
+                full_name="舌象標記人員3",
+                mobile="",
+                email="user3@tonguelabel.tw",
                 is_active=True,
                 is_superuser=False,
             ),

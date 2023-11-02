@@ -645,7 +645,7 @@ def process_s005(values, parameter_dict):
             result[question_id] = option["value"]
         elif option["label"] == process_text(work_type):
             result[question_id] = option["value"]
-        elif option["label"] in work_type:
+        elif option["label"] in str(work_type):
             # 有固定的工作或上學時間者 in 有固定的工作或上學時間者，請續填答下題A-B
             result[question_id] = option["value"]
 

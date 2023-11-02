@@ -29,7 +29,15 @@ from auo_project.core.constants import (
     UploadStatusType,
 )
 from auo_project.core.security import decrypt
-from auo_project.core.utils import get_age, safe_divide, safe_substract
+from auo_project.core.utils import (
+    get_age,
+    get_max_amp_value,
+    get_measure_strength,
+    get_measure_width,
+    get_pass_rate_from_statistics,
+    safe_divide,
+    safe_substract,
+)
 from auo_project.db.session import SessionLocal
 
 conn_args = {}
@@ -173,7 +181,6 @@ def get_mean_prop_range_123(infos_analyze, hand, position):
 def get_range_idx(v, values):
     # 浮2;中1;沉0
     if v < values[0]:
-        # TODO
         # raise Exception("max depth should not less than start", v, values)
         print("max depth should not less than start", v, values)
     elif v < values[1]:
@@ -183,8 +190,8 @@ def get_range_idx(v, values):
     elif v <= values[3]:
         return 0
     else:
-        # raise Exception("max depth should not more than end", v, values)
-        print("max depth should not more than end", v, values)
+        # 若static_max_amp_{hand}_{position} > static_range_end_{hand}_{position}，亦判為沉
+        return 0
     return
 
 
@@ -285,6 +292,12 @@ def cal_extra_measure_info(infos_analyze):
                 **get_max_amp_depth_of_range_from_file(infos_analyze, hand, position),
             }
     return result
+
+
+def serialize(df):
+    if isinstance(df, pd.DataFrame):
+        return df.to_csv(sep="\t", index=False, header=None)
+    return
 
 
 def read_statistics_txt(content) -> List[schemas.FileStatistics]:
@@ -537,6 +550,7 @@ async def process_file(
         )
         subject = await crud.subject.create(db_session=db_session, obj_in=subject_in)
     else:
+        # TODO: check survey data
         subject_in = schemas.SubjectUpdate(
             birth_date=infos.birth_date,
             sex=infos.sex,
@@ -555,7 +569,7 @@ async def process_file(
     measure_info = await crud.measure_info.get_exist_measure(
         db_session=db_session,
         org_id=file.owner.org_id,
-        sid=subject.sid,
+        number=subject.number,
         measure_time=infos.measure_time,
     ) or await crud.measure_info.get_by_file_id(db_session=db_session, file_id=file.id)
 
@@ -581,14 +595,54 @@ async def process_file(
     if isinstance(infos.height, float) and isinstance(infos.weight, float):
         bmi = safe_divide(infos.weight, (infos.height / 100) ** 2)
 
+    statistics_records = result_dict.get("statistics.csv", [])
+    (
+        pass_rate_l_cu,
+        pass_rate_l_qu,
+        pass_rate_l_ch,
+        pass_rate_r_cu,
+        pass_rate_r_qu,
+        pass_rate_r_ch,
+    ) = get_pass_rate_from_statistics(statistics_records)
+
     if measure_info:
         print(f"measure exist: {measure_info.id}")
     if overwrite and measure_info:
         print("start deleting...")
         await db_session.delete(measure_info)
         await db_session.commit()
-        # await crud.measure_info.remove(db_session=db_session, id=measure_info.id)
         print("deleted")
+
+    max_amp_value_l_cu = get_max_amp_value(
+        infos.select_static_l_cu,
+        serialize(result_dict.get("left/analyze_raw_Cu.txt")),
+    )
+    max_amp_value_l_qu = get_max_amp_value(
+        infos.select_static_l_qu,
+        serialize(result_dict.get("left/analyze_raw_Qu.txt")),
+    )
+    max_amp_value_l_ch = get_max_amp_value(
+        infos.select_static_l_ch,
+        serialize(result_dict.get("left/analyze_raw_Ch.txt")),
+    )
+    max_amp_value_r_cu = get_max_amp_value(
+        infos.select_static_r_cu,
+        serialize(result_dict.get("right/analyze_raw_Cu.txt")),
+    )
+    max_amp_value_r_qu = get_max_amp_value(
+        infos.select_static_r_qu,
+        serialize(result_dict.get("right/analyze_raw_Qu.txt")),
+    )
+    max_amp_value_r_ch = get_max_amp_value(
+        infos.select_static_r_ch,
+        serialize(result_dict.get("right/analyze_raw_Ch.txt")),
+    )
+    width_value_l_cu = safe_divide(infos.range_length_l_cu, 0.2)
+    width_value_l_qu = safe_divide(infos.range_length_l_qu, 0.2)
+    width_value_l_ch = safe_divide(infos.range_length_l_ch, 0.2)
+    width_value_r_cu = safe_divide(infos.range_length_r_cu, 0.2)
+    width_value_r_qu = safe_divide(infos.range_length_r_qu, 0.2)
+    width_value_r_ch = safe_divide(infos.range_length_r_ch, 0.2)
     if not measure_info or overwrite:
         measure_info_in = schemas.MeasureInfoCreate(
             subject_id=subject.id,
@@ -634,12 +688,12 @@ async def process_file(
             max_amp_depth_of_range_r_cu=extra_info.max_amp_depth_of_range_r_cu,
             max_amp_depth_of_range_r_qu=extra_info.max_amp_depth_of_range_r_qu,
             max_amp_depth_of_range_r_ch=extra_info.max_amp_depth_of_range_r_ch,
-            max_amp_value_l_cu=infos_analyze.max_amp_value_l_cu,
-            max_amp_value_l_qu=infos_analyze.max_amp_value_l_qu,
-            max_amp_value_l_ch=infos_analyze.max_amp_value_l_ch,
-            max_amp_value_r_cu=infos_analyze.max_amp_value_r_cu,
-            max_amp_value_r_qu=infos_analyze.max_amp_value_r_qu,
-            max_amp_value_r_ch=infos_analyze.max_amp_value_r_ch,
+            max_amp_value_l_cu=max_amp_value_l_cu,
+            max_amp_value_l_qu=max_amp_value_l_qu,
+            max_amp_value_l_ch=max_amp_value_l_ch,
+            max_amp_value_r_cu=max_amp_value_r_cu,
+            max_amp_value_r_qu=max_amp_value_r_qu,
+            max_amp_value_r_ch=max_amp_value_r_ch,
             irregular_hr_l_cu=infos.irregular_hr_l_cu,
             irregular_hr_l_qu=infos.irregular_hr_l_qu,
             irregular_hr_l_ch=infos.irregular_hr_l_ch,
@@ -678,24 +732,78 @@ async def process_file(
             max_slope_value_r_cu=infos_analyze.max_slop_r_cu,
             max_slope_value_r_qu=infos_analyze.max_slop_r_qu,
             max_slope_value_r_ch=infos_analyze.max_slop_r_ch,
-            strength_l_cu=infos.strength_l_cu,
-            strength_l_qu=infos.strength_l_qu,
-            strength_l_ch=infos.strength_l_ch,
-            strength_r_cu=infos.strength_r_cu,
-            strength_r_qu=infos.strength_r_qu,
-            strength_r_ch=infos.strength_r_ch,
+            # strength_l_cu=infos.strength_l_cu,
+            # strength_l_qu=infos.strength_l_qu,
+            # strength_l_ch=infos.strength_l_ch,
+            # strength_r_cu=infos.strength_r_cu,
+            # strength_r_qu=infos.strength_r_qu,
+            # strength_r_ch=infos.strength_r_ch,
+            strength_l_cu=get_measure_strength(
+                infos_analyze.max_slop_l_cu,
+                max_amp_value_l_cu,
+            ),
+            strength_l_qu=get_measure_strength(
+                infos_analyze.max_slop_l_qu,
+                max_amp_value_l_qu,
+            ),
+            strength_l_ch=get_measure_strength(
+                infos_analyze.max_slop_l_ch,
+                max_amp_value_l_ch,
+            ),
+            strength_r_cu=get_measure_strength(
+                infos_analyze.max_slop_r_cu,
+                max_amp_value_r_cu,
+            ),
+            strength_r_qu=get_measure_strength(
+                infos_analyze.max_slop_r_qu,
+                max_amp_value_r_qu,
+            ),
+            strength_r_ch=get_measure_strength(
+                infos_analyze.max_slop_r_ch,
+                max_amp_value_r_ch,
+            ),
             range_length_l_cu=infos.range_length_l_cu,
             range_length_l_qu=infos.range_length_l_qu,
             range_length_l_ch=infos.range_length_l_ch,
             range_length_r_cu=infos.range_length_r_cu,
             range_length_r_qu=infos.range_length_r_qu,
             range_length_r_ch=infos.range_length_r_ch,
-            width_l_cu=None,
-            width_l_qu=None,
-            width_l_ch=None,
-            width_r_cu=None,
-            width_r_qu=None,
-            width_r_ch=None,
+            width_l_cu=get_measure_width(
+                infos.range_length_l_cu,
+                max_amp_value_l_cu,
+                infos_analyze.max_slop_l_cu,
+            ),
+            width_l_qu=get_measure_width(
+                infos.range_length_l_qu,
+                max_amp_value_l_qu,
+                infos_analyze.max_slop_l_qu,
+            ),
+            width_l_ch=get_measure_width(
+                infos.range_length_l_ch,
+                max_amp_value_l_ch,
+                infos_analyze.max_slop_l_ch,
+            ),
+            width_r_cu=get_measure_width(
+                infos.range_length_r_cu,
+                max_amp_value_r_cu,
+                infos_analyze.max_slop_r_cu,
+            ),
+            width_r_qu=get_measure_width(
+                infos.range_length_r_qu,
+                max_amp_value_r_qu,
+                infos_analyze.max_slop_r_qu,
+            ),
+            width_r_ch=get_measure_width(
+                infos.range_length_r_ch,
+                max_amp_value_r_ch,
+                infos_analyze.max_slop_r_ch,
+            ),
+            width_value_l_cu=round(width_value_l_cu, 1) if width_value_l_cu else None,
+            width_value_l_qu=round(width_value_l_qu, 1) if width_value_l_qu else None,
+            width_value_l_ch=round(width_value_l_ch, 1) if width_value_l_ch else None,
+            width_value_r_cu=round(width_value_r_cu, 1) if width_value_r_cu else None,
+            width_value_r_qu=round(width_value_r_qu, 1) if width_value_r_qu else None,
+            width_value_r_ch=round(width_value_r_ch, 1) if width_value_r_ch else None,
             static_max_amp_l_cu=infos_analyze.static_max_amp_l_cu,
             static_max_amp_l_qu=infos_analyze.static_max_amp_l_qu,
             static_max_amp_l_ch=infos_analyze.static_max_amp_l_ch,
@@ -738,6 +846,18 @@ async def process_file(
                 infos_analyze.range_end_index_r_ch,
                 infos_analyze.range_start_index_r_ch,
             ),
+            select_static_l_cu=infos.select_static_l_cu,
+            select_static_l_qu=infos.select_static_l_qu,
+            select_static_l_ch=infos.select_static_l_ch,
+            select_static_r_cu=infos.select_static_r_cu,
+            select_static_r_qu=infos.select_static_r_qu,
+            select_static_r_ch=infos.select_static_r_ch,
+            pass_rate_l_cu=pass_rate_l_cu,
+            pass_rate_l_qu=pass_rate_l_qu,
+            pass_rate_l_ch=pass_rate_l_ch,
+            pass_rate_r_cu=pass_rate_r_cu,
+            pass_rate_r_qu=pass_rate_r_qu,
+            pass_rate_r_ch=pass_rate_r_ch,
             sex=infos.sex,
             age=age,
             height=infos.height,
@@ -762,6 +882,7 @@ async def process_file(
             obj_in=measure_info_in,
         )
     else:
+        # TODO: check if survey data exists, if exists, update measure info
         measure_info_in = schemas.MeasureInfoUpdate(
             subject_id=subject.id,
             file_id=file.id,
@@ -805,12 +926,12 @@ async def process_file(
             max_amp_depth_of_range_r_cu=extra_info.max_amp_depth_of_range_r_cu,
             max_amp_depth_of_range_r_qu=extra_info.max_amp_depth_of_range_r_qu,
             max_amp_depth_of_range_r_ch=extra_info.max_amp_depth_of_range_r_ch,
-            max_amp_value_l_cu=infos_analyze.max_amp_value_l_cu,
-            max_amp_value_l_qu=infos_analyze.max_amp_value_l_qu,
-            max_amp_value_l_ch=infos_analyze.max_amp_value_l_ch,
-            max_amp_value_r_cu=infos_analyze.max_amp_value_r_cu,
-            max_amp_value_r_qu=infos_analyze.max_amp_value_r_qu,
-            max_amp_value_r_ch=infos_analyze.max_amp_value_r_ch,
+            max_amp_value_l_cu=max_amp_value_l_cu,
+            max_amp_value_l_qu=max_amp_value_l_qu,
+            max_amp_value_l_ch=max_amp_value_l_ch,
+            max_amp_value_r_cu=max_amp_value_r_cu,
+            max_amp_value_r_qu=max_amp_value_r_qu,
+            max_amp_value_r_ch=max_amp_value_r_ch,
             irregular_hr_l_cu=infos.irregular_hr_l_cu,
             irregular_hr_l_qu=infos.irregular_hr_l_qu,
             irregular_hr_l_ch=infos.irregular_hr_l_ch,
@@ -849,24 +970,66 @@ async def process_file(
             max_slope_value_r_cu=infos_analyze.max_slop_r_cu,
             max_slope_value_r_qu=infos_analyze.max_slop_r_qu,
             max_slope_value_r_ch=infos_analyze.max_slop_r_ch,
-            strength_l_cu=infos.strength_l_cu,
-            strength_l_qu=infos.strength_l_qu,
-            strength_l_ch=infos.strength_l_ch,
-            strength_r_cu=infos.strength_r_cu,
-            strength_r_qu=infos.strength_r_qu,
-            strength_r_ch=infos.strength_r_ch,
+            strength_l_cu=get_measure_strength(
+                infos_analyze.max_slop_l_cu,
+                max_amp_value_l_cu,
+            ),
+            strength_l_qu=get_measure_strength(
+                infos_analyze.max_slop_l_qu,
+                max_amp_value_l_qu,
+            ),
+            strength_l_ch=get_measure_strength(
+                infos_analyze.max_slop_l_ch,
+                max_amp_value_l_ch,
+            ),
+            strength_r_cu=get_measure_strength(
+                infos_analyze.max_slop_r_cu,
+                max_amp_value_r_cu,
+            ),
+            strength_r_qu=get_measure_strength(
+                infos_analyze.max_slop_r_qu,
+                max_amp_value_r_qu,
+            ),
+            strength_r_ch=get_measure_strength(
+                infos_analyze.max_slop_r_ch,
+                max_amp_value_r_ch,
+            ),
             range_length_l_cu=infos.range_length_l_cu,
             range_length_l_qu=infos.range_length_l_qu,
             range_length_l_ch=infos.range_length_l_ch,
             range_length_r_cu=infos.range_length_r_cu,
             range_length_r_qu=infos.range_length_r_qu,
             range_length_r_ch=infos.range_length_r_ch,
-            width_l_cu=None,
-            width_l_qu=None,
-            width_l_ch=None,
-            width_r_cu=None,
-            width_r_qu=None,
-            width_r_ch=None,
+            width_l_cu=get_measure_width(
+                infos.range_length_l_cu,
+                max_amp_value_l_cu,
+                infos_analyze.max_slop_l_cu,
+            ),
+            width_l_qu=get_measure_width(
+                infos.range_length_l_qu,
+                max_amp_value_l_qu,
+                infos_analyze.max_slop_l_qu,
+            ),
+            width_l_ch=get_measure_width(
+                infos.range_length_l_ch,
+                max_amp_value_l_ch,
+                infos_analyze.max_slop_l_ch,
+            ),
+            width_r_cu=get_measure_width(
+                infos.range_length_r_cu,
+                max_amp_value_r_cu,
+                infos_analyze.max_slop_r_cu,
+            ),
+            width_r_qu=get_measure_width(
+                infos.range_length_r_qu,
+                max_amp_value_r_qu,
+                infos_analyze.max_slop_r_qu,
+            ),
+            width_r_ch=get_measure_width(
+                infos.range_length_r_ch,
+                max_amp_value_r_ch,
+                infos_analyze.max_slop_r_ch,
+            ),
             static_max_amp_l_cu=infos_analyze.static_max_amp_l_cu,
             static_max_amp_l_qu=infos_analyze.static_max_amp_l_qu,
             static_max_amp_l_ch=infos_analyze.static_max_amp_l_ch,
@@ -909,6 +1072,18 @@ async def process_file(
                 infos_analyze.range_end_index_r_ch,
                 infos_analyze.range_start_index_r_ch,
             ),
+            select_static_l_cu=infos.select_static_l_cu,
+            select_static_l_qu=infos.select_static_l_qu,
+            select_static_l_ch=infos.select_static_l_ch,
+            select_static_r_cu=infos.select_static_r_cu,
+            select_static_r_qu=infos.select_static_r_qu,
+            select_static_r_ch=infos.select_static_r_ch,
+            pass_rate_l_cu=pass_rate_l_cu,
+            pass_rate_l_qu=pass_rate_l_qu,
+            pass_rate_l_ch=pass_rate_l_ch,
+            pass_rate_r_cu=pass_rate_r_cu,
+            pass_rate_r_qu=pass_rate_r_qu,
+            pass_rate_r_ch=pass_rate_r_ch,
             sex=infos.sex,
             age=age,
             height=infos.height,
@@ -969,7 +1144,7 @@ async def process_file(
                 file_path=obj_path,
                 object=result_dict["T_down.jpg"],
             )
-        if not tongue:
+        if tongue is None:
             tongue_in = schemas.MeasureTongueCreate(
                 **report.dict(),
                 measure_id=measure_info.id,
@@ -1000,11 +1175,6 @@ async def process_file(
                     db_session=db_session,
                     obj_in=statistic_in,
                 )
-
-    def serialize(df):
-        if isinstance(df, pd.DataFrame):
-            return df.to_csv(sep="\t", index=False, header=None)
-        return
 
     # 6s
     measure_raw = await crud.measure_raw.get_by_measure_id(
