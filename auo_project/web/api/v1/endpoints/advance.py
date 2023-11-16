@@ -225,7 +225,6 @@ def is_need_to_filter(measure: dict, key: str, val: dict):
             and isinstance(input_result, list)
             and len(input_result) > 0
         ):
-
             if input_result[0].split(":")[0] == "c006":
                 match = is_input_and_options_c006_match(measure_val, input_result)
                 return match is False
@@ -734,7 +733,7 @@ async def get_chart_result_data(
         ]
 
         def convert_diff_pct1(measure_statistics):
-            if domain[1].lower() not in ("cn", "cncv", "pn", "pncv"):
+            if domain[1].lower() not in ("cn", "pn"):
                 return measure_statistics
             for measure_statistic in measure_statistics:
                 hand_position = f"{measure_statistic['hand'].lower()[0]}_{measure_statistic['position'].lower()}"
@@ -794,7 +793,7 @@ async def get_chart_result_data(
         ]
 
         def convert_diff_pct2(measure_statistics):
-            if chart_input.y["domain"][1].lower() not in ("cn", "cncv", "pn", "pncv"):
+            if chart_input.y["domain"][1].lower() not in ("cn", "pn"):
                 return measure_statistics
             for measure_statistic in measure_statistics:
                 hand_position = f"{measure_statistic['hand'].lower()[0]}_{measure_statistic['position'].lower()}"
@@ -867,7 +866,8 @@ async def get_chart_result_data(
                     )
             return measure_statistics
 
-        measure_statistics = convert_diff_pct3(measure_statistics)
+        if statistics == "mean":
+            measure_statistics = convert_diff_pct3(measure_statistics)
 
         result = get_chart_type3_data(
             x_options,
@@ -888,7 +888,6 @@ async def get_chart_export_data(
     parameter_labels_dict: dict,
     statistic_dict: dict,
 ) -> schemas.MultiExportFile:
-
     hand_map = {"Left": "左", "Right": "右"}
     position_map = {"Cu": "寸", "Qu": "關", "Ch": "尺"}
 
@@ -1043,17 +1042,72 @@ async def get_chart_export_data(
                             hand_position,
                             "c11",
                         ),
-                        "p1": measure_statistic["p1"],
-                        "p2": measure_statistic["p2"],
-                        "p3": measure_statistic["p3"],
-                        "p4": measure_statistic["p4"],
-                        "p5": measure_statistic["p5"],
-                        "p6": measure_statistic["p6"],
-                        "p7": measure_statistic["p7"],
-                        "p8": measure_statistic["p8"],
-                        "p9": measure_statistic["p9"],
-                        "p10": measure_statistic["p10"],
-                        "p11": measure_statistic["p11"],
+                        "p1": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p1",
+                        ),
+                        "p2": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p2",
+                        ),
+                        "p3": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p3",
+                        ),
+                        "p4": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p4",
+                        ),
+                        "p5": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p5",
+                        ),
+                        "p6": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p6",
+                        ),
+                        "p7": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p7",
+                        ),
+                        "p8": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p8",
+                        ),
+                        "p9": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p9",
+                        ),
+                        "p10": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p10",
+                        ),
+                        "p11": get_diff_pct(
+                            measure_statistic,
+                            statistic_dict,
+                            hand_position,
+                            "p11",
+                        ),
                     },
                 )
             elif measure_statistic["statistic"] == "CV":
@@ -1161,28 +1215,138 @@ async def get_chart_export_data(
                     "t1/t": measure_statistic["t1_div_t"],
                     "pw": measure_statistic["pw"],
                     "a0": measure_statistic["a0"],
-                    "c1": measure_statistic["c1"],
-                    "c2": measure_statistic["c2"],
-                    "c3": measure_statistic["c3"],
-                    "c4": measure_statistic["c4"],
-                    "c5": measure_statistic["c5"],
-                    "c6": measure_statistic["c6"],
-                    "c7": measure_statistic["c7"],
-                    "c8": measure_statistic["c8"],
-                    "c9": measure_statistic["c9"],
-                    "c10": measure_statistic["c10"],
-                    "c11": measure_statistic["c11"],
-                    "p1": measure_statistic["p1"],
-                    "p2": measure_statistic["p2"],
-                    "p3": measure_statistic["p3"],
-                    "p4": measure_statistic["p4"],
-                    "p5": measure_statistic["p5"],
-                    "p6": measure_statistic["p6"],
-                    "p7": measure_statistic["p7"],
-                    "p8": measure_statistic["p8"],
-                    "p9": measure_statistic["p9"],
-                    "p10": measure_statistic["p10"],
-                    "p11": measure_statistic["p11"],
+                    "c1": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c1",
+                    ),
+                    "c2": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c2",
+                    ),
+                    "c3": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c3",
+                    ),
+                    "c4": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c4",
+                    ),
+                    "c5": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c5",
+                    ),
+                    "c6": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c6",
+                    ),
+                    "c7": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c7",
+                    ),
+                    "c8": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c8",
+                    ),
+                    "c9": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c9",
+                    ),
+                    "c10": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c10",
+                    ),
+                    "c11": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "c11",
+                    ),
+                    "p1": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p1",
+                    ),
+                    "p2": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p2",
+                    ),
+                    "p3": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p3",
+                    ),
+                    "p4": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p4",
+                    ),
+                    "p5": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p5",
+                    ),
+                    "p6": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p6",
+                    ),
+                    "p7": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p7",
+                    ),
+                    "p8": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p8",
+                    ),
+                    "p9": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p9",
+                    ),
+                    "p10": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p10",
+                    ),
+                    "p11": get_diff_pct(
+                        measure_statistic,
+                        statistic_dict,
+                        hand_position,
+                        "p11",
+                    ),
                 }
                 measure_data = {
                     f"{column_prefix}{key}": value for key, value in tmp_data.items()
