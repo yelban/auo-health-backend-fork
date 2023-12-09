@@ -1404,13 +1404,13 @@ def process_psqi(values):
         else:
             try:
                 start_dt = today.replace(
-                    hour=int(a035_start_answer.split(":")[0]),
+                    hour=int(a035_start_answer.split(":")[0]) % 24,
                     minute=int(a035_start_answer.split(":")[1]),
                     second=0,
                     microsecond=0,
                 )
                 end_dt = timedelta(days=1) + today.replace(
-                    hour=int(a035_end_answer.split(":")[0]),
+                    hour=int(a035_end_answer.split(":")[0]) % 24,
                     minute=int(a035_end_answer.split(":")[1]),
                     second=0,
                     microsecond=0,
