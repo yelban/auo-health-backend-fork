@@ -47,3 +47,9 @@ update measure.subjects
 set number = null
 where id = '0e05d6dd-9fe3-4a03-914c-ca4d98a04086';
 rollback;
+
+
+ka014
+d9c0e06b-8775-44cc-babf-8c219f2baac5
+KA014
+fc736cc1-1899-440a-80cd-6b179b80ad28
