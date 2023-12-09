@@ -92,6 +92,7 @@ async def init_db(db_session: AsyncSession) -> None:
         OrgCreate(name="y_medical_center", description="Y Medical Center"),
         OrgCreate(name="tph", description="部北醫院"),
         OrgCreate(name="tongue_label", description="舌象標記專用"),
+        OrgCreate(name="nricm", description="國家中醫藥所"),
     ]
 
     for action in actions:
@@ -300,6 +301,19 @@ async def init_db(db_session: AsyncSession) -> None:
                 full_name="舌象標記人員3",
                 mobile="",
                 email="user3@tonguelabel.tw",
+                is_active=True,
+                is_superuser=False,
+            ),
+            "group_name": "manager",
+        },
+        {
+            "data": UserCreate(
+                username="chief@nricm.org.tw",
+                password=settings.NRICM_PASSWORD,
+                org_id=current_orgs[6].id,
+                full_name="國家中醫藥所管理員",
+                mobile="",
+                email="chief@nricm.org.tw",
                 is_active=True,
                 is_superuser=False,
             ),

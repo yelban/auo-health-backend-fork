@@ -135,6 +135,7 @@ class Settings(BaseSettings):
     USER_PASSWORD1: str = ""
     USER_PASSWORD2: str = ""
     TPH_PASSWORD: str = ""
+    NRICM_PASSWORD: str = ""
     TONGUE_LABEL_PASSWORD1: str = ""
     TONGUE_LABEL_PASSWORD2: str = ""
     TONGUE_LABEL_PASSWORD3: str = ""
