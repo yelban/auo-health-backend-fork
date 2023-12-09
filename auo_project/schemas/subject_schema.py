@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
@@ -56,7 +56,7 @@ class MeasureListPage(BaseModel):
 
 
 class SubjectReadWithMeasures(BaseModel):
-    subject: SubjectSecretRead
+    subject: Union[SubjectRead, SubjectSecretRead]
     measure: MeasureListPage
     measure_times: List[Dict[str, Any]] = Field([], title="選項：檢測時間")
     org_names: List[Dict[str, Any]] = Field([], title="選項：檢測單位")

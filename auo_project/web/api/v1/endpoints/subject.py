@@ -1,6 +1,6 @@
 from datetime import datetime
 from io import BytesIO
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -34,6 +34,7 @@ from auo_project.core.utils import (
     get_hr_type,
     get_pct_cmp_base,
     get_pct_cmp_overall_and_standard,
+    get_subject_schema,
     safe_divide,
 )
 from auo_project.models import MeasureInfo, Org
@@ -54,7 +55,7 @@ class SubjectPage(BaseModel):
     page_count: int
     total_count: int
     link: Link
-    items: List[schemas.SubjectSecretRead]
+    items: List[Union[schemas.SubjectRead, schemas.SubjectSecretRead]]
 
 
 class SubjectListResponse(BaseModel):
@@ -159,6 +160,8 @@ async def get_subject(
         skip=(pagination.page - 1) * pagination.per_page,
         limit=pagination.per_page,
     )
+    subject_schema = get_subject_schema(org_name=current_user.org.name)
+    items = [subject_schema.from_orm(item) for item in items]
     resp = await db_session.execute(select(func.count()).select_from(query.subquery()))
     total_count = resp.scalar_one()
 
@@ -358,7 +361,7 @@ async def get_subject_measures(
     ]
 
     return schemas.SubjectReadWithMeasures(
-        subject=subject,
+        subject=get_subject_schema(org_name=current_user.org.name)(**subject.dict()),
         measure=page_result,
         measure_times=MEASURE_TIMES,
         org_names=org_names,
@@ -877,7 +880,7 @@ async def get_multi_measure_summary(
     )
 
     return schemas.MultiMeasureDetailResponse(
-        subject=schemas.SubjectSecretRead(
+        subject=get_subject_schema(org_name=current_user.org.name)(
             **jsonable_encoder(subject),
             standard_measure_info=standard_measure_info,
         ),

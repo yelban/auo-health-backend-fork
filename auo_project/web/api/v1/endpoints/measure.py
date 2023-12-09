@@ -21,6 +21,7 @@ from auo_project.core.utils import (
     get_hr_type,
     get_measure_strength,
     get_measure_width,
+    get_subject_schema,
     safe_divide,
 )
 from auo_project.web.api import deps
@@ -319,7 +320,7 @@ async def get_measure_summary(
             dbp = survey_result_value.get("dbp", None)
 
     return schemas.MeasureDetailResponse(
-        subject=schemas.SubjectSecretRead(
+        subject=get_subject_schema(org_name=current_user.org.name)(
             **jsonable_encoder(subject),
             standard_measure_info=standard_measure_info,
         ),

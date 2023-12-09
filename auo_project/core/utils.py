@@ -448,3 +448,9 @@ def get_max_amp_value(select_static: float, analyze_raw_file_content: str) -> fl
         return found
     except Exception as e:
         print(f"get_max_amp_value error: {e}")
+
+
+def get_subject_schema(org_name: str):
+    if org_name == "nricm":
+        return schemas.SubjectRead
+    return schemas.SubjectSecretRead
