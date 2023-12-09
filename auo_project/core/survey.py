@@ -1418,7 +1418,7 @@ def process_psqi(values):
                 sleep_hour = (end_dt - start_dt).seconds / 3600
                 return sleep_hour
             except Exception as e:
-                print("error", e)
+                print("error", e, a035_start_answer, a035_end_answer)
 
     a034_score = 0
 

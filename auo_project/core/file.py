@@ -273,6 +273,7 @@ def get_max_amp_depth_of_range_from_file(infos_analyze, hand, position):
     max_value = getattr(infos_analyze, f"static_max_amp_{hand}_{position}")
 
     if not all([v is not None for v in values]) or max_value is None:
+        print(f"{hand}, {position} not all values exist or max_value is None")
         return default_value
 
     return {
