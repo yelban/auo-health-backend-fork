@@ -451,6 +451,6 @@ def get_max_amp_value(select_static: float, analyze_raw_file_content: str) -> fl
 
 
 def get_subject_schema(org_name: str):
-    if org_name == "nricm":
+    if org_name in ("nricm", "tongue_label"):
         return schemas.SubjectRead
     return schemas.SubjectSecretRead

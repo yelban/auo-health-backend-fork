@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from math import ceil
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import pydash as py_
@@ -18,7 +18,7 @@ from auo_project.core.config import settings
 from auo_project.core.constants import MEASURE_TIMES
 from auo_project.core.dateutils import DateUtils
 from auo_project.core.pagination import Pagination
-from auo_project.core.utils import get_filters, safe_int
+from auo_project.core.utils import get_filters, get_subject_schema, safe_int
 from auo_project.web.api import deps
 
 
@@ -39,7 +39,7 @@ class TongueMeasure(BaseModel):
 
 
 class TongueItem(BaseModel):
-    subject: schemas.SubjectSecretRead
+    subject: Union[schemas.SubjectRead, schemas.SubjectSecretRead]
     measure: TongueMeasure
 
 
@@ -300,10 +300,9 @@ async def get_tongue(
             tongue_coating_status=[0],
         )
     )
+    subject_schema = get_subject_schema(org_name=current_user.org.name)
     return {
-        "subject": schemas.SubjectSecretRead(
-            **jsonable_encoder(measure.subject),
-        ),
+        "subject": subject_schema.from_orm(measure.subject),
         "measure": {
             "tongue": {
                 "exist": True if advanced_tongue else False,
