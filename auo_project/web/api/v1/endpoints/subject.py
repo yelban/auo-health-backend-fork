@@ -766,91 +766,91 @@ async def get_multi_measure_summary(
                 score_yang=measure.bcq.percentage_yang if measure.bcq else None,
                 score_yin=measure.bcq.percentage_yin if measure.bcq else None,
                 score_phlegm=measure.bcq.percentage_phlegm if measure.bcq else None,
-                score_yang_head=measure.bcq.percentage_yang_head
-                if measure.bcq
-                else None,
-                score_yang_chest=measure.bcq.percentage_yang_chest
-                if measure.bcq
-                else None,
-                score_yang_limbs=measure.bcq.percentage_yang_limbs
-                if measure.bcq
-                else None,
-                score_yang_abdomen=measure.bcq.percentage_yang_abdomen
-                if measure.bcq
-                else None,
-                score_yang_surface=measure.bcq.percentage_yang_surface
-                if measure.bcq
-                else None,
+                score_yang_head=(
+                    measure.bcq.percentage_yang_head if measure.bcq else None
+                ),
+                score_yang_chest=(
+                    measure.bcq.percentage_yang_chest if measure.bcq else None
+                ),
+                score_yang_limbs=(
+                    measure.bcq.percentage_yang_limbs if measure.bcq else None
+                ),
+                score_yang_abdomen=(
+                    measure.bcq.percentage_yang_abdomen if measure.bcq else None
+                ),
+                score_yang_surface=(
+                    measure.bcq.percentage_yang_surface if measure.bcq else None
+                ),
                 score_yin_head=measure.bcq.percentage_yin_head if measure.bcq else None,
-                score_yin_limbs=measure.bcq.percentage_yin_limbs
-                if measure.bcq
-                else None,
+                score_yin_limbs=(
+                    measure.bcq.percentage_yin_limbs if measure.bcq else None
+                ),
                 score_yin_gt=measure.bcq.percentage_yin_gt if measure.bcq else None,
-                score_yin_surface=measure.bcq.percentage_yin_surface
-                if measure.bcq
-                else None,
-                score_yin_abdomen=measure.bcq.percentage_yin_abdomen
-                if measure.bcq
-                else None,
-                score_phlegm_trunk=measure.bcq.percentage_phlegm_trunk
-                if measure.bcq
-                else None,
-                score_phlegm_surface=measure.bcq.percentage_phlegm_surface
-                if measure.bcq
-                else None,
-                score_phlegm_head=measure.bcq.percentage_phlegm_head
-                if measure.bcq
-                else None,
-                score_phlegm_gt=measure.bcq.percentage_phlegm_gt
-                if measure.bcq
-                else None,
+                score_yin_surface=(
+                    measure.bcq.percentage_yin_surface if measure.bcq else None
+                ),
+                score_yin_abdomen=(
+                    measure.bcq.percentage_yin_abdomen if measure.bcq else None
+                ),
+                score_phlegm_trunk=(
+                    measure.bcq.percentage_phlegm_trunk if measure.bcq else None
+                ),
+                score_phlegm_surface=(
+                    measure.bcq.percentage_phlegm_surface if measure.bcq else None
+                ),
+                score_phlegm_head=(
+                    measure.bcq.percentage_phlegm_head if measure.bcq else None
+                ),
+                score_phlegm_gt=(
+                    measure.bcq.percentage_phlegm_gt if measure.bcq else None
+                ),
                 percentage_yang=measure.bcq.percentage_yang if measure.bcq else None,
                 percentage_yin=measure.bcq.percentage_yin if measure.bcq else None,
-                percentage_phlegm=measure.bcq.percentage_phlegm
-                if measure.bcq
-                else None,
-                percentage_yang_head=measure.bcq.percentage_yang_head
-                if measure.bcq
-                else None,
-                percentage_yang_chest=measure.bcq.percentage_yang_chest
-                if measure.bcq
-                else None,
-                percentage_yang_limbs=measure.bcq.percentage_yang_limbs
-                if measure.bcq
-                else None,
-                percentage_yang_abdomen=measure.bcq.percentage_yang_abdomen
-                if measure.bcq
-                else None,
-                percentage_yang_surface=measure.bcq.percentage_yang_surface
-                if measure.bcq
-                else None,
-                percentage_yin_head=measure.bcq.percentage_yin_head
-                if measure.bcq
-                else None,
-                percentage_yin_limbs=measure.bcq.percentage_yin_limbs
-                if measure.bcq
-                else None,
-                percentage_yin_gt=measure.bcq.percentage_yin_gt
-                if measure.bcq
-                else None,
-                percentage_yin_surface=measure.bcq.percentage_yin_surface
-                if measure.bcq
-                else None,
-                percentage_yin_abdomen=measure.bcq.percentage_yin_abdomen
-                if measure.bcq
-                else None,
-                percentage_phlegm_trunk=measure.bcq.percentage_phlegm_trunk
-                if measure.bcq
-                else None,
-                percentage_phlegm_surface=measure.bcq.percentage_phlegm_surface
-                if measure.bcq
-                else None,
-                percentage_phlegm_head=measure.bcq.percentage_phlegm_head
-                if measure.bcq
-                else None,
-                percentage_phlegm_gt=measure.bcq.percentage_phlegm_gt
-                if measure.bcq
-                else None,
+                percentage_phlegm=(
+                    measure.bcq.percentage_phlegm if measure.bcq else None
+                ),
+                percentage_yang_head=(
+                    measure.bcq.percentage_yang_head if measure.bcq else None
+                ),
+                percentage_yang_chest=(
+                    measure.bcq.percentage_yang_chest if measure.bcq else None
+                ),
+                percentage_yang_limbs=(
+                    measure.bcq.percentage_yang_limbs if measure.bcq else None
+                ),
+                percentage_yang_abdomen=(
+                    measure.bcq.percentage_yang_abdomen if measure.bcq else None
+                ),
+                percentage_yang_surface=(
+                    measure.bcq.percentage_yang_surface if measure.bcq else None
+                ),
+                percentage_yin_head=(
+                    measure.bcq.percentage_yin_head if measure.bcq else None
+                ),
+                percentage_yin_limbs=(
+                    measure.bcq.percentage_yin_limbs if measure.bcq else None
+                ),
+                percentage_yin_gt=(
+                    measure.bcq.percentage_yin_gt if measure.bcq else None
+                ),
+                percentage_yin_surface=(
+                    measure.bcq.percentage_yin_surface if measure.bcq else None
+                ),
+                percentage_yin_abdomen=(
+                    measure.bcq.percentage_yin_abdomen if measure.bcq else None
+                ),
+                percentage_phlegm_trunk=(
+                    measure.bcq.percentage_phlegm_trunk if measure.bcq else None
+                ),
+                percentage_phlegm_surface=(
+                    measure.bcq.percentage_phlegm_surface if measure.bcq else None
+                ),
+                percentage_phlegm_head=(
+                    measure.bcq.percentage_phlegm_head if measure.bcq else None
+                ),
+                percentage_phlegm_gt=(
+                    measure.bcq.percentage_phlegm_gt if measure.bcq else None
+                ),
             ),
             # bcq=measure.bcq or {},
         )
@@ -978,9 +978,9 @@ async def get_multi_measure_summary_data(
         schemas.DF1Schema(
             measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
             number=subject.number,
-            birth_date=subject.birth_date.strftime("%Y-%m-%d")
-            if subject.birth_date
-            else None,
+            birth_date=(
+                subject.birth_date.strftime("%Y-%m-%d") if subject.birth_date else None
+            ),
             sex_label=SEX_TYPE_LABEL.get(subject.sex),
             bmi=measure.bmi,
             hand=HAND_TYPE_LABEL.get(hand),
@@ -1426,9 +1426,11 @@ async def get_multi_measure_by_conditions(
         schemas.DF1Schema(
             measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
             number=subject_dict[measure.subject_id].number.upper(),
-            birth_date=subject_dict[measure.subject_id].birth_date.strftime("%Y-%m-%d")
-            if subject_dict[measure.subject_id].birth_date
-            else None,
+            birth_date=(
+                subject_dict[measure.subject_id].birth_date.strftime("%Y-%m-%d")
+                if subject_dict[measure.subject_id].birth_date
+                else None
+            ),
             sex_label=SEX_TYPE_LABEL.get(subject_dict[measure.subject_id].sex),
             bmi=measure.bmi,
             hand=HAND_TYPE_LABEL.get(hand),
