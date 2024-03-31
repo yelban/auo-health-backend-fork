@@ -7,8 +7,11 @@ import dateutil.parser
 import pandas as pd
 import pydash as py_
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import text
 
 from auo_project import schemas
+from auo_project.core.constants import MAX_DEPTH_RATIO
+from auo_project.db.session import AsyncSession
 
 
 def mask_credential_name(s: str):
@@ -208,7 +211,7 @@ def safe_parse_dt(s):
     try:
         return dateutil.parser.parse(s)
     except Exception as e:
-        print(e)
+        print("safe_parse_dt", e)
         return None
 
 
@@ -454,3 +457,71 @@ def get_subject_schema(org_name: str):
     if org_name in ("nricm", "tongue_label"):
         return schemas.SubjectRead
     return schemas.SubjectSecretRead
+
+
+async def get_formulas(db_session: AsyncSession, org_name: str):
+    if org_name in ("auo_health"):
+        resp = await db_session.execute(
+            text(
+                """
+            select
+                max_depth_ratio,
+                strength_code,
+                width_code,
+                hr_type_code
+            from measure.custom_formulas
+            """,
+            ),
+        )
+        formulas = resp.fetchone()
+
+        if formulas is None:
+            return (
+                MAX_DEPTH_RATIO,
+                get_measure_strength,
+                get_measure_width,
+                get_subject_schema,
+            )
+
+        max_depth_ratio = MAX_DEPTH_RATIO
+        try:
+            max_depth_ratio = tuple(map(int, formulas[0].split(":")))
+            if len(max_depth_ratio) != 3:
+                raise Exception("max_depth_ratio length must be 3")
+            print("max_depth_ratio", max_depth_ratio)
+        except Exception as e:
+            print("max_depth_ratio error:", e)
+
+        ns = {}
+        get_custom_strength = get_measure_strength
+        try:
+            exec(formulas[1], {"__builtins__": {}}, ns)
+            get_custom_strength = ns["get_custom_strength"]
+        except Exception as e:
+            print("strength_code_string error:", e)
+
+        get_custom_width = get_measure_width
+        try:
+            exec(formulas[2], {"__builtins__": {}}, ns)
+            get_custom_width = ns["get_custom_width"]
+        except Exception as e:
+            print("width_code_string error:", e)
+
+        get_custom_hr_type = get_hr_type
+        try:
+            exec(formulas[3], {"__builtins__": {}}, ns)
+            get_custom_hr_type = ns["get_custom_hr_type"]
+        except Exception as e:
+            print("hr_type_code_string error:", e)
+        return (
+            max_depth_ratio,
+            get_custom_strength,
+            get_custom_width,
+            get_custom_hr_type,
+        )
+    return (
+        MAX_DEPTH_RATIO,
+        get_measure_strength,
+        get_measure_width,
+        get_hr_type,
+    )

@@ -14,6 +14,12 @@ from auo_project.schemas.file_schema import (
     FileUpdate,
 )
 from auo_project.schemas.group_schema import GroupCreate, GroupRead, GroupUpdate
+from auo_project.schemas.measure_advanced_tongue2_schema import (
+    MeasureAdvancedTongue2Create,
+    MeasureAdvancedTongue2Read,
+    MeasureAdvancedTongue2Update,
+    MeasureAdvancedTongue2UpdateInput,
+)
 from auo_project.schemas.measure_advanced_tongue_schema import (
     MeasureAdvancedTongueCreate,
     MeasureAdvancedTongueRead,
@@ -67,10 +73,40 @@ from auo_project.schemas.measure_survey_schema import (
     MeasureSurveyRead,
     MeasureSurveyUpdate,
 )
+from auo_project.schemas.measure_tongue_config_schema import (
+    MeasureTongueConfigCreate,
+    MeasureTongueConfigRead,
+    MeasureTongueConfigUpdate,
+)
+from auo_project.schemas.measure_tongue_config_upload_schema import (
+    MeasureTongueConfigUploadCreate,
+    MeasureTongueConfigUploadRead,
+    MeasureTongueConfigUploadUpdate,
+)
+from auo_project.schemas.measure_tongue_disease_schema import (
+    MeasureTongueDiseaseCreate,
+    MeasureTongueDiseaseRead,
+    MeasureTongueDiseaseUpdate,
+)
+from auo_project.schemas.measure_tongue_group_symptom_schema import (
+    MeasureTongueGroupSymptomCreate,
+    MeasureTongueGroupSymptomRead,
+    MeasureTongueGroupSymptomUpdate,
+)
 from auo_project.schemas.measure_tongue_schema import (
     MeasureTongueCreate,
     MeasureTongueRead,
     MeasureTongueUpdate,
+)
+from auo_project.schemas.measure_tongue_symptom_disease_schema import (
+    MeasureTongueSymptomDiseaseCreate,
+    MeasureTongueSymptomDiseaseRead,
+    MeasureTongueSymptomDiseaseUpdate,
+)
+from auo_project.schemas.measure_tongue_upload_schema import (
+    MeasureTongueUploadCreate,
+    MeasureTongueUploadRead,
+    MeasureTongueUploadUpdate,
 )
 from auo_project.schemas.org_schema import OrgCreate, OrgRead, OrgUpdate
 from auo_project.schemas.recipe_parameter_schema import (

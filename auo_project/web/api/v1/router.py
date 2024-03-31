@@ -9,6 +9,7 @@ from auo_project.web.api.v1.endpoints import (
     monitoring,
     subject,
     tongue,
+    tool,
     upload,
     user,
 )
@@ -24,3 +25,4 @@ api_router.include_router(measure.router, prefix="/measures", tags=["measures"])
 api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
 api_router.include_router(advance.router, prefix="/advance", tags=["advance"])
 api_router.include_router(tongue.router, prefix="/tongues", tags=["tongue"])
+api_router.include_router(tool.router, prefix="/tools", tags=["tools"])

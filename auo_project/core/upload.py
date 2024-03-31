@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException
 
 from auo_project import crud
-from auo_project.core.azure import blob_service
+from auo_project.core.azure import private_blob_service
 from auo_project.core.config import settings
 from auo_project.core.constants import FileStatusType, UploadStatusType
 from auo_project.core.file import get_and_write
@@ -83,19 +83,19 @@ async def post_finish(arbitrary_json):
             target_file_path = file_name
             print("meta_data", meta_data)
             print("source_blob", source_blob)
-            copied_blob = blob_service.get_blob_client(
+            copied_blob = private_blob_service.get_blob_client(
                 target_container_name,
                 target_file_path,
             )
             copied_blob.start_copy_from_url(source_blob)
 
-            remove_blob = blob_service.get_blob_client(
+            remove_blob = private_blob_service.get_blob_client(
                 source_container_name,
                 source_file_path,
             )
             remove_blob.delete_blob()
 
-            remove_blob = blob_service.get_blob_client(
+            remove_blob = private_blob_service.get_blob_client(
                 source_container_name,
                 source_file_info_path,
             )

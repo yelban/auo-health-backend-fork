@@ -379,26 +379,34 @@ class AuthJWT(AuthConfig):
             cookie_key = self._access_cookie_key
             cookie = request.cookies.get(cookie_key) or request.headers.get(
                 cookie_key.replace("_", "-"),
-            )
-            csrf_token = request.headers.get(self._access_csrf_header_name)
-            # print('access', cookie, csrf_token)
+            )  # header name with underscore is invalid -> RFC 3875 4.1.18
+            csrf_token = request.cookies.get(
+                self._access_csrf_header_name,
+            ) or request.headers.get(self._access_csrf_header_name)
+
         if type_token == "refresh":
             cookie_key = self._refresh_cookie_key
             cookie = request.cookies.get(cookie_key) or request.headers.get(
                 cookie_key.replace("_", "-"),
-            )
-            csrf_token = request.headers.get(self._refresh_csrf_header_name)
+            )  # header name with underscore is invalid -> RFC 3875 4.1.18
+            csrf_token = request.cookies.get(
+                self._refresh_csrf_header_name,
+            ) or request.headers.get(self._refresh_csrf_header_name)
 
         if not cookie:
             # TODO: fixme
             raise MissingTokenError(
                 status_code=401,
-                message="Missing cookie {}".format(cookie_key),
+                message="Missing cookie {} or header {}".format(
+                    cookie_key,
+                    cookie_key.replace("_", "-"),
+                ),
             )
 
         if self._cookie_csrf_protect and not csrf_token:
-            if request.method in self._csrf_methods:
-                raise CSRFError(status_code=401, message="Missing CSRF Token")
+            pass
+            # if request.method in self._csrf_methods:
+            # raise CSRFError(status_code=401, message="Missing CSRF Token")
 
         # set token from cookie and verify jwt
         self._token = cookie
@@ -558,7 +566,9 @@ class AuthJWT(AuthConfig):
 
         if type_token == "access":
             cookie_key = self._access_cookie_key
-            cookie = request.cookies.get(cookie_key)
+            cookie = request.cookies.get(cookie_key) or request.headers.get(
+                self._access_cookie_key,
+            )
         if type_token == "refresh":
             cookie_key = self._refresh_cookie_key
             cookie = request.cookies.get(cookie_key)

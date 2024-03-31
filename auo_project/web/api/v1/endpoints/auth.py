@@ -62,8 +62,8 @@ async def login_access_token(
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        # "csrf_access_token": csrf_access_token,
-        # "csrf_refresh_token": csrf_refresh_token,
+        "csrf_access_token": csrf_access_token,
+        "csrf_refresh_token": csrf_refresh_token,
         "token_type": "bearer",
     }
 

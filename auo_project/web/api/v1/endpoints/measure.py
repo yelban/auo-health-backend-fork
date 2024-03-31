@@ -14,16 +14,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
 from auo_project.core.config import settings
-from auo_project.core.constants import MAX_DEPTH_RATIO
 from auo_project.core.file import get_max_amp_depth_of_range
-from auo_project.core.utils import (
-    compare_cn_diff,
-    get_hr_type,
-    get_measure_strength,
-    get_measure_width,
-    get_subject_schema,
-    safe_divide,
-)
+from auo_project.core.utils import compare_cn_diff, get_subject_schema, safe_divide
 from auo_project.web.api import deps
 
 router = APIRouter()
@@ -161,6 +153,15 @@ async def get_measure_summary(
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
+    from auo_project.core.utils import get_formulas
+
+    (
+        max_depth_ratio,
+        get_measure_strength,
+        get_measure_width,
+        get_hr_type,
+    ) = await get_formulas(db_session=db_session, org_name=current_user.org.name)
+
     measure = await crud.measure_info.get(
         db_session=db_session,
         id=measure_id,
@@ -178,7 +179,7 @@ async def get_measure_summary(
             status_code=400,
             detail=f"Not found measure id: {measure_id}",
         )
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -365,73 +366,73 @@ async def get_measure_summary(
                 static_range_start_hand_position=measure.static_range_start_l_cu,
                 static_range_end_hand_position=measure.static_range_end_l_cu,
                 static_max_amp_hand_position=measure.static_max_amp_l_cu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_l_qu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_l_qu,
                 static_range_end_hand_position=measure.static_range_end_l_qu,
                 static_max_amp_hand_position=measure.static_max_amp_l_qu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_l_ch=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_l_ch,
                 static_range_end_hand_position=measure.static_range_end_l_ch,
                 static_max_amp_hand_position=measure.static_max_amp_l_ch,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_r_cu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_cu,
                 static_range_end_hand_position=measure.static_range_end_r_cu,
                 static_max_amp_hand_position=measure.static_max_amp_r_cu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_r_qu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_qu,
                 static_range_end_hand_position=measure.static_range_end_r_qu,
                 static_max_amp_hand_position=measure.static_max_amp_r_qu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_r_ch=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_ch,
                 static_range_end_hand_position=measure.static_range_end_r_ch,
                 static_max_amp_hand_position=measure.static_max_amp_r_ch,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             max_amp_depth_of_range_l_cu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_l_cu,
                 static_range_end_hand_position=measure.static_range_end_l_cu,
                 static_max_amp_hand_position=measure.static_max_amp_l_cu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             max_amp_depth_of_range_l_qu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_l_qu,
                 static_range_end_hand_position=measure.static_range_end_l_qu,
                 static_max_amp_hand_position=measure.static_max_amp_l_qu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             max_amp_depth_of_range_l_ch=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_l_ch,
                 static_range_end_hand_position=measure.static_range_end_l_ch,
                 static_max_amp_hand_position=measure.static_max_amp_l_ch,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             max_amp_depth_of_range_r_cu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_cu,
                 static_range_end_hand_position=measure.static_range_end_r_cu,
                 static_max_amp_hand_position=measure.static_max_amp_r_cu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             max_amp_depth_of_range_r_qu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_qu,
                 static_range_end_hand_position=measure.static_range_end_r_qu,
                 static_max_amp_hand_position=measure.static_max_amp_r_qu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             max_amp_depth_of_range_r_ch=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_ch,
                 static_range_end_hand_position=measure.static_range_end_r_ch,
                 static_max_amp_hand_position=measure.static_max_amp_r_ch,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             max_amp_value_l_cu=measure.max_amp_value_l_cu,
             max_amp_value_l_qu=measure.max_amp_value_l_qu,
@@ -544,7 +545,7 @@ async def get_measure_summary(
                 percentage_phlegm_head=0,
                 percentage_phlegm_gt=0,
             )
-            if measure.has_bcq
+            if measure.has_bcq or measure.bcq
             else {},
             all_sec=all_sec,
             cn=cn,
@@ -999,7 +1000,7 @@ async def get_measure_six_sec_pw(
             detail=f"Not found measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1047,7 +1048,7 @@ async def update_measure_memo(
             detail=f"Not found measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1084,7 +1085,7 @@ async def update_measure_comment(
             detail=f"Not found measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1125,7 +1126,7 @@ async def update_measure_tongue_info(
             detail=f"Not found tongue of measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1170,7 +1171,7 @@ async def update_measure_irregular_hr(
             detail=f"Not found measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1209,3 +1210,71 @@ async def update_measure_irregular_hr(
         obj_new=measure_in,
     )
     return irregular_hr
+
+
+@router.put("/activate/{measure_id}")
+async def activate_measure(
+    measure_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if not measure:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
+    measure_in = schemas.MeasureInfoUpdate(
+        is_active=True,
+    )
+    await crud.measure_info.update(
+        db_session=db_session,
+        obj_current=measure,
+        obj_new=measure_in,
+    )
+    return measure_id
+
+
+@router.put("/deactivate/{measure_id}")
+async def deactivate_measure(
+    measure_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if not measure:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
+    measure_in = schemas.MeasureInfoUpdate(
+        is_active=False,
+    )
+    await crud.measure_info.update(
+        db_session=db_session,
+        obj_current=measure,
+        obj_new=measure_in,
+    )
+    return measure_id

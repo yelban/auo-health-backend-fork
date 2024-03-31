@@ -20,6 +20,7 @@ from auo_project.core.utils import (
     get_bmi,
     get_date,
     get_datetime,
+    get_time,
     safe_divide,
     safe_float,
     safe_int,
@@ -59,6 +60,7 @@ class SurveyAnswer(BaseModel):
     a039: str = None
     a040: str = None
     a040_other: str = None
+    a041: str = None  # 居住鄉鎮市區
 
     p001: str = None
     s001: str = None
@@ -118,6 +120,14 @@ class SurveyAnswer(BaseModel):
     hr: int = None
 
 
+class BaseSurveyFileHandler:
+    def get_qa_df(self, key):
+        return getattr(self, f"qa_{key}_df")
+
+    def get_qa_mapping(self, key):
+        return getattr(self, f"qa_mapping_{key}")
+
+
 class SingletonSurveyResult:
     _instance = None
     survey_result = None
@@ -138,6 +148,7 @@ class SingletonSurveyResult:
 
 
 survey_instance = SingletonSurveyResult()
+
 
 # unit: hour
 def get_time_duration(
@@ -172,7 +183,7 @@ def get_eat_to_measure_diff_hours(eat_at_time: datetime, measure_time: datetime)
         measure_time = measure_time.replace(year=1900, month=1, day=1)
         return (measure_time - eat_at_time).seconds / 3600
     except Exception as e:
-        print(e)
+        print("get_eat_to_measure_diff_hours error:", e)
         return None
 
 
@@ -304,7 +315,30 @@ def process_text2(text):
     return text.strip().replace("(", "（").replace(")", "）")
 
 
-class AUOInternalSurveyHandler:
+def process_text3(text):
+    """高中/職 -> 高中職, 研究所(或以上) -> 研究所及以上"""
+    if pd.isnull(text):
+        return ""
+    elif text == "高中/職":
+        return "高中職"
+    elif text == "研究所(或以上)":
+        return "研究所及以上"
+    return text
+
+
+# e.g. [1. 過去一個月來，您晚上通常幾點上床睡覺？, 幾點上床睡覺？, 幾點上床睡覺？, 幾分上床睡覺？]
+def process_new_time(am_pm: str, hour1: str, hour2: str, minute: str):
+    hour1 = None if pd.isnull(hour1) else hour1
+    hour2 = None if pd.isnull(hour2) else hour2
+    hour = hour1 if hour1 is not None else hour2
+    hour = safe_int(hour) if pd.isnull(hour) is False else None
+    minute = safe_int(minute) if pd.isnull(minute) is False else None
+    if hour is not None and minute is not None:
+        return get_time(f"{hour:02}:{minute:02}")
+    return None
+
+
+class AUOInternalSurveyHandler(BaseSurveyFileHandler):
     def __init__(self) -> None:
         self.qa_df = None
         self.question_mapping_df = None
@@ -342,10 +376,45 @@ class AUOInternalSurveyHandler:
         return question_mapping
 
 
+class NRICMSurveyHandler(BaseSurveyFileHandler):
+    def __init__(self, survey_name: str) -> None:
+        qa_basic_df = pd.read_excel(
+            f"20240105 中醫診斷數位化群體性研究自評問卷 20231212-20231226_processed.xlsx",
+            sheet_name=0,
+        )
+        qa_before_measure_df = pd.read_excel(
+            f"20240105 中醫診斷數位化群體性研究自評問卷 20231212-20231226_processed.xlsx",
+            sheet_name=1,
+        )
+
+        qa_mapping_basic_df = pd.read_excel("問卷題號對照 - 內測v2.xlsx", sheet_name=0)
+        qa_mapping_before_measure_df = pd.read_excel(
+            "問卷題號對照 - 內測v2.xlsx",
+            sheet_name=1,
+        )
+
+        self.qa_basic_df = qa_basic_df
+        self.qa_before_measure_df = qa_before_measure_df
+        self.qa_mapping_basic = get_question_mapping(qa_mapping_basic_df)
+        self.qa_mapping_before_measure = get_question_mapping(
+            qa_mapping_before_measure_df,
+        )
+
+    def get_all_rows(self):
+        return {
+            "basic": [],
+            "before_measure": [],
+        }
+
+
 # TODO: check if need to get measure time
 class QAHandler:
-    def __init__(self, survey_name: str) -> None:
-        self.file_handler = AUOSurveyFileHandler(survey_name=survey_name)
+    def __init__(
+        self,
+        survey_name: str,
+        file_handler_class: BaseSurveyFileHandler,
+    ) -> None:
+        self.file_handler = file_handler_class(survey_name=survey_name)
 
         self.parameter_dict = None
         self.disease_options_dict = None
@@ -406,13 +475,7 @@ class QAHandler:
             "s040": process_s040,
         }
 
-        all_rows = {
-            "basic": [],
-            "stop2": [],
-            "stop3": [],
-            "stop4": [],
-            "stop6": [],
-        }
+        all_rows = self.file_handler.get_all_rows()
 
         self.parameter_dict = parameter_dict
         self.disease_options_dict = disease_options_dict
@@ -519,6 +582,10 @@ class QAHandler:
                                     "label"
                                 ] == process_text2(row[indices[0]]):
                                     answer[question_id] = option["value"]
+                                elif isinstance(row[indices[0]], str) and option[
+                                    "label"
+                                ] == process_text3(row[indices[0]]):
+                                    answer[question_id] = option["value"]
 
                     options = py_.get(
                         parameter_dict,
@@ -552,7 +619,7 @@ def get_question_mapping(question_mapping_df):
     return question_mapping
 
 
-class AUOSurveyFileHandler:
+class AUOSurveyFileHandler(BaseSurveyFileHandler):
     def __init__(self, survey_name: str) -> None:
         qa_basic_df = pd.read_excel(f"{survey_name}收案資料.xlsx", sheet_name=0)
         qa_stop2_df = pd.read_excel(f"{survey_name}收案資料.xlsx", sheet_name=1)
@@ -590,28 +657,37 @@ class AUOSurveyFileHandler:
     def get_qa_mapping(self, key):
         return getattr(self, f"qa_mapping_{key}")
 
+    def get_all_rows(self):
+        return {
+            "basic": [],
+            "stop2": [],
+            "stop3": [],
+            "stop4": [],
+            "stop6": [],
+        }
+
 
 qa_df = pd.read_csv(
     "STANDARD_wZN8X_中醫診斷現代化研究問卷_202306151458_648b2702784da.xlsx - 「sheet1」的副本.csv",
 )
-# col index 1: 請填入您的收案編號
-qa_df = qa_df[qa_df.iloc[:, 1].notnull()]
-question_mapping_df = pd.read_csv(
-    "STANDARD_wZN8X_中醫診斷現代化研究問卷_202306151458_648b2702784da.xlsx - question_mapping.csv",
-)
-question_mapping_df = question_mapping_df[
-    question_mapping_df.question_id.notnull()
-].sort_values("question_number")
+# # col index 1: 請填入您的收案編號
+# qa_df = qa_df[qa_df.iloc[:, 1].notnull()]
+# question_mapping_df = pd.read_csv(
+#     "STANDARD_wZN8X_中醫診斷現代化研究問卷_202306151458_648b2702784da.xlsx - question_mapping.csv",
+# )
+# question_mapping_df = question_mapping_df[
+#     question_mapping_df.question_id.notnull()
+# ].sort_values("question_number")
 
-question_mapping_records = question_mapping_df[
-    ["question_id", "question_number"]
-].to_dict("records")
-question_mapping = (
-    py_.chain(question_mapping_records)
-    .group_by(lambda x: x["question_id"])
-    .map_values(lambda x: sorted([e["question_number"] for e in x]))
-    .value()
-)
+# question_mapping_records = question_mapping_df[
+#     ["question_id", "question_number"]
+# ].to_dict("records")
+# question_mapping = (
+#     py_.chain(question_mapping_records)
+#     .group_by(lambda x: x["question_id"])
+#     .map_values(lambda x: sorted([e["question_number"] for e in x]))
+#     .value()
+# )
 
 
 def process_p001(values):
@@ -622,8 +698,15 @@ def process_s005(values, parameter_dict):
     result = {}
     question_id = process_s005.__name__.split("_")[-1]
     work_type = values[0]
-    start = values[1]
-    end = values[2]
+    if len(values) == 3:
+        start = values[1]
+        end = values[2]
+    elif len(values) == 9:
+        start = process_new_time(values[1], values[2], values[3], values[4])
+        end = process_new_time(values[5], values[6], values[7], values[8])
+    else:
+        raise Exception(f"process_s005 values length error: {len(values)}")
+
     if isinstance(start, (datetime, time)):
         start = start.strftime("%H:%M")
     elif pd.isnull(start):
@@ -655,8 +738,14 @@ def process_s005(values, parameter_dict):
 def process_s025(values, parameter_dict):
     result = {}
     question_id = process_s025.__name__.split("_")[-1]
-    sleep_at = values[0]
-    wake_up_at = values[1]
+    if len(values) == 2:
+        sleep_at = values[0]
+        wake_up_at = values[1]
+    elif len(values) == 8:
+        sleep_at = process_new_time(values[0], values[1], values[2], values[3])
+        wake_up_at = process_new_time(values[4], values[5], values[6], values[7])
+    else:
+        raise Exception(f"process_s025 values length error: {len(values)}")
     # if isinstance(sleep_at, str) and isinstance(wake_up_at, str):
     result["sleep_duration"] = get_time_duration(wake_up_at, sleep_at)
     options = py_.get(
@@ -849,7 +938,8 @@ def process_a028(values):
 
 def process_number(values):
     result = {}
-    result["number"] = values[0].upper()
+    if isinstance(values[0], str):
+        result["number"] = values[0].upper()
     return result
 
 
@@ -1328,14 +1418,60 @@ def process_bcq(values):
 
 
 def process_psqi(values):
+    # note: values is pd.Series
+    if len(values) == 19:
+        pass
+    elif len(values) == 25:
+        values = pd.concat(
+            [
+                pd.Series(
+                    data=[
+                        process_new_time(
+                            am_pm=values[0],
+                            hour1=values[1],
+                            hour2=values[2],
+                            minute=values[3],
+                        ),
+                    ],
+                    index=[values.index[0]],
+                ),
+                pd.Series(data=[values[4]], index=[values.index[4]]),
+                pd.Series(
+                    data=[
+                        process_new_time(
+                            am_pm=values[5],
+                            hour1=values[6],
+                            hour2=values[7],
+                            minute=values[8],
+                        ),
+                    ],
+                    index=[values.index[5]],
+                ),
+                values[9:],
+            ],
+            ignore_index=True,
+        )
+    else:
+        raise Exception(f"psqi questions number is 19 or 25 but {len(values)}")
+
     sleep_result = {}
     sleep_questions = values
 
     sleep_quality_option_scores1 = {"非常好": 0, "好": 1, "不好": 2, "非常不好": 3}
     sleep_quality_option_scores2 = {"極好": 0, "好": 1, "中等程度好": 2, "不好": 3}
     # old: sleep_option_scores = {"從未發生": 0, "每周少於1次": 1, "每周1-2次": 2, "每周3次或以上": 3}
-    sleep_option_scores = {"從未發生": 0, "每週少於 1 次": 1, "每週 1-2 次": 2, "每週 3 次或以上": 3}
-    sleep_option_scores2 = {"完全沒有困擾": 0, "只有很少困擾": 1, "有些困擾": 2, "有很大的困擾": 3}
+    sleep_option_scores = {
+        "從未發生": 0,
+        "每週少於 1 次": 1,
+        "每週 1-2 次": 2,
+        "每週 3 次或以上": 3,
+    }
+    sleep_option_scores2 = {
+        "完全沒有困擾": 0,
+        "只有很少困擾": 1,
+        "有些困擾": 2,
+        "有很大的困擾": 3,
+    }
 
     # 睡眠品質
     # TODO: 這邊台北收案結果和選項不同
@@ -1430,6 +1566,8 @@ def process_psqi(values):
     # Part B - 上床後通常多久可以睡著
     a034_part_b_questions = 2
     a034_part_b_answer = sleep_questions[a034_part_b_questions - 1]
+    # if pd.isnull(a034_part_b_answer):
+    #     breakpoint()
     a034_part_b_score = get_sleep_incubation_period_part_b_score(a034_part_b_answer)
 
     a034_score = get_sleep_incubation_period_score(a034_part_a_score, a034_part_b_score)
@@ -1564,9 +1702,21 @@ def process_a031(values, parameter_dict):
 
 
 def get_bcq_score(option):
-    option_score = {"完全不會": 1, "稍微會": 2, "中等程度會": 3, "很會": 4, "最嚴重會": 5}
+    option_score = {
+        "完全不會": 1,
+        "稍微會": 2,
+        "中等程度會": 3,
+        "很會": 4,
+        "最嚴重會": 5,
+    }
     # TODO: check correction
-    option_score2 = {"從來沒有": 1, "偶爾有": 2, "一半有一半沒有": 3, "時常有": 4, "一直都有": 5}
+    option_score2 = {
+        "從來沒有": 1,
+        "偶爾有": 2,
+        "一半有一半沒有": 3,
+        "時常有": 4,
+        "一直都有": 5,
+    }
     if option_score.get(option):
         return option_score.get(option)
     elif option_score2.get(option):
@@ -1579,6 +1729,7 @@ def match_option(answer, parameter_dict):
     pass
 
 
+# @deprecated
 def process_single_row(row, parameter_dict, disease_options_dict):
     answer = {}
     answer["survey_at"] = get_datetime(row["填答時間"])
@@ -1799,12 +1950,24 @@ def process_single_row(row, parameter_dict, disease_options_dict):
                     answer["s025"] = options[0]["value"]
 
         elif question_id == "s026":  # 距最近1次用餐時間 range
-            eat_at = row[indices[0]]
-            answer["eat_at"] = (
-                datetime.strptime(eat_at, "%H:%M")
-                if isinstance(row[indices[0]], str) and ":" in row[indices[0]]
-                else None
-            )
+            if len(indices) == 1:
+                eat_at = row[indices[0]]
+            elif len(indices) == 4:
+                eat_at = process_new_time(
+                    row[indices[0]],
+                    row[indices[1]],
+                    row[indices[2]],
+                    row[indices[3]],
+                )
+            else:
+                raise Exception(f"s026 indices length is not 1 or 4 but {len(indices)}")
+
+            if isinstance(eat_at, str) and ":" in row[indices[0]]:
+                answer["eat_at"] = datetime.strptime(eat_at, "%H:%M")
+            elif isinstance(eat_at, (datetime, time)):
+                answer["eat_at"] = eat_at
+            else:
+                answer["eat_at"] = None
             # TODO: calculate eat with measure time
 
         elif question_id == "s030":  # 前4小時內是否有運動
@@ -1826,8 +1989,24 @@ def process_single_row(row, parameter_dict, disease_options_dict):
                 answer["s030"] = options[1]["value"]
 
         elif question_id == "s031":  # 運動時數
-            exercise_from = row[indices[0]]
-            exercise_to = row[indices[1]]
+            if len(indices) == 2:
+                exercise_from = row[indices[0]]
+                exercise_to = row[indices[1]]
+            elif len(indices) == 8:
+                exercise_from = process_new_time(
+                    row[indices[0]],
+                    row[indices[1]],
+                    row[indices[2]],
+                    row[indices[3]],
+                )
+                exercise_to = process_new_time(
+                    row[indices[4]],
+                    row[indices[5]],
+                    row[indices[6]],
+                    row[indices[7]],
+                )
+            else:
+                raise Exception(f"s031 indices length is not 2 or 8 but {len(indices)}")
             exercise_duration_minute = get_time_duration(exercise_from, exercise_to)
             exercise_duration = (
                 exercise_duration_minute * 60 if exercise_duration_minute else None
@@ -2036,13 +2215,25 @@ async def save_old_survey_result():
         )
 
 
-async def save_survey_result():
+# survey_name_list = ["台北站問卷", "金門站問卷"]
+# survey_name_list = ["台北站問卷"]
+# survey_name_list = ["nricm 問卷"]
+async def save_survey_result(org_name: str, survey_name_list: List[str] = None):
     db_session = SessionLocal()
-
-    org = await crud.org.get_by_name(db_session=db_session, name="tph")
+    org = await crud.org.get_by_name(db_session=db_session, name=org_name)
     survey_list = []
-    survey_name_list = ["台北站問卷", "金門站問卷"]
-    # survey_name_list = ["台北站問卷"]
+
+    file_handler_class_map = {
+        "內測問卷": AUOInternalSurveyHandler,
+        "台北站問卷": AUOSurveyFileHandler,
+        "金門站問卷": AUOSurveyFileHandler,
+        "nricm 問卷": NRICMSurveyHandler,
+    }
+
+    file_handler_measure_range_map = {
+        "nricm 問卷": (datetime(2023, 12, 12), datetime(2024, 2, 1)),
+    }
+
     for survey_name in survey_name_list:
         survey = await crud.measure_survey.get_by_name(
             db_session=db_session,
@@ -2053,10 +2244,19 @@ async def save_survey_result():
                 db_session=db_session,
                 obj_in=schemas.MeasureSurveyCreate(name=survey_name, org_id=org.id),
             )
+        else:
+            if survey.org_id != org.id:
+                raise Exception(f"survey {survey_name} already exist in other org")
+
         survey_list.append(survey)
 
+    error_dict = {}
     for idx, survey_name in enumerate(survey_name_list):
-        qa_handler = QAHandler(survey_name=survey_name)
+        error_dict[survey_name] = []
+        qa_handler = QAHandler(
+            survey_name=survey_name,
+            file_handler_class=file_handler_class_map[survey_name],
+        )
         survey_result_list = await qa_handler.get_survey_result()
 
         survey_id = survey_list[idx].id
@@ -2076,18 +2276,29 @@ async def save_survey_result():
                 number=survey_result.number,
             )
             if subject is None:
+                print("cannot find subject number", survey_result.number)
+                error_dict[survey_name].append(survey_result.number)
                 continue
             subject_id = subject.id
-            measure = await crud.measure_info.get_closest_by_survey_at(
-                db_session=db_session,
-                subject_id=subject_id,
-                survey_at=survey_result.survey_at,
-            )
-            if subject is not None and measure is not None:
+            if survey_name in file_handler_measure_range_map:
+                measure = await crud.measure_info.get_by_measure_time_range(
+                    db_session=db_session,
+                    subject_id=subject_id,
+                    start_at=file_handler_measure_range_map[survey_name][0],
+                    end_at=file_handler_measure_range_map[survey_name][1],
+                )
+            else:
+                measure = await crud.measure_info.get_closest_by_survey_at(
+                    db_session=db_session,
+                    subject_id=subject_id,
+                    survey_at=survey_result.survey_at,
+                )
                 if abs((measure.measure_time - survey_result.survey_at).days) > 7:
                     print("ignore diff day more than 7 days")
+                    error_dict[survey_name].append(survey_result.number)
                     continue
 
+            if subject is not None and measure is not None:
                 sex_type_label_map = {
                     value: key for key, value in SEX_TYPE_LABEL.items()
                 }
@@ -2118,6 +2329,7 @@ async def save_survey_result():
                     obj_new=measure_in.dict(exclude_none=True),
                 )
             else:
+                error_dict[survey_name].append(survey_result.number)
                 print(f"cannot find subject/measure number {survey_result.number}")
 
             survey_result_in = schemas.MeasureSurveyResultCreate(
@@ -2147,6 +2359,7 @@ async def save_survey_result():
             )
 
     await save_bcq_score_new(org_id=org.id)
+    print("error_dict", error_dict)
 
 
 async def save_bcq_score():

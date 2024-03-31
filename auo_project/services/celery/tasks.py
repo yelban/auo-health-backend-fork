@@ -1,6 +1,12 @@
+from uuid import UUID
+
 from asgiref.sync import async_to_sync
 from celery.schedules import crontab
 
+from auo_project.core.color_correction import (
+    process_tongue_image_by_id,
+    process_tongue_raw_images,
+)
 from auo_project.core.measure import (
     create_merged_measures,
     update_measure_cn_means,
@@ -25,6 +31,13 @@ def setup_periodic_tasks(sender, **kwargs):
         crontab(minute="*/5"),
         task_create_merged_measures.s(),
         expire=60,
+    )
+
+    # Call every 30 minutes
+    sender.add_periodic_task(
+        crontab(minute="*/30"),
+        task_process_tongue_raw_images.s(),
+        expire=60 * 60,
     )
 
     # Call everyday
@@ -74,3 +87,13 @@ def task_update_uploading_upload_status():
 @celery_app.task()
 def task_create_merged_measures():
     async_to_sync(create_merged_measures)()
+
+
+@celery_app.task()
+def task_process_tongue_image_by_id(upload_id: UUID):
+    async_to_sync(process_tongue_image_by_id)(upload_id)
+
+
+@celery_app.task()
+def task_process_tongue_raw_images():
+    async_to_sync(process_tongue_raw_images)()

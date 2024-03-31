@@ -182,7 +182,10 @@ def get_current_user_with_perm(
 
 
 def get_ip_allowed(cf_ipcountry: Optional[str] = Header("")):
-    # if not "TW" in cf_ipcountry:
+    if not "TW" in cf_ipcountry:
+        print("The IP is not allowed.")
+    else:
+        print("The IP is allowed.")
     #     raise HTTPException(
     #         status_code=403,
     #         detail=f"The IP is not allowed.",

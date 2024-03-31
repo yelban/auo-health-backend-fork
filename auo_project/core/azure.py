@@ -2,7 +2,7 @@ from azure.storage.blob import BlobServiceClient
 
 from auo_project.core.config import settings
 
-blob_service = BlobServiceClient(
+private_blob_service = BlobServiceClient(
     account_url=f"https://{settings.AZURE_STORAGE_ACCOUNT}.blob.core.windows.net",
     credential={
         "account_name": settings.AZURE_STORAGE_ACCOUNT,
@@ -19,8 +19,8 @@ internet_blob_service = BlobServiceClient(
 )
 
 
-def upload_internet_file(
-    blob_service_client,
+def upload_blob_file(
+    blob_service_client: BlobServiceClient,
     category,
     file_path,
     object,
@@ -37,6 +37,18 @@ def upload_internet_file(
 def download_zip_file(blob_service_client, file_path):
     blob_client = blob_service_client.get_blob_client(
         container=settings.AZURE_STORAGE_CONTAINER_RAW_ZIP,
+        blob=file_path,
+    )
+    return blob_client.download_blob()
+
+
+def download_file(
+    blob_service_client: BlobServiceClient,
+    category,
+    file_path,
+):
+    blob_client = blob_service_client.get_blob_client(
+        container=category,
         blob=file_path,
     )
     return blob_client.download_blob()

@@ -35,3 +35,7 @@ class Org(BaseUUIDModel, BaseTimestampModel, OrgBase, table=True):
         back_populates="org",
         sa_relationship_kwargs={"lazy": "select"},
     )
+    measure_tongue_upload: List["MeasureTongueUpload"] = Relationship(
+        back_populates="org",
+        sa_relationship_kwargs={"lazy": "select"},
+    )

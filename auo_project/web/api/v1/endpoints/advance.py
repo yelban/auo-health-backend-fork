@@ -63,6 +63,26 @@ from auo_project.web.api import deps
 router = APIRouter()
 
 
+def get_diff_pct(
+    measure_statistic,
+    statistic_dict,
+    hand_position,
+    table_column,
+):
+    hand_position = f"{ py_.get(measure_statistic, 'hand').lower()[0]}_{py_.get(measure_statistic, 'position').lower()}"
+    mean_val = py_.get(
+        statistic_dict,
+        f"{measure_statistic['statistic'].lower()}.{hand_position}.{table_column}",
+        0,
+    )
+    return (
+        safe_divide(
+            safe_substract(measure_statistic[table_column], mean_val),
+            mean_val,
+        ),
+    )
+
+
 class PatchRecipeChartsInput(BaseModel):
     recipe_name: str = Field(min_length=1, max_length=50)
     analytical_params: schemas.RecipeAnalyticalParamsInput
@@ -921,24 +941,24 @@ async def get_chart_export_data(
             for statistic in measure_statistics
         ]
 
-        def get_diff_pct(
-            measure_statistic,
-            statistic_dict,
-            hand_position,
-            table_column,
-        ):
-            hand_position = f"{ py_.get(measure_statistic, 'hand').lower()[0]}_{py_.get(measure_statistic, 'position').lower()}"
-            mean_val = py_.get(
-                statistic_dict,
-                f"{measure_statistic['statistic'].lower()}.{hand_position}.{table_column}",
-                0,
-            )
-            return (
-                safe_divide(
-                    safe_substract(measure_statistic[table_column], mean_val),
-                    mean_val,
-                ),
-            )
+        # def get_diff_pct(
+        #     measure_statistic,
+        #     statistic_dict,
+        #     hand_position,
+        #     table_column,
+        # ):
+        #     hand_position = f"{ py_.get(measure_statistic, 'hand').lower()[0]}_{py_.get(measure_statistic, 'position').lower()}"
+        #     mean_val = py_.get(
+        #         statistic_dict,
+        #         f"{measure_statistic['statistic'].lower()}.{hand_position}.{table_column}",
+        #         0,
+        #     )
+        #     return (
+        #         safe_divide(
+        #             safe_substract(measure_statistic[table_column], mean_val),
+        #             mean_val,
+        #         ),
+        #     )
 
         result = {}
         for measure_statistic in measure_statistics:
@@ -1205,6 +1225,7 @@ async def get_chart_export_data(
             hand = hand_map.get(py_.get(measure_statistic, "hand"), "")
             position = position_map.get(py_.get(measure_statistic, "position"), "")
             column_prefix = f"{hand}{position}"
+            hand_position = column_prefix
             if measure_statistic["statistic"] == "MEAN":
                 tmp_data = {
                     "h1": measure_statistic["h1"],
@@ -2064,6 +2085,7 @@ async def export_csv(
         org_id=current_user.org_id,
         filter_infos_dict=filter_infos_dict,
     )
+    print("len(measure_statistics)", len(measure_statistics))
     chart_settings = [setting for setting in body.chart_settings if setting]
     z_options_dict = await get_z_options_dict(
         db_session,

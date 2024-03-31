@@ -403,6 +403,14 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
             "cascade": "all, delete",
         },
     )
+    advanced_tongue: "MeasureAdvancedTongue" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={
+            "lazy": "select",
+            "uselist": False,
+            "cascade": "all, delete",
+        },
+    )
     org: "Org" = Relationship(
         back_populates="measure_info",
         sa_relationship_kwargs={

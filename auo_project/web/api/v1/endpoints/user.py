@@ -24,7 +24,7 @@ async def read_user_me(
 @router.get("/test", response_model=schemas.UserRead)
 async def test_user_perm(
     current_user: schemas.UserRead = Depends(
-        deps.get_current_user_with_perm(required_groups=["user"]),
+        deps.get_current_user_with_perm(required_roles=["UploadCreator"]),
     ),
 ) -> Any:
     return current_user

@@ -83,3 +83,7 @@ class User(BaseUUIDModel, BaseTimestampModel, UserBase, table=True):
         back_populates="owner",
         sa_relationship_kwargs={"lazy": "select"},
     )
+    tongue_uploads: List["MeasureTongueUpload"] = Relationship(
+        back_populates="owner",
+        sa_relationship_kwargs={"lazy": "select"},
+    )

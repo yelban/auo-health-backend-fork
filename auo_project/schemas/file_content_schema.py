@@ -350,6 +350,34 @@ class FileBCQ(BaseModel):
     q43_select: int
     q44_select: int
 
+    @validator(
+        "percentage_yang",
+        "percentage_yin",
+        "percentage_phlegm",
+        "percentage_yanghead",
+        "percentage_yangchest",
+        "percentage_yanglimbs",
+        "percentage_yangabdomen",
+        "percentage_yangsurface",
+        "percentage_yinhead",
+        "percentage_yinlimbs",
+        "percentage_yingt",
+        "percentage_yinsurface",
+        "percentage_yinabdomen",
+        "percentage_phlegmtrunk",
+        "percentage_phlegmsurface",
+        "percentage_phlegmhead",
+        "percentage_phlegmgt",
+        pre=True,
+    )
+    def convert_percentage(cls, v):
+        if v:
+            try:
+                return int(round(v))
+            except:
+                return 0
+        return v
+
 
 class FileStatistics(BaseModel):
     """statistics.csv; need to remove extra comma of each line."""

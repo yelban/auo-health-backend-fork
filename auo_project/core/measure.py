@@ -156,7 +156,18 @@ async def create_merged_measures():
         ["a0"]
         + [f"c{i}" for i in range(1, 12)]
         + [f"p{i}" for i in range(1, 12)]
-        + ["hr", "pass_num", "all_num"]
+        + [
+            "h1",
+            "t1",
+            "h1_div_t1",
+            "w1",
+            "w1_div_t",
+            "t1_div_t",
+            "pw",
+            "hr",
+            "pass_num",
+            "all_num",
+        ]
     )
     statistic_stmt_column_names = []
     statistic_stmt_list = []
@@ -311,6 +322,7 @@ async def create_merged_measures():
         "select_static_r_ch",
     ]
     info_columns_stmt = ", ".join([f"info.{column}" for column in info_columns])
+    # TODO: p001, p002, p003, p004, p005, p006, p007, p008
     survey_columns = [
         "disease",
         "a003",
@@ -421,18 +433,20 @@ async def create_merged_measures():
     stmt = f"""
     CREATE TABLE IF NOT EXISTS measure.merged_measures AS
     select
+    org.name as org_name,
     s.name as survey_name,
     sub.number,
     info.id as measure_id,
      {info_columns_stmt}, {bcq_columns_stmt}, {statistic_stmt_column_names_stmt}, {survey_result_columns_stmt}, now() as created_at, now() + interval '8 hours' as created_at_utc8
     from measure.infos as info
-    left join measure.subjects as sub on sub.id = info.subject_id
+    inner join measure.subjects as sub on sub.id = info.subject_id
+    inner join app.auth_orgs as org on org.id = info.org_id
+    inner join measure.survey_results as sr on sr.measure_id = info.id
+    inner join measure.surveys as s on s.id = sr.survey_id
     left join (
         {statistic_stmt}
     ) as stat on stat.measure_id = info.id
     left join measure.bcqs as bcq on bcq.measure_id = info.id
-    left join measure.survey_results as sr on sr.measure_id = info.id
-    left join measure.surveys as s on s.id = sr.survey_id
     order by
         s.name,
         info.measure_time desc
@@ -444,4 +458,7 @@ async def create_merged_measures():
     async with deps.get_db2() as db_session:
         await db_session.execute("drop table if exists measure.merged_measures")
         await db_session.execute(stmt)
+        await db_session.execute(
+            "GRANT SELECT ON measure.merged_measures TO readaccess;",
+        )
         await db_session.commit()

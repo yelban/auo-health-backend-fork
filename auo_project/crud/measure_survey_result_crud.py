@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
 
+from sqlalchemy.orm import selectinload
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -75,8 +76,8 @@ class CRUDMeasureSurveyResult(
     ) -> List[MeasureSurveyResult]:
         conditions = []
 
-        if org_id:
-            conditions.append(MeasureInfo.org_id == org_id)
+        # if org_id:
+        conditions.append(MeasureInfo.org_id == org_id)
         if measure_time:
             conditions.append(
                 func.date(MeasureInfo.measure_time + timedelta(hours=8))
@@ -105,14 +106,15 @@ class CRUDMeasureSurveyResult(
         print("conditions", conditions)
         relations = kwargs.get("relations", [])
         print("relations", relations)
-        from sqlalchemy.orm import selectinload
 
         relations = [selectinload(getattr(MeasureSurveyResult, "measure_info"))]
         measure_survey_result = await db_session.execute(
             select(MeasureSurveyResult)
             .where(
                 MeasureSurveyResult.id.in_(
-                    select(MeasureSurveyResult.id).where(
+                    select(MeasureSurveyResult.id)
+                    .join(MeasureInfo)
+                    .where(
                         *conditions,
                     ),
                 ),
