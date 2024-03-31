@@ -32,9 +32,10 @@ def page():
 
     choice1 = "解密完整 ZIP"
     choice2 = "解密全部 Channel 全段資料"
+    choice3 = "下載原始 ZIP"
     data_type = st.radio(
         "請選擇：",
-        [choice1, choice2],
+        [choice1, choice2, choice3],
         disabled=st.session_state.disabled,
     )
 
@@ -104,6 +105,12 @@ def page():
                     label="下載解密 Channel 全段資料壓縮檔",
                     data=decrpyted_zip.getvalue(),
                     file_name=f"{filep.stem}_all_raw_decrpyted{filep.suffix}",
+                )
+            elif data_type == choice3:
+                st.download_button(
+                    label="下載原始壓縮檔",
+                    data=bytes_file.getvalue(),
+                    file_name=filename,
                 )
             else:
                 st.write(f"不允許選項: {data_type}")

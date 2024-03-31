@@ -28,7 +28,7 @@ def page():
         settings.TXT_FILE_AES_IV,
         bytes_data,
     )
-    print("decrypted_data", decrypted_data)
+    # print("decrypted_data", decrypted_data)
     filep = Path(uploaded_file.name)
     st.download_button(
         label="下載檔案",
