@@ -2,10 +2,10 @@ server {
     listen 80;
     listen [::]:80;
 
-    server_name api.auohealth.com;
+    server_name dev-api.auohealth.com;
     location ~ ^/files/ {
         # Forward incoming requests to local tusd instance
-        proxy_pass         http://127.0.0.1:1080;
+        proxy_pass         http://127.0.0.1:21080;
 
         # Disable request and response buffering
         proxy_request_buffering  off;
@@ -22,7 +22,7 @@ server {
     }
 
     location / {
-            proxy_pass         http://127.0.0.1:8000;
+            proxy_pass         http://127.0.0.1:28000;
             client_max_body_size     50M;
     }
 }
