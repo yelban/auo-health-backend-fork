@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 import pandas as pd
+import pydash as py_
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
@@ -16,9 +17,38 @@ from auo_project import crud, models, schemas
 from auo_project.core.config import settings
 from auo_project.core.file import get_max_amp_depth_of_range
 from auo_project.core.utils import compare_cn_diff, get_subject_schema, safe_divide
+from auo_project.schemas.measure_tongue_schema import (
+    AdvancedTongueOutput,
+    Disease,
+    LevelOption,
+    TongueSampleMeasure,
+)
 from auo_project.web.api import deps
 
 router = APIRouter()
+
+
+def get_pusle_28():
+    pulse_names = "革 洪 散 虛 芤 濡 平 牢 弱 微 伏 大 小 代 疾 促 動 數 緩 遲 結 弦 緊 實 長 短 滑 澀".split(
+        " ",
+    )
+    from uuid import uuid4
+
+    pusle_elmenets = [
+        schemas.Pulse28Elmenet(
+            value=uuid4(),
+            label=name,
+            description="",
+            selected=False,
+        )
+        for name in pulse_names
+    ]
+    return schemas.OneSidePulse(
+        overall=pusle_elmenets,
+        cu=pusle_elmenets,
+        qu=pusle_elmenets,
+        ch=pusle_elmenets,
+    )
 
 
 class Memo(BaseModel):
@@ -67,6 +97,10 @@ class MeasureSixSecPWResponse(BaseModel):
     r_cu: LineChart = Field(title="右寸")
     r_qu: LineChart = Field(title="右關")
     r_ch: LineChart = Field(title="右尺")
+    exclude_analytics: List[str] = Field(
+        [],
+        title="不計入分析項目: l_cu, l_qu, l_ch, r_cu, r_qu, r_ch",
+    )
 
 
 class ColumnChart(BaseChart):
@@ -320,10 +354,26 @@ async def get_measure_summary(
         if dbp is None:
             dbp = survey_result_value.get("dbp", None)
 
+    # TODO: fixme
+    subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+    subject_tag_dict = {
+        tag.id: {
+            "value": tag.id,
+            "key": tag.name,
+            "type": tag.tag_type,
+        }
+        for tag in subject_tags
+    }
+
+    measure_pulse_28_list = await crud.measure_pulse_28_option.get_all(
+        db_session=db_session,
+    )
+
     return schemas.MeasureDetailResponse(
         subject=get_subject_schema(org_name=current_user.org.name)(
             **jsonable_encoder(subject),
             standard_measure_info=standard_measure_info,
+            tags=[subject_tag_dict.get(tag_id) for tag_id in subject.tag_ids],
         ),
         measure=schemas.MeasureDetailRead(
             measure_time=measure.measure_time,
@@ -508,47 +558,87 @@ async def get_measure_summary(
             width_value_r_ch=round(width_value_r_ch, 1) if width_value_r_ch else None,
             comment=measure.comment,
             # TODO: changme
-            bcq=schemas.BCQ(
-                exist=measure.has_bcq,
-                score_yang=measure.bcq.percentage_yang,
-                score_yin=measure.bcq.percentage_yin,
-                score_phlegm=measure.bcq.percentage_phlegm,
-                score_yang_head=measure.bcq.percentage_yang_head,
-                score_yang_chest=measure.bcq.percentage_yang_chest,
-                score_yang_limbs=measure.bcq.percentage_yang_limbs,
-                score_yang_abdomen=measure.bcq.percentage_yang_abdomen,
-                score_yang_surface=measure.bcq.percentage_yang_surface,
-                score_yin_head=measure.bcq.percentage_yin_head,
-                score_yin_limbs=measure.bcq.percentage_yin_limbs,
-                score_yin_gt=measure.bcq.percentage_yin_gt,
-                score_yin_surface=measure.bcq.percentage_yin_surface,
-                score_yin_abdomen=measure.bcq.percentage_yin_abdomen,
-                score_phlegm_trunk=measure.bcq.percentage_phlegm_trunk,
-                score_phlegm_surface=measure.bcq.percentage_phlegm_surface,
-                score_phlegm_head=measure.bcq.percentage_phlegm_head,
-                score_phlegm_gt=measure.bcq.percentage_phlegm_gt,
-                percentage_yang=measure.bcq.percentage_yang,
-                percentage_yin=measure.bcq.percentage_yin,
-                percentage_phlegm=measure.bcq.percentage_phlegm,
-                percentage_yang_head=0,
-                percentage_yang_chest=0,
-                percentage_yang_limbs=0,
-                percentage_yang_abdomen=0,
-                percentage_yang_surface=0,
-                percentage_yin_head=0,
-                percentage_yin_limbs=0,
-                percentage_yin_gt=0,
-                percentage_yin_surface=0,
-                percentage_yin_abdomen=0,
-                percentage_phlegm_trunk=0,
-                percentage_phlegm_surface=0,
-                percentage_phlegm_head=0,
-                percentage_phlegm_gt=0,
-            )
-            if measure.has_bcq or measure.bcq
-            else {},
+            bcq=(
+                schemas.BCQ(
+                    exist=measure.has_bcq,
+                    score_yang=measure.bcq.percentage_yang,
+                    score_yin=measure.bcq.percentage_yin,
+                    score_phlegm=measure.bcq.percentage_phlegm,
+                    score_yang_head=measure.bcq.percentage_yang_head,
+                    score_yang_chest=measure.bcq.percentage_yang_chest,
+                    score_yang_limbs=measure.bcq.percentage_yang_limbs,
+                    score_yang_abdomen=measure.bcq.percentage_yang_abdomen,
+                    score_yang_surface=measure.bcq.percentage_yang_surface,
+                    score_yin_head=measure.bcq.percentage_yin_head,
+                    score_yin_limbs=measure.bcq.percentage_yin_limbs,
+                    score_yin_gt=measure.bcq.percentage_yin_gt,
+                    score_yin_surface=measure.bcq.percentage_yin_surface,
+                    score_yin_abdomen=measure.bcq.percentage_yin_abdomen,
+                    score_phlegm_trunk=measure.bcq.percentage_phlegm_trunk,
+                    score_phlegm_surface=measure.bcq.percentage_phlegm_surface,
+                    score_phlegm_head=measure.bcq.percentage_phlegm_head,
+                    score_phlegm_gt=measure.bcq.percentage_phlegm_gt,
+                    percentage_yang=measure.bcq.percentage_yang,
+                    percentage_yin=measure.bcq.percentage_yin,
+                    percentage_phlegm=measure.bcq.percentage_phlegm,
+                    percentage_yang_head=0,
+                    percentage_yang_chest=0,
+                    percentage_yang_limbs=0,
+                    percentage_yang_abdomen=0,
+                    percentage_yang_surface=0,
+                    percentage_yin_head=0,
+                    percentage_yin_limbs=0,
+                    percentage_yin_gt=0,
+                    percentage_yin_surface=0,
+                    percentage_yin_abdomen=0,
+                    percentage_phlegm_trunk=0,
+                    percentage_phlegm_surface=0,
+                    percentage_phlegm_head=0,
+                    percentage_phlegm_gt=0,
+                )
+                if measure.has_bcq or measure.bcq
+                else {}
+            ),
             all_sec=all_sec,
             cn=cn,
+            pulse_28=schemas.Pulse28(
+                left=schemas.OneSidePulse(
+                    overall=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_l_overall,
+                    ),
+                    cu=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_l_cu,
+                    ),
+                    qu=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_l_qu,
+                    ),
+                    ch=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_l_ch,
+                    ),
+                ),
+                right=schemas.OneSidePulse(
+                    overall=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_r_overall,
+                    ),
+                    cu=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_r_cu,
+                    ),
+                    qu=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_r_qu,
+                    ),
+                    ch=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_r_ch,
+                    ),
+                ),
+            ),
             tongue=schemas.Tongue(
                 exist=True if tongue else False,
                 info=tongue_info,
@@ -1102,8 +1192,43 @@ async def update_measure_comment(
     return comment.content
 
 
-@router.patch("/{measure_id}/tongue_info")
-async def update_measure_tongue_info(
+@router.patch("/{measure_id}")
+async def update_measure(
+    measure_id: UUID,
+    measure_in: schemas.MeasureInfoUpdateInput,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if not measure:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
+    # TODO: handle irregular_hr_type_l, irregular_hr_type_r, irregular_hr_l, irregular_hr_r
+    # check max_amp_value_l_cu, max_amp_value_l_qu, max_amp_value_l_ch, max_amp_value_r_cu, max_amp_value_r_qu, max_amp_value_r_ch of frontend key
+    await crud.measure_info.update(
+        db_session=db_session,
+        obj_current=measure,
+        obj_new=schemas.MeasureInfoUpdate(**measure_in.dict(exclude_none=True)),
+    )
+    return {"status": "ok"}
+
+
+# deprecated
+@router.patch("/{measure_id}/old_tongue_info")
+async def update_old_measure_tongue_info(
     measure_id: UUID,
     tongue_info: schemas.TongueInfo,
     db_session: AsyncSession = Depends(deps.get_db),
@@ -1135,14 +1260,16 @@ async def update_measure_tongue_info(
     tongue_in = schemas.MeasureTongueUpdate(
         tongue_color=tongue_info.tongue_color,
         tongue_shap=tongue_info.tongue_shap if tongue_info.tongue_shap else None,
-        tongue_status1=tongue_info.tongue_status1
-        if tongue_info.tongue_status1
-        else None,
+        tongue_status1=(
+            tongue_info.tongue_status1 if tongue_info.tongue_status1 else None
+        ),
         tongue_status2=tongue_info.tongue_status2,
         tongue_coating_color=tongue_info.tongue_coating_color,
-        tongue_coating_status=tongue_info.tongue_coating_status
-        if tongue_info.tongue_coating_status
-        else None,
+        tongue_coating_status=(
+            tongue_info.tongue_coating_status
+            if tongue_info.tongue_coating_status
+            else None
+        ),
         tongue_coating_bottom=tongue_info.tongue_coating_bottom,
     )
     await crud.measure_tongue.update(
@@ -1212,7 +1339,7 @@ async def update_measure_irregular_hr(
     return irregular_hr
 
 
-@router.put("/activate/{measure_id}")
+@router.put("/{measure_id}/activate")
 async def activate_measure(
     measure_id: UUID,
     db_session: AsyncSession = Depends(deps.get_db),
@@ -1246,7 +1373,7 @@ async def activate_measure(
     return measure_id
 
 
-@router.put("/deactivate/{measure_id}")
+@router.put("/{measure_id}/deactivate")
 async def deactivate_measure(
     measure_id: UUID,
     db_session: AsyncSession = Depends(deps.get_db),
@@ -1278,3 +1405,551 @@ async def deactivate_measure(
         obj_new=measure_in,
     )
     return measure_id
+
+
+@router.post("/batch/activate", response_model=schemas.BatchResponse)
+async def batch_activate_measures(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        measure_info = await crud.measure_info.get(db_session=db_session, id=obj_id)
+        if measure_info is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            measure_info = await crud.measure_info.update(
+                db_session=db_session,
+                obj_current=measure_info,
+                obj_new=schemas.MeasureInfoUpdate(is_active=True),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.post("/batch/deactivate", response_model=schemas.BatchResponse)
+async def batch_deactivate_measures(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        measure_info = await crud.measure_info.get(db_session=db_session, id=obj_id)
+        if measure_info is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            measure_info = await crud.measure_info.update(
+                db_session=db_session,
+                obj_current=measure_info,
+                obj_new=schemas.MeasureInfoUpdate(is_active=False),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.get("/{measure_id}/tongue_info", response_model=schemas.AdvancedTongueOutput)
+async def get_tongue(
+    measure_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+        relations=["tongue"],
+    )
+    if measure is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+    if measure.is_active is False:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} is not active",
+        )
+    if measure.tongue is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found tongue of measure id: {measure_id}",
+        )
+
+    subject = await crud.subject.get(
+        db_session=db_session,
+        id=measure.subject_id,
+        relations=[models.Subject.standard_measure_info],
+    )
+
+    tongue = measure.tongue
+    front_loc = tongue.up_img_uri
+    back_loc = tongue.down_img_uri
+    if front_loc:
+        container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        file_path = front_loc
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        sas_token = generate_blob_sas(
+            account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
+            container_name=container_name,
+            blob_name=file_path,
+            account_key=settings.AZURE_STORAGE_KEY_INTERNET,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            # TODO: add ip
+        )
+        front_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+
+    if back_loc:
+        container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        file_path = back_loc
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        sas_token = generate_blob_sas(
+            account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
+            container_name=container_name,
+            blob_name=file_path,
+            account_key=settings.AZURE_STORAGE_KEY_INTERNET,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            # TODO: add ip
+        )
+        back_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+
+    advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
+        db_session=db_session,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+    advanced_tongue_exist = advanced_tongue is not None
+
+    advanced_tongue = advanced_tongue or schemas.MeasureAdvancedTongue2Read(
+        id=measure_id,
+        measure_id=measure_id,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+
+    # TODO: merge to func
+    labled_symptom_map = {}
+    labeled_symptom_level_map = {}
+    labeled_symptom_disease_map = {}
+    if advanced_tongue_exist:
+        for column in advanced_tongue.columns:
+            if "tongue" in column and "level" not in column and "disease" not in column:
+                values = getattr(advanced_tongue, column, [])
+                if isinstance(values, list) is False:
+                    values = [] if values is None else [values]
+                labled_symptom_map[column] = set(values)
+
+        for column in advanced_tongue.columns:
+            if "_level_map" in column:
+                item_id = column.replace("_level_map", "")
+                obj = getattr(advanced_tongue, column)
+                labeled_symptom_level_map[item_id] = {
+                    str(key): val for key, val in obj.items()
+                }
+
+        for column in advanced_tongue.columns:
+            if "_disease_map" in column:
+                item_id = column.replace("_disease_map", "")
+                labeled_symptom_disease_map[item_id] = getattr(advanced_tongue, column)
+
+    # prepare component
+    tongue_symptoms = await crud.measure_tongue_symptom.get_all(db_session=db_session)
+    tongue_symptoms = py_.order_by(tongue_symptoms, ["order"])
+    tongue_symptom_diseases = await crud.measure_tongue_symptom_disease.get_all(
+        db_session=db_session,
+    )
+    tongue_symptom_diseases_dict = {}
+    tongue_groups = await crud.measure_tongue_group_symptom.get_all(
+        db_session=db_session,
+    )
+    tongue_groups = sorted(tongue_groups, key=lambda x: f"{x.item_id}:{x.group_id}")
+    tongue_group_dict = dict(
+        [
+            (f"{item.item_id}_{item.group_id}", item.component_type)
+            for item in tongue_groups
+        ],
+    )
+    for item in tongue_symptom_diseases:
+        tongue_symptom_diseases_dict[item.item_id] = tongue_symptom_diseases_dict.get(
+            item.item_id,
+            {},
+        )
+
+        disease_item = Disease(
+            value=item.disease_id,
+            # label=item.tongue_disease.disease_name,  # TODO: item.disease.disease_name
+            label=item.disease_id,  # TODO: item.disease.disease_name
+            selected=item.disease_id
+            in py_.get(
+                labeled_symptom_disease_map,
+                f"{item.item_id}.{item.symptom_id}",
+                [],
+            ),
+        )
+
+        if item.symptom_id in tongue_symptom_diseases_dict[item.item_id]:
+            tongue_symptom_diseases_dict[item.item_id][item.symptom_id].append(
+                disease_item,
+            )
+        else:
+            tongue_symptom_diseases_dict[item.item_id][item.symptom_id] = [disease_item]
+
+    level_map = {
+        1: "輕",
+        2: "中",
+        3: "重",
+    }
+    result = {}
+    result2 = []
+    for item in tongue_symptoms:
+        labeled_symptom_set = py_.get(labled_symptom_map, item.item_id, set())
+
+        append_item = {
+            "id": item.id,
+            "item_id": item.item_id,
+            "item_name": item.item_name,
+            "group_id": item.group_id or "0",
+            "symptom_id": item.symptom_id,
+            "symptom_name": item.symptom_name,
+            "symptom_description": item.symptom_description,
+            "level_options": (
+                [
+                    LevelOption(
+                        label=level_map.get(int(level)),
+                        value=int(level),
+                        selected=int(level)
+                        == py_.get(
+                            labeled_symptom_level_map,
+                            f"{item.item_id}.{item.symptom_id}",
+                        ),
+                    )
+                    for level in item.symptom_levels
+                ]
+                if item.symptom_levels
+                else []
+            ),
+            "is_default": item.is_default or False,
+            "is_normal": item.is_normal or False,
+            "diseases": tongue_symptom_diseases_dict.get(item.item_id, {}).get(
+                item.symptom_id,
+                [],
+            ),
+            "selected": (
+                True
+                if item.symptom_id in labeled_symptom_set
+                else (
+                    (True if item.is_default else False)
+                    if len(labeled_symptom_set) == 0
+                    else False
+                )
+            ),
+        }
+        if item.item_id in result:
+            result[item.item_id].append(append_item)
+        else:
+            result[item.item_id] = [append_item]
+
+        result2 = []
+        for key, value in result.items():
+            result2.append(
+                {
+                    "item_id": key,
+                    "item_name": value[0]["item_name"],
+                    "symptoms": py_.chain(value)
+                    .group_by("group_id")
+                    .map_(
+                        lambda objs, group_id: {
+                            "item_id": key,
+                            "component_id": f"{key}_{group_id}",
+                            "component_type": tongue_group_dict.get(
+                                f"{key}_{group_id}",
+                                "radio",
+                            ),
+                            "children": py_.map_(
+                                objs,
+                                lambda x: py_.pick_by(
+                                    x,
+                                    [
+                                        "id",
+                                        "symptom_id",
+                                        "symptom_name",
+                                        "symptom_description",
+                                        "level_options",
+                                        "is_default",
+                                        "is_normal",
+                                        "selected",
+                                        "diseases",
+                                    ],
+                                ),
+                            ),
+                        },
+                    )
+                    .value(),
+                },
+            )
+
+    return AdvancedTongueOutput(
+        subject=subject,
+        measure_tongue=TongueSampleMeasure(
+            image=schemas.TongueImage(
+                front=front_tongue_image_url or "",
+                back=back_tongue_image_url or "",
+            ),
+            measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
+            symptom=result2,
+            summary=advanced_tongue.tongue_summary,
+            memo=advanced_tongue.tongue_memo,
+            age=measure.age,
+            measure_operator=measure.measure_operator,
+        ),
+    )
+
+
+@router.patch("/{measure_id}/tongue_info")
+async def update_measure_tongue_info(
+    measure_id: UUID,
+    tongue_info: schemas.MeasureAdvancedTongue2UpdateInput,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if measure is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+    if measure.is_active is False:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} is not active",
+        )
+    if (
+        current_user.org_id != measure.org_id
+        and current_user.is_superuser is False
+        and current_user.org.name != "tongue_label"
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Permission Error",
+        )
+
+    advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
+        db_session=db_session,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+
+    def clean_level_map(
+        synptom_id_list: List[str],
+        level_map: Dict[str, int],
+    ) -> Dict[str, int]:
+        return {
+            key: value
+            for key, value in level_map.items()
+            if key in synptom_id_list and key is not None
+        }
+
+    def clean_disease_map(disease_map: Dict[str, str]) -> Dict[str, str]:
+        return disease_map
+
+    # TODO: validate
+    if advanced_tongue:
+        tongue_in = schemas.MeasureAdvancedTongue2Update(
+            tongue_tip=tongue_info.tongue_tip,
+            tongue_tip_disease_map=clean_disease_map(
+                tongue_info.tongue_tip_disease_map,
+            ),
+            tongue_color=tongue_info.tongue_color,
+            tongue_color_disease_map=clean_disease_map(
+                tongue_info.tongue_color_disease_map,
+            ),
+            tongue_shap=tongue_info.tongue_shap,
+            tongue_shap_level_map=clean_level_map(
+                tongue_info.tongue_shap,
+                tongue_info.tongue_shap_level_map,
+            ),
+            tongue_shap_disease_map=clean_disease_map(
+                tongue_info.tongue_shap_disease_map,
+            ),
+            tongue_status1=tongue_info.tongue_status1,
+            tongue_status1_disease_map=clean_disease_map(
+                tongue_info.tongue_status1_disease_map,
+            ),
+            tongue_status2=tongue_info.tongue_status2,
+            tongue_status2_level_map=clean_level_map(
+                tongue_info.tongue_status2,
+                tongue_info.tongue_status2_level_map,
+            ),
+            tongue_status2_disease_map=clean_disease_map(
+                tongue_info.tongue_status2_disease_map,
+            ),
+            tongue_coating_color=tongue_info.tongue_coating_color,
+            tongue_coating_color_level_map=clean_level_map(
+                tongue_info.tongue_coating_color,
+                tongue_info.tongue_coating_color_level_map,
+            ),
+            tongue_coating_color_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_color_disease_map,
+            ),
+            tongue_coating_status=tongue_info.tongue_coating_status,
+            tongue_coating_status_level_map=clean_level_map(
+                tongue_info.tongue_coating_status,
+                tongue_info.tongue_coating_status_level_map,
+            ),
+            tongue_coating_status_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_status_disease_map,
+            ),
+            tongue_coating_bottom=tongue_info.tongue_coating_bottom,
+            tongue_coating_bottom_level_map=clean_level_map(
+                tongue_info.tongue_coating_bottom,
+                tongue_info.tongue_coating_bottom_level_map,
+            ),
+            tongue_coating_bottom_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_bottom_disease_map,
+            ),
+            tongue_summary=tongue_info.tongue_summary,
+            tongue_memo=tongue_info.tongue_memo,
+            has_tongue_label=True,
+        )
+
+        tongue_info = await crud.measure_advanced_tongue2.update(
+            db_session=db_session,
+            obj_current=advanced_tongue,
+            obj_new=tongue_in.dict(exclude_unset=True),
+        )
+    else:
+        tongue_in = schemas.MeasureAdvancedTongue2Create(
+            info_id=measure_id,
+            owner_id=current_user.id,
+            tongue_tip=tongue_info.tongue_tip,
+            tongue_tip_disease_map=clean_disease_map(
+                tongue_info.tongue_tip_disease_map,
+            ),
+            tongue_color=tongue_info.tongue_color,
+            tongue_color_disease_map=clean_disease_map(
+                tongue_info.tongue_color_disease_map,
+            ),
+            tongue_shap=tongue_info.tongue_shap,
+            tongue_shap_level_map=clean_level_map(
+                tongue_info.tongue_shap,
+                tongue_info.tongue_shap_level_map,
+            ),
+            tongue_shap_disease_map=clean_disease_map(
+                tongue_info.tongue_shap_disease_map,
+            ),
+            tongue_status1=tongue_info.tongue_status1,
+            tongue_status1_disease_map=clean_disease_map(
+                tongue_info.tongue_status1_disease_map,
+            ),
+            tongue_status2=tongue_info.tongue_status2,
+            tongue_status2_level_map=clean_level_map(
+                tongue_info.tongue_status2,
+                tongue_info.tongue_status2_level_map,
+            ),
+            tongue_status2_disease_map=clean_disease_map(
+                tongue_info.tongue_status2_disease_map,
+            ),
+            tongue_coating_color=tongue_info.tongue_coating_color,
+            tongue_coating_color_level_map=clean_level_map(
+                tongue_info.tongue_coating_color,
+                tongue_info.tongue_coating_color_level_map,
+            ),
+            tongue_coating_color_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_color_disease_map,
+            ),
+            tongue_coating_status=tongue_info.tongue_coating_status,
+            tongue_coating_status_level_map=clean_level_map(
+                tongue_info.tongue_coating_status,
+                tongue_info.tongue_coating_status_level_map,
+            ),
+            tongue_coating_status_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_status_disease_map,
+            ),
+            tongue_coating_bottom=tongue_info.tongue_coating_bottom,
+            tongue_coating_bottom_level_map=clean_level_map(
+                tongue_info.tongue_coating_bottom,
+                tongue_info.tongue_coating_bottom_level_map,
+            ),
+            tongue_coating_bottom_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_bottom_disease_map,
+            ),
+            tongue_summary=tongue_info.tongue_summary,
+            tongue_memo="",
+            has_tongue_label=True,
+        )
+        tongue_info = await crud.measure_advanced_tongue2.create(
+            db_session=db_session,
+            obj_in=tongue_in,
+        )
+    return tongue_info
+
+
+@router.patch("/{measure_id}/tongue_memo")
+async def update_tongue_memo(
+    measure_id: UUID,
+    memo: Memo,
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if measure is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+    if measure.is_active is False:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} is not active",
+        )
+    if (
+        current_user.org_id != measure.org_id
+        and current_user.org.name != "tongue_label"
+        and current_user.is_superuser is False
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Permission Error",
+        )
+
+    advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
+        db_session=db_session,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+    if advanced_tongue:
+        tongue_in = schemas.MeasureAdvancedTongue2Update(
+            tongue_memo=memo.content,
+        )
+        tongue_info = await crud.measure_advanced_tongue2.update(
+            db_session=db_session,
+            obj_current=advanced_tongue,
+            obj_new=tongue_in,
+        )
+    else:
+        tongue_in = schemas.MeasureAdvancedTongue2Create(
+            info_id=measure_id,
+            owner_id=current_user.id,
+            tongue_memo=memo.content,
+        )
+        tongue_info = await crud.measure_advanced_tongue2.create(
+            db_session=db_session,
+            obj_in=tongue_in,
+        )
+
+    return tongue_info
