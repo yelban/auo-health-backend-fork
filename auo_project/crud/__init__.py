@@ -9,6 +9,7 @@ from auo_project.crud.measure_info_crud import measure_info
 from auo_project.crud.measure_mean_crud import measure_cn_mean
 from auo_project.crud.measure_parameter_crud import measure_parameter
 from auo_project.crud.measure_parameter_option_curd import measure_parameter_option
+from auo_project.crud.measure_pulse_28_options_crud import measure_pulse_28_option
 from auo_project.crud.measure_question_option_crud import measure_question_option
 from auo_project.crud.measure_raw_crud import measure_raw
 from auo_project.crud.measure_statistic_crud import measure_statistic
@@ -33,5 +34,6 @@ from auo_project.crud.recipe_crud import recipe
 from auo_project.crud.recipe_parameter_crud import recipe_parameter
 from auo_project.crud.role_crud import role
 from auo_project.crud.subject_crud import subject
+from auo_project.crud.subject_tag_crud import subject_tag
 from auo_project.crud.upload_crud import upload
 from auo_project.crud.user_crud import user

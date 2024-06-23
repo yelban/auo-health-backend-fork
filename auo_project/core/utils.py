@@ -286,10 +286,13 @@ def get_measure_strength(max_slop, max_amp_value):
 def get_measure_width(range_length, max_amp_value, max_slop):
     if range_length is None or max_amp_value is None:
         return None
+    # 細
     if range_length / 0.2 < 25 and (max_amp_value >= 20 or max_slop > 180):
         return 0
+    # 大
     elif range_length / 0.2 < 25 and (max_amp_value < 20 or max_slop < 100):
         return 2
+    # 正常
     else:
         return 1
 

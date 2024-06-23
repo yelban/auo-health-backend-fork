@@ -498,6 +498,9 @@ class QAHandler:
         merged_rows_dict = {}
         for all_rows_key in all_rows.keys():
             for row in all_rows[all_rows_key]:
+                if "number" not in row:
+                    print(f"number not in row: {row}")
+                    continue
                 merged_rows_dict.setdefault(row["number"], {})
                 survey_at = row["survey_at"]
                 merged_rows_dict[row["number"]].update(row)

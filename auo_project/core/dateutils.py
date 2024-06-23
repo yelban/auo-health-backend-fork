@@ -48,7 +48,11 @@ class DateUtils:
             except:
                 pass
             try:
-                end_date = datetime.strptime(self.end_date, "%Y/%m/%d")
+                end_date = datetime.strptime(self.end_date, "%Y/%m/%d") + timedelta(
+                    hours=23,
+                    minutes=59,
+                    seconds=59,
+                )
             except:
                 pass
             return start_date, end_date

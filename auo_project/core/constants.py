@@ -88,7 +88,6 @@ MEASURE_TIMES = [
         "extra": [
             {"value": "start_date", "key": "開始時間"},
             {"value": "end_date", "key": "結束時間"},
-            {"value": "specific_months", "key": "指定月份"},
         ],
     },
 ]
