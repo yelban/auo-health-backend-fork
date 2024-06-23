@@ -12,7 +12,7 @@ from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.param_functions import Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import and_
 from sqlmodel import String, cast, extract, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -125,113 +125,15 @@ surface_disease_records = pd.read_csv(
 ).to_dict("records")
 
 
-class Memo(BaseModel):
-    content: str = Field(None, title="內容")
-
-
-class Link(BaseModel):
-    self: str
-    next: str = None
-    prev: str = None
-
-
-class TongueMeasure(BaseModel):
-    id: UUID
-    measure_time: str
-    tongue: Dict[str, Any]
-
-
-class TongueItem(BaseModel):
-    subject: Union[schemas.SubjectRead, schemas.SubjectSecretRead]
-    measure: TongueMeasure
-
-
-class TongueListPage(BaseModel):
-    page: int
-    per_page: int
-    page_count: int
-    total_count: int
-    link: Link
-    items: List[TongueItem] = Field(
-        default=[],
-        title="舌象紀錄",
-    )
-
-
-class TongueListOutput(BaseModel):
-    measure_times: List[dict]
-    tongue: TongueListPage
-
-
-class Disease(BaseModel):
-    """證型"""
-
-    value: Union[str, UUID]
-    label: str
-    selected: bool = False
-
-
-class LevelOption(BaseModel):
-    value: int
-    label: str
-    selected: bool = False
-
-
-class ComponentChild(BaseModel):
-    id: Union[str, UUID] = Field(None, title="症狀/特徵流水號")
-    symptom_id: str = Field(None, title="症狀/特徵易讀編號")
-    symptom_name: str = Field(None, title="症狀/特徵名稱")
-    symptom_description: str = Field(None, title="症狀/特徵描述")
-    level_options: List[LevelOption] = Field([], title="程度選項：輕/中/重")
-    # is_default: bool = Field(False, title="是否為預設值")
-    is_normal: bool = Field(
-        False,
-        title="是否為正常，若為正常需把 item 底下正常以外選項清空",
-    )
-    selected: bool = Field(False, title="是否選擇")
-    diseases: List[Disease] = Field([], title="證型列表")
-
-
-class Component(BaseModel):
-    item_id: str
-    component_id: str
-    component_type: str = Field("radio", title="UI 元件類型")
-    children: List[ComponentChild]
-
-
-class SymptomItem(BaseModel):
-    """症狀/特徵"""
-
-    item_id: str
-    item_name: str
-    symptoms: List[Component]
-
-
-class TongueSampleImage(BaseModel):
-    front: str = None
-    back: str = None
-
-
-class TongueSampleMeasure(BaseModel):
-    image: TongueSampleImage = Field(None, title="舌象圖片")
-    measure_time: str = Field(None, title="拍攝時間")
-    symptom: List[SymptomItem] = Field([], title="症狀/特徵列表")
-    summary: str = Field(None, title="舌象概要")
-    memo: str = Field(None, title="檢測標記")
-    age: Optional[int] = Field(None, title="受測時年齡")
-    measure_operator: Optional[str] = Field(None, title="檢測人員")
-
-
-class AdvancedTongueOutput(BaseModel):
-    subject: schemas.SubjectRead
-    measure_tongue: TongueSampleMeasure
-
-
-class TongueConfigUploadResponse(BaseModel):
-    msg: str = Field(title="訊息")
-    upload_id: UUID = Field(title="上傳 ID")
-    color_hash: str = Field(title="校色 pickle 檔 SHA256")
-
+from auo_project.schemas.measure_tongue_schema import (
+    AdvancedTongueOutput,
+    Disease,
+    LevelOption,
+    TongueConfigUploadResponse,
+    TongueListOutput,
+    TongueSampleImage,
+    TongueSampleMeasure,
+)
 
 router = APIRouter()
 
@@ -382,12 +284,12 @@ async def get_tongue_list(
 
     return {
         "measure_times": MEASURE_TIMES,
-        "tongue": TongueListPage(
+        "tongue": schemas.TongueListPage(
             page=pagination.page,
             per_page=pagination.per_page,
             page_count=ceil(total_count / pagination.per_page),
             total_count=total_count,
-            link=Link(
+            link=schemas.Link(
                 self=pagination.get_self_url(),
                 next=pagination.get_next_url(),
                 prev=pagination.get_previous_url(),
@@ -617,7 +519,7 @@ async def update_measure_tongue_info(
 @router.patch("/{measure_id}/memo")
 async def update_tongue_memo(
     measure_id: UUID,
-    memo: Memo,
+    memo: schemas.Memo,
     *,
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
@@ -1347,7 +1249,10 @@ async def update_measure_tongue_info(
             status_code=400,
             detail=f"Not found measure id: {measure_id}",
         )
-    if current_user.org_id != measure.owner.org_id:
+    if (
+        current_user.org_id != measure.owner.org_id
+        and current_user.org.name != "tongue_label"
+    ):
         raise HTTPException(
             status_code=400,
             detail=f"Permission Error",
@@ -1506,7 +1411,7 @@ async def update_measure_tongue_info(
 @router.patch("/demo/{measure_id}/memo")
 async def update_tongue_memo(
     measure_id: UUID,
-    memo: Memo,
+    memo: schemas.Memo,
     *,
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
@@ -1557,6 +1462,139 @@ async def update_tongue_memo(
         )
 
     return tongue_info
+
+
+@router.post("/summary")
+async def create_measure_tongue_summary(
+    tongue_info: schemas.MeasureAdvancedTongue2UpdateInput,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    summary_components = [
+        ("舌尖", ["tongue_tip"], ""),
+        ("舌", ["tongue_color", "tongue_shap"], ""),
+        ("苔", ["tongue_coating_color", "tongue_coating_status"], ""),
+        ("舌態", ["tongue_status1"], ""),
+        ("舌神", ["tongue_status2"], ""),
+        ("舌下脈絡", ["tongue_coating_bottom"], ""),
+    ]
+    tongue_sympotms = await crud.measure_tongue_symptom.get_all(db_session=db_session)
+    normal_symptoms = py_.filter_(tongue_sympotms, lambda x: x.is_normal)
+    normal_symptom_dict = (
+        py_.chain(normal_symptoms)
+        .group_by("item_id")
+        .map_values(lambda values: [e.symptom_id for e in values])
+        .value()
+    )
+
+    # tongue_info ={"tongue_status1": ["白"], "tongue_status2": ["少"]}
+    # tongue_info = {"tongue_status1": ["白"], "tongue_status2": ["薄"]}
+    # show the symptom of the summary
+    special_rules = {
+        "tongue_coating_color": {
+            "tongue_coating_color": ["白"],
+            "tongue_coating_status": [
+                "少",
+                "厚",
+                "腐",
+                "膩",
+                "潤",
+                "燥",
+                "花剝",
+                "光剝",
+            ],
+        },
+    }
+    special_rules_match = py_.map_values(
+        special_rules,
+        lambda rule: py_.chain(rule)
+        .map_values(
+            lambda value, key: len(py_.intersection(py_.get(tongue_info, key), value))
+            > 0,
+        )
+        .values()
+        .every()
+        .value(),
+    )
+
+    tongue_summary_list = []
+    for prefix, items, suffix in summary_components:
+        abnormal_symptoms_list = []
+        for item in items:
+            symptoms = getattr(tongue_info, item, [])
+
+            if special_rules_match.get(item) is True:
+                sub_abnormal_symptoms = symptoms
+            else:
+                sub_abnormal_symptoms = py_.difference(
+                    symptoms,
+                    normal_symptom_dict.get(item, []),
+                )
+            abnormal_symptoms_list.extend(sub_abnormal_symptoms)
+        if abnormal_symptoms_list:
+            tongue_summary_list.append(
+                f"{prefix}{'、'.join(abnormal_symptoms_list)}{suffix}",
+            )
+
+    # 證型 disease
+    disease_list = []
+    for key in tongue_info.__fields__.keys():
+        if key.endswith("_disease_map"):
+            disease_map = getattr(tongue_info, key, {})
+            disease_list.extend(py_.flatten(disease_map.values()))
+    uniq_disease_list = list(set(disease_list))
+    if uniq_disease_list:
+        tongue_summary_list.append(f"一般會有{'、'.join(uniq_disease_list)}的傾向")
+
+    def process_symptom_id_list(content: str):
+        if isinstance(content, str):
+            return content.split("、")
+        return []
+
+    records = surface_disease_records
+    records = [
+        {
+            "tongue_tip": process_symptom_id_list(record["tongue_tip"]),
+            "tongue_color": process_symptom_id_list(record["tongue_color"]),
+            "tongue_shap": process_symptom_id_list(record["tongue_shap"]),
+            "tongue_coating_color": process_symptom_id_list(
+                record["tongue_coating_color"],
+            ),
+            "tongue_coating_status": process_symptom_id_list(
+                record["tongue_coating_status"],
+            ),
+            "tongue_status1": process_symptom_id_list(record["tongue_status1"]),
+            "tongue_status2": process_symptom_id_list(record["tongue_status2"]),
+            # "tongue_coating_bottom": process_symptom_id_list(
+            #     record["tongue_coating_bottom"]
+            # ),
+            "surface_disease": record["surface_disease"],
+        }
+        for record in records
+    ]
+
+    surface_summary_list = []
+    for record in records:
+        condition_match = []
+        for item_id, symptom_id_list in record.items():
+            if item_id == "surface_disease":
+                continue
+
+            selected_symptoms = getattr(tongue_info, item_id, [])
+            match = sorted(selected_symptoms) == sorted(symptom_id_list)
+            condition_match.append(match)
+
+        if all(condition_match):
+            surface_summary_list.append(record["surface_disease"])
+            break
+    if surface_summary_list:
+        tongue_summary_list.append(f"可能有{'、'.join(surface_summary_list)}的情況")
+
+    tongue_summary = "，".join(tongue_summary_list)
+    tongue_summary = tongue_summary and tongue_summary + "。"
+
+    return {"tongue_summary": tongue_summary}
 
 
 @router.post("/demo/tongue_summary")
@@ -1697,7 +1735,7 @@ class SubjectPage(BaseModel):
     per_page: int
     page_count: int
     total_count: int
-    link: Link
+    link: schemas.Link
     items: List[Union[schemas.SubjectRead, schemas.SubjectSecretRead]]
 
 
@@ -1786,9 +1824,13 @@ async def get_subject(
     )
     org_filters = get_filters(
         {
-            "org_id": None
-            if (current_user.is_superuser or current_user.org.name == "tongue_label")
-            else current_user.org_id,
+            "org_id": (
+                None
+                if (
+                    current_user.is_superuser or current_user.org.name == "tongue_label"
+                )
+                else current_user.org_id
+            ),
         },
     )
 
@@ -1933,9 +1975,13 @@ async def get_subject_measures(
             "org_id__in": org_id,
             "measure_operator__in": measure_operator,
             # "has_memo__in": has_memos, # TODO
-            "org_id": None
-            if (current_user.is_superuser or current_user.org.name == "tongue_label")
-            else current_user.org_id,
+            "org_id": (
+                None
+                if (
+                    current_user.is_superuser or current_user.org.name == "tongue_label"
+                )
+                else current_user.org_id
+            ),
         },
     )
     print("filters", filters)
