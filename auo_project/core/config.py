@@ -77,6 +77,8 @@ class Settings(BaseSettings):
 
     STREAMLIT_PASSWORD: Optional[str] = None
 
+    BCQ_MODEL_API_URL: str = "https://auoyourator-health-consultation.azurewebsites.net"
+
     DB_POOL_SIZE = 83
     POOL_SIZE = max(DB_POOL_SIZE // WORKERS_COUNT, 5)
     ASYNC_DATABASE_URI: Optional[str]
