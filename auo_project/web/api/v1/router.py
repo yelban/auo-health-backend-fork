@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from auo_project.web.api.v1.endpoints import (
     advance,
     auth,
+    bcq,
     file,
     hooks,
     measure,
@@ -26,3 +27,4 @@ api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monito
 api_router.include_router(advance.router, prefix="/advance", tags=["advance"])
 api_router.include_router(tongue.router, prefix="/tongues", tags=["tongue"])
 api_router.include_router(tool.router, prefix="/tools", tags=["tools"])
+api_router.include_router(bcq.router, prefix="/bcqs", tags=["bcq"])
