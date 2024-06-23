@@ -53,6 +53,7 @@ class MeasureAdvancedTongue2UpdateInput(BaseModel):
     tongue_coating_bottom_level_map: dict = Field({}, title="舌下脈絡等級對應表")
     tongue_coating_bottom_disease_map: dict = Field({}, title="舌下脈絡證型對應表")
     tongue_summary: str = Field(default=None, nullable=True, title="舌象概要")
+    tongue_memo: str = Field(None, title="舌象標記")
 
     @validator(
         "tongue_tip",

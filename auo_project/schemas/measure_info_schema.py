@@ -29,13 +29,37 @@ class IrregularHRType(IntEnum):
     fixed = 1
 
 
+class Pulse28Elmenet(BaseModel):
+    """二十八脈"""
+
+    value: UUID = Field(default=None, title="編號")
+    label: str = Field(default=None, title="名稱")
+    description: str = Field(default=None, title="描述")
+    selected: bool = Field(default=False, title="是否選擇")
+
+
+class OneSidePulse(BaseModel):
+    overall: List[Pulse28Elmenet] = Field([], title="總按")
+    cu: List[Pulse28Elmenet] = Field([], title="寸")
+    qu: List[Pulse28Elmenet] = Field([], title="關")
+    ch: List[Pulse28Elmenet] = Field([], title="尺")
+
+
+class Pulse28(BaseModel):
+    left: OneSidePulse = Field(title="左手 28 脈")
+    right: OneSidePulse = Field(title="右手 28 脈")
+
+
 class IrregularHR(BaseModel):
     side: SideType = Field(title="左右手; 左:0/右:1")
     type: IrregularHRType = Field(title="異常狀態; 止無定數:0/止有定數:1")
 
 
 class TongueInfo(BaseModel):
-    tongue_color: int = Field(None, title="舌色; 無:null/淡白:0/淡紅:1/紅:2/絳:3/青紫:4")
+    tongue_color: int = Field(
+        None,
+        title="舌色; 無:null/淡白:0/淡紅:1/紅:2/絳:3/青紫:4",
+    )
     tongue_shap: List[int] = Field(
         [],
         title="舌形; 無:null/正常:0/老:1/嫩:2/胖大:3/瘦薄:4/點刺:5/裂紋:6/齒痕:7",
@@ -45,7 +69,10 @@ class TongueInfo(BaseModel):
         title="舌態; 無:null/正常:0/痿軟:1/強硬:2/歪斜:3/顫動:4/吐弄:5/短縮:6",
     )
     tongue_status2: int = Field(None, title="舌神; 無:null/榮舌:0/枯舌:1")
-    tongue_coating_color: int = Field(None, title="苔色; 無:null/正常:0/白:1/黃:2/灰黑:3")
+    tongue_coating_color: int = Field(
+        None,
+        title="苔色; 無:null/正常:0/白:1/黃:2/灰黑:3",
+    )
     tongue_coating_status: List[int] = Field(
         [],
         title="苔質/舌苔; 無:null/正常:0/厚:1/薄:2/潤:3/燥:4/滑:5/糙:6/少:7/膩:8/腐:9/花剝:10/光剝:11",
@@ -59,7 +86,7 @@ class TongueImage(BaseModel):
 
 
 class Tongue(BaseModel):
-    exist: bool = Field(False, title="是否有舌象資訊")
+    exist: bool = Field(False, title="是否有購買或舌象資訊")
     info: TongueInfo = Field({}, title="舌象資訊")
     image: TongueImage = Field({}, title="舌頭圖片")
 
@@ -79,16 +106,16 @@ class BCQ(BaseModel):
         title="嚴重程度; 良好 good 0-16/普通 fair 17-29/嚴重 serious 30-100",
     )
     yang_second_state_spec: Dict[str, Any] = Field(
-        {"good": [0, 100], "fair": [101, 102], "serious": [103, 104]},
-        title="嚴重程度; 未定義",
+        {"good": [0, 100], "serious": [101, 104]},
+        title="嚴重程度; 非嚴重 good 嚴重 serious",
     )
     yin_second_state_spec: Dict[str, Any] = Field(
-        {"good": [0, 100], "fair": [101, 102], "serious": [103, 104]},
-        title="嚴重程度; 未定義",
+        {"good": [0, 100], "serious": [101, 104]},
+        title="嚴重程度; 非嚴重 good 嚴重 serious",
     )
     phlegm_second_state_spec: Dict[str, Any] = Field(
-        {"good": [0, 100], "fair": [101, 102], "serious": [103, 104]},
-        title="嚴重程度; 未定義",
+        {"good": [0, 100], "serious": [101, 104]},
+        title="嚴重程度; 非嚴重 good 嚴重 serious",
     )
     score_yang: int = Field(None, title="總分-陽(int)")
     score_yin: int = Field(None, title="總分-陰(int)")
@@ -186,6 +213,9 @@ class MeasureInfoReadByList(BaseModel):
     age: int = Field(default=None, title="年齡")
     bcq: bool = Field(default=None, title="BCQ檢測")
     bmi: float = Field(default=None, title="BMI")
+    sbp: int = Field(default=None, title="收縮壓")
+    dbp: int = Field(default=None, title="舒張壓")
+    has_tongue_measure: bool = Field(default=False, title="是否有舌象檢測")
     is_standard_measure: bool = Field(default=False, title="是否為基準值")
 
     @validator("bmi", always=True)
@@ -217,7 +247,12 @@ class MeasureInfoUpdate(BaseModel):
     has_measure: int = Field(nullable=True, index=True, title="脈象量測", default=None)
     has_bcq: bool = Field(nullable=True, index=True, title="BCQ體質量表", default=None)
     has_tongue: bool = Field(nullable=True, index=True, title="舌象", default=None)
-    has_memo: bool = Field(nullable=True, index=True, title="是否有檢測標記", default=None)
+    has_memo: bool = Field(
+        nullable=True,
+        index=True,
+        title="是否有檢測標記",
+        default=None,
+    )
     has_low_pass_rate: bool = Field(
         nullable=True,
         index=True,
@@ -363,12 +398,36 @@ class MeasureInfoUpdate(BaseModel):
         nullable=True,
         title="右尺-點選的靜態壓值(單位:mmHg)",
     )
-    irregular_hr_l_cu: bool = Field(default=None, nullable=True, title="左寸-有無脈律不整")
-    irregular_hr_l_qu: bool = Field(default=None, nullable=True, title="左關-有無脈律不整")
-    irregular_hr_l_ch: bool = Field(default=None, nullable=True, title="左尺-有無脈律不整")
-    irregular_hr_r_cu: bool = Field(default=None, nullable=True, title="右寸-有無脈律不整")
-    irregular_hr_r_qu: bool = Field(default=None, nullable=True, title="右關-有無脈律不整")
-    irregular_hr_r_ch: bool = Field(default=None, nullable=True, title="右尺-有無脈律不整")
+    irregular_hr_l_cu: bool = Field(
+        default=None,
+        nullable=True,
+        title="左寸-有無脈律不整",
+    )
+    irregular_hr_l_qu: bool = Field(
+        default=None,
+        nullable=True,
+        title="左關-有無脈律不整",
+    )
+    irregular_hr_l_ch: bool = Field(
+        default=None,
+        nullable=True,
+        title="左尺-有無脈律不整",
+    )
+    irregular_hr_r_cu: bool = Field(
+        default=None,
+        nullable=True,
+        title="右寸-有無脈律不整",
+    )
+    irregular_hr_r_qu: bool = Field(
+        default=None,
+        nullable=True,
+        title="右關-有無脈律不整",
+    )
+    irregular_hr_r_ch: bool = Field(
+        default=None,
+        nullable=True,
+        title="右尺-有無脈律不整",
+    )
     irregular_hr_l: int = Field(default=None, title="左手節律是否異常; 正常:0/異常:1")
     irregular_hr_type_l: int = Field(
         default=None,
@@ -392,12 +451,30 @@ class MeasureInfoUpdate(BaseModel):
     max_slope_value_r_qu: float = Field(default=None, title="右關斜率最大值")
     max_slope_value_r_ch: float = Field(default=None, title="右尺斜率最大值")
 
-    strength_l_cu: int = Field(default=None, title="左寸力量; 無:null/無力:0/正常:1/有力:2")
-    strength_l_qu: int = Field(default=None, title="左關力量; 無:null/無力:0/正常:1/有力:2")
-    strength_l_ch: int = Field(default=None, title="左尺力量; 無:null/無力:0/正常:1/有力:2")
-    strength_r_cu: int = Field(default=None, title="右寸力量; 無:null/無力:0/正常:1/有力:2")
-    strength_r_qu: int = Field(default=None, title="右關力量; 無:null/無力:0/正常:1/有力:2")
-    strength_r_ch: int = Field(default=None, title="右尺力量; 無:null/無力:0/正常:1/有力:2")
+    strength_l_cu: int = Field(
+        default=None,
+        title="左寸力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_l_qu: int = Field(
+        default=None,
+        title="左關力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_l_ch: int = Field(
+        default=None,
+        title="左尺力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_r_cu: int = Field(
+        default=None,
+        title="右寸力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_r_qu: int = Field(
+        default=None,
+        title="右關力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_r_ch: int = Field(
+        default=None,
+        title="右尺力量; 無:null/無力:0/正常:1/有力:2",
+    )
 
     range_length_l_cu: float = Field(default=None, title="左寸有效範圍長度(單位:mm)")
     range_length_l_qu: float = Field(default=None, title="左關有效範圍長度(單位:mm)")
@@ -406,12 +483,12 @@ class MeasureInfoUpdate(BaseModel):
     range_length_r_qu: float = Field(default=None, title="右關有效範圍長度(單位:mm)")
     range_length_r_ch: float = Field(default=None, title="右尺有效範圍長度(單位:mm)")
 
-    width_l_cu: int = Field(default=None, title="左寸虛實; 無:null/虛:0/正常:1/實:2")
-    width_l_qu: int = Field(default=None, title="左關虛實; 無:null/虛:0/正常:1/實:2")
-    width_l_ch: int = Field(default=None, title="左尺虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_cu: int = Field(default=None, title="右寸虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_qu: int = Field(default=None, title="右關虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_ch: int = Field(default=None, title="右尺虛實; 無:null/虛:0/正常:1/實:2")
+    width_l_cu: int = Field(default=None, title="左寸大細; 無:null/細:0/正常:1/大:2")
+    width_l_qu: int = Field(default=None, title="左關大細; 無:null/細:0/正常:1/大:2")
+    width_l_ch: int = Field(default=None, title="左尺大細; 無:null/細:0/正常:1/大:2")
+    width_r_cu: int = Field(default=None, title="右寸大細; 無:null/細:0/正常:1/大:2")
+    width_r_qu: int = Field(default=None, title="右關大細; 無:null/細:0/正常:1/大:2")
+    width_r_ch: int = Field(default=None, title="右尺大細; 無:null/細:0/正常:1/大:2")
 
     static_max_amp_l_cu: float = Field(
         default=None,
@@ -485,12 +562,30 @@ class MeasureInfoUpdate(BaseModel):
         default=None,
         title="靜態壓有效範圍-右尺-終點靜態壓值(單位:mmHg)",
     )
-    xingcheng_l_cu: float = Field(default=None, title="行程-左寸-起點終點相差深度(單位:mm)")
-    xingcheng_l_qu: float = Field(default=None, title="行程-左關-起點終點相差深度(單位:mm)")
-    xingcheng_l_ch: float = Field(default=None, title="行程-左尺-起點終點相差深度(單位:mm)")
-    xingcheng_r_cu: float = Field(default=None, title="行程-右寸-起點終點相差深度(單位:mm)")
-    xingcheng_r_qu: float = Field(default=None, title="行程-右關-起點終點相差深度(單位:mm)")
-    xingcheng_r_ch: float = Field(default=None, title="行程-右尺-起點終點相差深度(單位:mm)")
+    xingcheng_l_cu: float = Field(
+        default=None,
+        title="行程-左寸-起點終點相差深度(單位:mm)",
+    )
+    xingcheng_l_qu: float = Field(
+        default=None,
+        title="行程-左關-起點終點相差深度(單位:mm)",
+    )
+    xingcheng_l_ch: float = Field(
+        default=None,
+        title="行程-左尺-起點終點相差深度(單位:mm)",
+    )
+    xingcheng_r_cu: float = Field(
+        default=None,
+        title="行程-右寸-起點終點相差深度(單位:mm)",
+    )
+    xingcheng_r_qu: float = Field(
+        default=None,
+        title="行程-右關-起點終點相差深度(單位:mm)",
+    )
+    xingcheng_r_ch: float = Field(
+        default=None,
+        title="行程-右尺-起點終點相差深度(單位:mm)",
+    )
 
     pass_rate_l_cu: float = Field(default=None, title="左寸-通過率 0-100")
     pass_rate_l_qu: float = Field(default=None, title="左關-通過率 0-100")
@@ -515,10 +610,24 @@ class MeasureInfoUpdate(BaseModel):
     judge_time: datetime = Field(default=None, nullable=True, title="診斷時間")
     judge_dr: str = Field(default=None, max_length=128, nullable=True, title="診斷醫師")
 
-    hr_l: int = Field(default=None, nullable=True, title="左脈率")  # TODO: check 遲/正常/數 區間
+    hr_l: int = Field(
+        default=None,
+        nullable=True,
+        title="左脈率",
+    )  # TODO: check 遲/正常/數 區間
     hr_r: int = Field(default=None, nullable=True, title="右脈率")
-    special_l: str = Field(default=None, max_length=10, nullable=True, title="左手特殊脈")
-    special_r: str = Field(default=None, max_length=10, nullable=True, title="右手特殊脈")
+    special_l: str = Field(
+        default=None,
+        max_length=10,
+        nullable=True,
+        title="左手特殊脈",
+    )
+    special_r: str = Field(
+        default=None,
+        max_length=10,
+        nullable=True,
+        title="右手特殊脈",
+    )
     comment: str = Field(
         default=None,
         max_length=1024,
@@ -533,6 +642,103 @@ class MeasureInfoUpdate(BaseModel):
         title="計畫編號",
     )  # from report.txt
     ver: str = Field(default=None, max_length=100, nullable=True, title="ver.ini")
+    is_active: bool = Field(default=True, title="是否啟用")
+
+    six_sec_pw_valid_l_cu: Optional[bool] = Field(default=None, title="左寸是否計入分析")
+    six_sec_pw_valid_l_qu: Optional[bool] = Field(default=None, title="左關是否計入分析")
+    six_sec_pw_valid_l_ch: Optional[bool] = Field(default=None, title="左尺是否計入分析")
+    six_sec_pw_valid_r_cu: Optional[bool] = Field(default=None, title="右寸是否計入分析")
+    six_sec_pw_valid_r_qu: Optional[bool] = Field(default=None, title="右關是否計入分析")
+    six_sec_pw_valid_r_ch: Optional[bool] = Field(default=None, title="右尺是否計入分析")
+    pulse_28_ids_l_overall: Optional[List[UUID]] = Field(default=None, title="左手總按28脈")
+    pulse_28_ids_l_cu: Optional[List[UUID]] = Field(default=None, title="左寸28脈")
+    pulse_28_ids_l_qu: Optional[List[UUID]] = Field(default=None, title="左關28脈")
+    pulse_28_ids_l_ch: Optional[List[UUID]] = Field(default=None, title="左尺28脈")
+    pulse_28_ids_r_overall: Optional[List[UUID]] = Field(default=None, title="右手總按28脈")
+    pulse_28_ids_r_cu: Optional[List[UUID]] = Field(default=None, title="右寸28脈")
+    pulse_28_ids_r_qu: Optional[List[UUID]] = Field(default=None, title="右關28脈")
+    pulse_28_ids_r_ch: Optional[List[UUID]] = Field(default=None, title="右尺28脈")
+    pulse_memo: Optional[str] = Field(default=None, title="脈象標記")
+
+
+class MeasureInfoUpdateInput(BaseModel):
+    irregular_hr_type_l: Optional[int] = Field(
+        None,
+        title="左手節律異常類型; 無:null/止無定數:0/止有定數:1",
+    )
+    irregular_hr_type_r: Optional[int] = Field(
+        None,
+        title="右手節律異常類型; 無:null/止無定數:0/止有定數:1",
+    )
+    max_amp_depth_of_range_l_cu: Optional[int] = Field(
+        default=None,
+        title="左寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_l_qu: Optional[int] = Field(
+        default=None,
+        title="左關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_l_ch: Optional[int] = Field(
+        default=None,
+        title="左尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_cu: Optional[int] = Field(
+        default=None,
+        title="右寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_qu: Optional[int] = Field(
+        default=None,
+        title="右關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_ch: Optional[int] = Field(
+        default=None,
+        title="右尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    strength_l_cu: Optional[int] = Field(
+        default=None,
+        title="左寸力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_l_qu: Optional[int] = Field(
+        default=None,
+        title="左關力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_l_ch: Optional[int] = Field(
+        default=None,
+        title="左尺力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_r_cu: Optional[int] = Field(
+        default=None,
+        title="右寸力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_r_qu: Optional[int] = Field(
+        default=None,
+        title="右關力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    strength_r_ch: Optional[int] = Field(
+        default=None,
+        title="右尺力量; 無:null/無力:0/正常:1/有力:2",
+    )
+    width_l_cu: Optional[int] = Field(default=None, title="左寸大細; 無:null/細:0/正常:1/大:2")
+    width_l_qu: Optional[int] = Field(default=None, title="左關大細; 無:null/細:0/正常:1/大:2")
+    width_l_ch: Optional[int] = Field(default=None, title="左尺大細; 無:null/細:0/正常:1/大:2")
+    width_r_cu: Optional[int] = Field(default=None, title="右寸大細; 無:null/細:0/正常:1/大:2")
+    width_r_qu: Optional[int] = Field(default=None, title="右關大細; 無:null/細:0/正常:1/大:2")
+    width_r_ch: Optional[int] = Field(default=None, title="右尺大細; 無:null/細:0/正常:1/大:2")
+    six_sec_pw_valid_l_cu: Optional[bool] = Field(default=None, title="左寸是否計入分析")
+    six_sec_pw_valid_l_qu: Optional[bool] = Field(default=None, title="左關是否計入分析")
+    six_sec_pw_valid_l_ch: Optional[bool] = Field(default=None, title="左尺是否計入分析")
+    six_sec_pw_valid_r_cu: Optional[bool] = Field(default=None, title="右寸是否計入分析")
+    six_sec_pw_valid_r_qu: Optional[bool] = Field(default=None, title="右關是否計入分析")
+    six_sec_pw_valid_r_ch: Optional[bool] = Field(default=None, title="右尺是否計入分析")
+    pulse_28_ids_l_overall: Optional[List[UUID]] = Field(default=None, title="左手總按28脈")
+    pulse_28_ids_l_cu: Optional[List[UUID]] = Field(default=None, title="左寸28脈")
+    pulse_28_ids_l_qu: Optional[List[UUID]] = Field(default=None, title="左關28脈")
+    pulse_28_ids_l_ch: Optional[List[UUID]] = Field(default=None, title="左尺28脈")
+    pulse_28_ids_r_overall: Optional[List[UUID]] = Field(default=None, title="右手總按28脈")
+    pulse_28_ids_r_cu: Optional[List[UUID]] = Field(default=None, title="右寸28脈")
+    pulse_28_ids_r_qu: Optional[List[UUID]] = Field(default=None, title="右關28脈")
+    pulse_28_ids_r_ch: Optional[List[UUID]] = Field(default=None, title="右尺28脈")
+    pulse_memo: Optional[str] = Field(default=None, title="脈象標記")
 
 
 # TODO: 討論預設值
@@ -554,13 +760,25 @@ class MeasureDetailRead(BaseModel):
     weight: float = Field(None, title="體重")
     bmi: float = Field(None, title="BMI")
     irregular_hr_l: int = Field(None, title="左手節律是否異常; 正常:0/異常:1")
-    irregular_hr_type_l: int = Field(None, title="左手節律異常類型; 無:null/止無定數:0/止有定數:1")
+    irregular_hr_type_l: int = Field(
+        None,
+        title="左手節律異常類型; 無:null/止無定數:0/止有定數:1",
+    )
     irregular_hr_r: int = Field(None, title="右手節律是否異常; 正常:0/異常:1")
-    irregular_hr_type_r: int = Field(None, title="右手節律異常類型; 無:null/止無定數:0/止有定數:1")
+    irregular_hr_type_r: int = Field(
+        None,
+        title="右手節律異常類型; 無:null/止無定數:0/止有定數:1",
+    )
     hr_l: int = Field(None, title="左手脈率數值")
-    hr_l_type: int = Field(None, title="左手脈率類型; 無:null/遲:0/正常:1/數:2")  # TODO 確認遲/正常/數區間
+    hr_l_type: int = Field(
+        None,
+        title="左手脈率類型; 無:null/遲:0/正常:1/數:2",
+    )  # TODO 確認遲/正常/數區間
     hr_r: int = Field(None, title="右手脈率數值")
-    hr_r_type: int = Field(None, title="右手脈率類型; 無:null/遲:0/正常:1/數:2")  # TODO 確認遲/正常/數區間
+    hr_r_type: int = Field(
+        None,
+        title="右手脈率類型; 無:null/遲:0/正常:1/數:2",
+    )  # TODO 確認遲/正常/數區間
     # infos_analyze
     mean_prop_range_1_l_cu: float = Field(None, title="左寸浮振幅平均值佔比")
     mean_prop_range_2_l_cu: float = Field(None, title="左寸中振幅平均值佔比")
@@ -581,20 +799,56 @@ class MeasureDetailRead(BaseModel):
     mean_prop_range_2_r_ch: float = Field(None, title="右尺中振幅平均值佔比")
     mean_prop_range_3_r_ch: float = Field(None, title="右尺沉振幅平均值佔比")
 
-    mean_prop_range_max_l_cu: int = Field(None, title="左寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_l_qu: int = Field(None, title="左關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_l_ch: int = Field(None, title="左尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_r_cu: int = Field(None, title="右寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_r_qu: int = Field(None, title="右關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_r_ch: int = Field(None, title="右尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
+    mean_prop_range_max_l_cu: int = Field(
+        None,
+        title="左寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_l_qu: int = Field(
+        None,
+        title="左關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_l_ch: int = Field(
+        None,
+        title="左尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_r_cu: int = Field(
+        None,
+        title="右寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_r_qu: int = Field(
+        None,
+        title="右關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_r_ch: int = Field(
+        None,
+        title="右尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
 
     # infos_analyze
-    max_amp_depth_of_range_l_cu: int = Field(None, title="左寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_l_qu: int = Field(None, title="左關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_l_ch: int = Field(None, title="左尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_r_cu: int = Field(None, title="右寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_r_qu: int = Field(None, title="右關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_r_ch: int = Field(None, title="右尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
+    max_amp_depth_of_range_l_cu: int = Field(
+        None,
+        title="左寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_l_qu: int = Field(
+        None,
+        title="左關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_l_ch: int = Field(
+        None,
+        title="左尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_cu: int = Field(
+        None,
+        title="右寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_qu: int = Field(
+        None,
+        title="右關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_ch: int = Field(
+        None,
+        title="右尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
 
     # infos_analyze
     max_amp_value_l_cu: float = Field(None, title="左寸-有效範圍內最大振幅值")
@@ -621,19 +875,19 @@ class MeasureDetailRead(BaseModel):
     strength_r_ch: int = Field(None, title="右尺力量; 無:null/無力:0/正常:1/有力:2")
 
     # report / info
-    width_l_cu: int = Field(None, title="左寸虛實; 無:null/虛:0/正常:1/實:2")
-    width_l_qu: int = Field(None, title="左關虛實; 無:null/虛:0/正常:1/實:2")
-    width_l_ch: int = Field(None, title="左尺虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_cu: int = Field(None, title="右寸虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_qu: int = Field(None, title="右關虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_ch: int = Field(None, title="右尺虛實; 無:null/虛:0/正常:1/實:2")
+    width_l_cu: int = Field(None, title="左寸大細; 無:null/細:0/正常:1/大:2")
+    width_l_qu: int = Field(None, title="左關大細; 無:null/細:0/正常:1/大:2")
+    width_l_ch: int = Field(None, title="左尺大細; 無:null/細:0/正常:1/大:2")
+    width_r_cu: int = Field(None, title="右寸大細; 無:null/細:0/正常:1/大:2")
+    width_r_qu: int = Field(None, title="右關大細; 無:null/細:0/正常:1/大:2")
+    width_r_ch: int = Field(None, title="右尺大細; 無:null/細:0/正常:1/大:2")
 
-    width_value_l_cu: float = Field(None, title="左寸虛實值(時間，單位為秒)")
-    width_value_l_qu: float = Field(None, title="左關虛實值(時間，單位為秒)")
-    width_value_l_ch: float = Field(None, title="左尺虛實值(時間，單位為秒)")
-    width_value_r_cu: float = Field(None, title="右寸虛實值(時間，單位為秒)")
-    width_value_r_qu: float = Field(None, title="右關虛實值(時間，單位為秒)")
-    width_value_r_ch: float = Field(None, title="右尺虛實值(時間，單位為秒)")
+    width_value_l_cu: float = Field(None, title="左寸大細值(時間，單位為秒)")
+    width_value_l_qu: float = Field(None, title="左關大細值(時間，單位為秒)")
+    width_value_l_ch: float = Field(None, title="左尺大細值(時間，單位為秒)")
+    width_value_r_cu: float = Field(None, title="右寸大細值(時間，單位為秒)")
+    width_value_r_qu: float = Field(None, title="右關大細值(時間，單位為秒)")
+    width_value_r_ch: float = Field(None, title="右尺大細值(時間，單位為秒)")
 
     # tongue
     tongue: Tongue = Field({}, title="舌象資訊與圖片")
@@ -646,7 +900,10 @@ class MeasureDetailRead(BaseModel):
     # 全段脈波
     all_sec: Dict[str, Any] = Field({}, title="全段脈波")
     # CN
-    cn: Dict[str, Any] = Field({}, title="CN: C1-C11; 如果 standard_value 為空畫面不可選")
+    cn: Dict[str, Any] = Field(
+        {},
+        title="CN: C1-C11; 如果 standard_value 為空畫面不可選",
+    )
     cn_state_spec: Dict[str, Any] = Field(
         {
             "pos": {"good": [0, 49], "fair": [50, 69], "serious": [70]},
@@ -654,6 +911,16 @@ class MeasureDetailRead(BaseModel):
         },
         title="嚴重程度; 類型分成正值 pos 和負值 neg，狀態良好 good, fair 數值區間皆為左右包含; serious 正值為大於等於，負值為小於等於",
     )
+    # 28 脈
+    pulse_28: Optional[Pulse28] = Field({}, title="28 脈")
+
+    six_sec_pw_valid_l_cu: Optional[bool] = Field(default=None, title="左寸是否計入分析")
+    six_sec_pw_valid_l_qu: Optional[bool] = Field(default=None, title="左關是否計入分析")
+    six_sec_pw_valid_l_ch: Optional[bool] = Field(default=None, title="左尺是否計入分析")
+    six_sec_pw_valid_r_cu: Optional[bool] = Field(default=None, title="右寸是否計入分析")
+    six_sec_pw_valid_r_qu: Optional[bool] = Field(default=None, title="右關是否計入分析")
+    six_sec_pw_valid_r_ch: Optional[bool] = Field(default=None, title="右尺是否計入分析")
+    pulse_memo: Optional[str] = Field(default=None, title="脈象標記")
 
 
 class MultiMeasureDetailRead(BaseModel):
@@ -661,23 +928,65 @@ class MultiMeasureDetailRead(BaseModel):
     tn: str = Field(default=None, title="T1-T20")
     measure_time: datetime = Field(default=None, title="檢測時間")
     hr_l: int = Field(None, title="左手脈率數值")
-    hr_l_type: int = Field(None, title="左手脈率類型; 無:null/遲:0/正常:1/數:2")  # TODO 確認遲/正常/數區間
+    hr_l_type: int = Field(
+        None,
+        title="左手脈率類型; 無:null/遲:0/正常:1/數:2",
+    )
     hr_r: int = Field(None, title="右手脈率數值")
-    hr_r_type: int = Field(None, title="右手脈率類型; 無:null/遲:0/正常:1/數:2")  # TODO 確認遲/正常/數區間
+    hr_r_type: int = Field(
+        None,
+        title="右手脈率類型; 無:null/遲:0/正常:1/數:2",
+    )
 
-    mean_prop_range_max_l_cu: int = Field(None, title="左寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_l_qu: int = Field(None, title="左關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_l_ch: int = Field(None, title="左尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_r_cu: int = Field(None, title="右寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_r_qu: int = Field(None, title="右關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
-    mean_prop_range_max_r_ch: int = Field(None, title="右尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0")
+    mean_prop_range_max_l_cu: int = Field(
+        None,
+        title="左寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_l_qu: int = Field(
+        None,
+        title="左關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_l_ch: int = Field(
+        None,
+        title="左尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_r_cu: int = Field(
+        None,
+        title="右寸浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_r_qu: int = Field(
+        None,
+        title="右關浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
+    mean_prop_range_max_r_ch: int = Field(
+        None,
+        title="右尺浮沉振幅平均佔比最大值區塊; 浮:2/中:1/沉:0",
+    )
 
-    max_amp_depth_of_range_l_cu: int = Field(None, title="左寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_l_qu: int = Field(None, title="左關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_l_ch: int = Field(None, title="左尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_r_cu: int = Field(None, title="右寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_r_qu: int = Field(None, title="右關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
-    max_amp_depth_of_range_r_ch: int = Field(None, title="右尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0")
+    max_amp_depth_of_range_l_cu: int = Field(
+        None,
+        title="左寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_l_qu: int = Field(
+        None,
+        title="左關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_l_ch: int = Field(
+        None,
+        title="左尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_cu: int = Field(
+        None,
+        title="右寸浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_qu: int = Field(
+        None,
+        title="右關浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
+    max_amp_depth_of_range_r_ch: int = Field(
+        None,
+        title="右尺浮沉振幅最大值落點區塊; 浮:2/中:1/沉:0",
+    )
 
     # TODO: check
     max_amp_value_l_cu: float = Field(None, title="左寸-有效範圍內最大振幅值")
@@ -768,11 +1077,23 @@ class MultiMeasureDetailRead(BaseModel):
     a0_r_ch: float = Field(None, title="右尺 a0")
 
     # CN
-    cn: Dict[str, Any] = Field({}, title="CN: C1-C11; 如果 standard_value 為空畫面不可選")
+    cn: Dict[str, Any] = Field(
+        {},
+        title="CN: C1-C11; 如果 standard_value 為空畫面不可選",
+    )
     # TODO: cncv, pn, pnsd 對應資料
-    cncv: Dict[str, Any] = Field({}, title="CNCV: C1-C11; 如果 standard_value 為空畫面不可選")
-    pn: Dict[str, Any] = Field({}, title="PN: C1-C11; 如果 standard_value 為空畫面不可選")
-    pnsd: Dict[str, Any] = Field({}, title="PNSD: C1-C11; 如果 standard_value 為空畫面不可選")
+    cncv: Dict[str, Any] = Field(
+        {},
+        title="CNCV: C1-C11; 如果 standard_value 為空畫面不可選",
+    )
+    pn: Dict[str, Any] = Field(
+        {},
+        title="PN: C1-C11; 如果 standard_value 為空畫面不可選",
+    )
+    pnsd: Dict[str, Any] = Field(
+        {},
+        title="PNSD: C1-C11; 如果 standard_value 為空畫面不可選",
+    )
 
     ### bcq.txt
     bcq: BCQ = Field({}, title="BCQ 資訊")
