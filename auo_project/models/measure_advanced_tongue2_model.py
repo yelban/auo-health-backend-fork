@@ -9,9 +9,16 @@ from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUI
 
 class MeasureAdvancedTongue2Base(BaseModel):
     measure_id: UUID = Field(
+        default=None,
         index=True,
-        nullable=False,
+        nullable=True,
         foreign_key="measure.tongue_uploads.id",
+    )
+    info_id: UUID = Field(
+        default=None,
+        index=True,
+        nullable=True,
+        foreign_key="measure.infos.id",
     )
     owner_id: UUID = Field(
         index=True,
@@ -132,6 +139,11 @@ class MeasureAdvancedTongue2(
     )
 
     tongue_upload: "MeasureTongueUpload" = Relationship(
+        back_populates="advanced_tongue2",
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+
+    measure_info: "MeasureInfo" = Relationship(
         back_populates="advanced_tongue2",
         sa_relationship_kwargs={"lazy": "selectin"},
     )

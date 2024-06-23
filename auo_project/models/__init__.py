@@ -13,6 +13,7 @@ from auo_project.models.measure_advanced_tongue_model import MeasureAdvancedTong
 from auo_project.models.measure_bcq_model import BCQ
 from auo_project.models.measure_info_model import MeasureInfo
 from auo_project.models.measure_mean_model import MeasureMean
+from auo_project.models.measure_pulse_28_options_model import MeasurePulse28Option
 from auo_project.models.measure_raw_model import MeasureRaw
 from auo_project.models.measure_statistic_model import MeasureStatistic
 from auo_project.models.measure_survey_model import MeasureSurvey
@@ -34,6 +35,7 @@ from auo_project.models.measure_tongue_upload_model import MeasureTongueUpload
 from auo_project.models.org_model import Org
 from auo_project.models.role_model import Role
 from auo_project.models.subject_model import Subject
+from auo_project.models.subject_tag_model import SubjectTag
 from auo_project.models.subscription_model import Subscription
 from auo_project.models.upload_model import Upload
 from auo_project.models.user_model import User

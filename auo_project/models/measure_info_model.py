@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
-from sqlmodel import Field, Relationship, UniqueConstraint
+import sqlmodel
+from sqlalchemy.dialects import postgresql
+from sqlmodel import Column, Field, Relationship, UniqueConstraint
 
 from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
@@ -222,12 +224,12 @@ class MeasureInfoBase(BaseModel):
     range_length_r_qu: float = Field(default=None, title="右關有效範圍長度(單位:mm)")
     range_length_r_ch: float = Field(default=None, title="右尺有效範圍長度(單位:mm)")
 
-    width_l_cu: int = Field(default=None, title="左寸虛實; 無:null/虛:0/正常:1/實:2")
-    width_l_qu: int = Field(default=None, title="左關虛實; 無:null/虛:0/正常:1/實:2")
-    width_l_ch: int = Field(default=None, title="左尺虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_cu: int = Field(default=None, title="右寸虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_qu: int = Field(default=None, title="右關虛實; 無:null/虛:0/正常:1/實:2")
-    width_r_ch: int = Field(default=None, title="右尺虛實; 無:null/虛:0/正常:1/實:2")
+    width_l_cu: int = Field(default=None, title="左寸大細; 無:null/虛:0/正常:1/實:2")
+    width_l_qu: int = Field(default=None, title="左關大細; 無:null/虛:0/正常:1/實:2")
+    width_l_ch: int = Field(default=None, title="左尺大細; 無:null/虛:0/正常:1/實:2")
+    width_r_cu: int = Field(default=None, title="右寸大細; 無:null/虛:0/正常:1/實:2")
+    width_r_qu: int = Field(default=None, title="右關大細; 無:null/虛:0/正常:1/實:2")
+    width_r_ch: int = Field(default=None, title="右尺大細; 無:null/虛:0/正常:1/實:2")
 
     static_max_amp_l_cu: float = Field(
         default=None,
@@ -349,6 +351,57 @@ class MeasureInfoBase(BaseModel):
         nullable=True,
         title="計畫編號",
     )  # from report.txt
+
+    six_sec_pw_valid_l_cu: bool = Field(default=True, title="左寸六秒脈波有效")
+    six_sec_pw_valid_l_qu: bool = Field(default=True, title="左關六秒脈波有效")
+    six_sec_pw_valid_l_ch: bool = Field(default=True, title="左尺六秒脈波有效")
+    six_sec_pw_valid_r_cu: bool = Field(default=True, title="右寸六秒脈波有效")
+    six_sec_pw_valid_r_qu: bool = Field(default=True, title="右關六秒脈波有效")
+    six_sec_pw_valid_r_ch: bool = Field(default=True, title="右尺六秒脈波有效")
+
+    pulse_28_ids_l_overall: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        title="左手總按28脈 UUID",
+    )
+    pulse_28_ids_l_cu: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        title="左寸28脈 UUID",
+    )
+    pulse_28_ids_l_qu: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        title="左關28脈 UUID",
+    )
+    pulse_28_ids_l_ch: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        title="左尺28脈 UUID",
+    )
+    pulse_28_ids_r_overall: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        title="右手總按28脈 UUID",
+    )
+    pulse_28_ids_r_cu: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        title="右寸28脈 UUID",
+    )
+    pulse_28_ids_r_qu: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        title="右關28脈 UUID",
+    )
+    pulse_28_ids_r_ch: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        title="右尺28脈 UUID",
+    )
+
+    pulse_memo: str = Field(default="", title="脈象標記")
+
     ver: str = Field(default=None, max_length=100, nullable=True, title="ver.ini")
 
     is_active: bool = Field(index=True, nullable=False, default=True)
@@ -424,4 +477,8 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
             "lazy": "select",
             "uselist": False,
         },
+    )
+    advanced_tongue2: "MeasureAdvancedTongue2" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={"lazy": "select", "uselist": True},
     )
