@@ -64,6 +64,7 @@ streamlit-code-editor = "^0.1.10"
 better-exceptions = "^0.3.3"
 imutils = "^0.5.4"
 opencv-python-headless = "^4.9.0.80"
+azure-communication-email = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"

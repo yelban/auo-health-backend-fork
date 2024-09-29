@@ -223,6 +223,35 @@ pyflakes = ">=1.1.0"
 tomli = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
 
 [[package]]
+name = "azure-common"
+version = "1.1.28"
+description = "Microsoft Azure Client Library for Python (Common)"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "azure-common-1.1.28.zip", hash = "sha256:4ac0cd3214e36b6a1b6a442686722a5d8cc449603aa833f3f0f40bda836704a3"},
+    {file = "azure_common-1.1.28-py2.py3-none-any.whl", hash = "sha256:5c12d3dcf4ec20599ca6b0d3e09e86e146353d443e7fcc050c9a19c1f9df20ad"},
+]
+
+[[package]]
+name = "azure-communication-email"
+version = "1.0.0"
+description = "Microsoft Azure MyService Management Client Library for Python"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "azure-communication-email-1.0.0.zip", hash = "sha256:5df96b8b4389696244982ffc3740722f1948abb289f19af00ce2e1c534450095"},
+    {file = "azure_communication_email-1.0.0-py3-none-any.whl", hash = "sha256:b580ccfc9f1372d0b65f235334e569f3909894316bc3203bd9deb5760612693a"},
+]
+
+[package.dependencies]
+azure-common = ">=1.1,<2.0"
+azure-mgmt-core = ">=1.3.2,<2.0.0"
+msrest = ">=0.7.1"
+
+[[package]]
 name = "azure-core"
 version = "1.25.1"
 description = "Microsoft Azure Core Library for Python"
@@ -238,6 +267,21 @@ files = [
 requests = ">=2.18.4"
 six = ">=1.11.0"
 typing-extensions = ">=4.0.1"
+
+[[package]]
+name = "azure-mgmt-core"
+version = "1.3.2"
+description = "Microsoft Azure Management Core Library for Python"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "azure-mgmt-core-1.3.2.zip", hash = "sha256:07f4afe823a55d704b048d61edfdc1318c051ed59f244032126350be95e9d501"},
+    {file = "azure_mgmt_core-1.3.2-py3-none-any.whl", hash = "sha256:fd829f67086e5cf6f7eb016c9e80bb0fb293cbbbd4d8738dc90af9aa1055fb7b"},
+]
+
+[package.dependencies]
+azure-core = ">=1.24.0,<2.0.0"
 
 [[package]]
 name = "azure-storage-blob"
@@ -4816,4 +4860,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.9.7 || >3.9.7,<4.0"
-content-hash = "cacb53308dfc7ba919a97dbb30d7184e0a8f1d7704aca60be23a216cd34bdc82"
+content-hash = "bb156a0701cd32e334b442b83d4be0ef62c34a4b887cd601f426b78484cbad33"
