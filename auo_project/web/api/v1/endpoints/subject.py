@@ -12,6 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.param_functions import Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
 from sqlmodel import String, cast, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -24,6 +25,8 @@ from auo_project.core.constants import (
     POSITION_TYPE_LABEL,
     RANGE_TYPE_LABEL,
     SEX_TYPE_LABEL,
+    LikeItemType,
+    ReportType,
     SexType,
 )
 from auo_project.core.dateutils import DateUtils
@@ -77,6 +80,12 @@ class MultiMeasuresBody(BaseModel):
     survey_names: List[str] = []
 
 
+class ExportReportInputPayload(BaseModel):
+    org_id: UUID
+    subject_ids: List[UUID]
+    report_types: List[ReportType]
+
+
 # 下拉選單：計畫編號、受測者編號、身分證字號、姓名、受測者標籤、檢測人員
 @router.get("/", response_model=SubjectListResponse)
 async def get_subject(
@@ -112,6 +121,10 @@ async def get_subject(
         alias="bmi[]",
     ),  # measure bmi
     memo: Optional[str] = Query(None, regex="contains__", title="檢測標記"),
+    liked: Optional[bool] = Query(
+        None,
+        title="是否篩選已加星號項目",
+    ),
     sort_expr: Optional[str] = Query(
         None,
         title="updated_at 代表由小到大排。-updated_at 代表由大到小排。",
@@ -210,13 +223,18 @@ async def get_subject(
             .subquery()
         )
 
-    query = (
-        select(models.Subject)
-        .join(subquery, models.Subject.id == subquery.c.id)
-        .where(*filter_expr)
-        .options(
-            selectinload(models.Subject.standard_measure_info),
+    query = select(models.Subject).join(subquery, models.Subject.id == subquery.c.id)
+    if liked:
+        query = query.join(
+            models.UserLikedItem,
+            and_(
+                models.UserLikedItem.item_id == models.Subject.id,
+                models.UserLikedItem.item_type == LikeItemType.subjects,
+                models.UserLikedItem.user_id == current_user.id,
+            ),
         )
+    query = query.where(*filter_expr).options(
+        selectinload(models.Subject.standard_measure_info),
     )
 
     subject_tags = await crud.subject_tag.get_all(db_session=db_session)
@@ -229,6 +247,7 @@ async def get_subject(
         }
         for tag in subject_tags
     }
+
     items = await crud.subject.get_multi(
         db_session=db_session,
         query=query,
@@ -236,7 +255,20 @@ async def get_subject(
         skip=(pagination.page - 1) * pagination.per_page,
         limit=pagination.per_page,
     )
-    # enrich subject tags
+
+    if liked:
+        liked_items_ids_set = set([item.id for item in items])
+    else:
+        liked_items = await crud.user_liked_item.get_by_item_type_and_ids(
+            db_session=db_session,
+            user_id=current_user.id,
+            item_type=LikeItemType.subjects,
+            item_ids=[item.id for item in items],
+            is_active=True,
+        )
+        liked_items_ids_set = set([item.item_id for item in liked_items])
+
+    # enrich subject tags and liked
     item_dicts = [
         {
             **jsonable_encoder(item),
@@ -246,6 +278,7 @@ async def get_subject(
                     [subject_tag_dict.get(tag_id) for tag_id in item.tag_ids],
                 ),
             ),
+            "liked": item.id in liked_items_ids_set,
         }
         for item in items
     ]
@@ -353,7 +386,11 @@ async def get_subject_measures(
         title="節律標記",
         alias="irregular_hr[]",
     ),
-    has_bcq: Optional[List[bool]] = Query([], title="BCQ 檢測/體質量表", alias="has_bcq[]"),
+    has_bcq: Optional[List[bool]] = Query(
+        [],
+        title="BCQ 檢測/體質量表",
+        alias="has_bcq[]",
+    ),
     # TODO: implement filter by pass rate
     pass_rate: Optional[List[int]] = Query(
         [],
@@ -479,10 +516,12 @@ async def get_subject_measures(
         if operator[0]
     ]
 
-    subject_tags = await crud.subject_tag.get_by_ids(
-        db_session=db_session,
-        list_ids=subject.tag_ids,
-    )
+    all_subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+    subject_tags = [
+        subject_tag
+        for subject_tag in all_subject_tags
+        if subject_tag.id in subject.tag_ids
+    ]
     subject_tag_options = crud.subject_tag.format_options(options=subject_tags)
     subject_dict = {**jsonable_encoder(subject), "tags": subject_tag_options}
     return schemas.SubjectReadWithMeasures(
@@ -496,6 +535,7 @@ async def get_subject_measures(
         ],
         has_bcqs=[{"value": True, "key": "有"}, {"value": False, "key": "無"}],
         pass_rates=[{"value": pct, "key": f"{pct}% 以上"} for pct in range(10, 110, 10)],
+        subject_tags=crud.subject_tag.format_options(options=all_subject_tags),
         normal_spec=[
             {"column": "irregular_hrs", "range": [0, 1]},
             {"column": "bmi", "range": [18.5, 24]},
@@ -505,6 +545,98 @@ async def get_subject_measures(
     )
 
 
+@router.patch("/{subject_id}")
+async def update_subject(
+    subject_id: UUID,
+    subject_in: schemas.SubjectUpdateInput,
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    if not subject:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found subject id: {subject_id}",
+        )
+
+    if current_user.org_id != subject.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Permission Error",
+        )
+
+    # if number already exists, raise error
+    same_number_subject = await crud.subject.get_by_number_and_org_id(
+        db_session=db_session,
+        org_id=current_user.org_id,
+        number=subject_in.number,
+    )
+    # TODO: check whether need merge different subjects to the one
+    if same_number_subject and same_number_subject.id != subject_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Number already exists: {subject_in.number}",
+        )
+
+    subject = await crud.subject.update(
+        db_session=db_session,
+        obj_current=subject,
+        obj_new=subject_in.dict(exclude_none=True),
+    )
+    return subject
+
+
+@router.patch("/{subject_id}/tags", response_model=schemas.SubjectRead)
+async def update_subject_tags(
+    subject_id: UUID,
+    tag_input: schemas.SubjectTagUpdateInput,
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    subject = await crud.subject.get(
+        db_session=db_session,
+        id=subject_id,
+        relations=[models.Subject.standard_measure_info],
+    )
+    if not subject:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found subject id: {subject_id}",
+        )
+
+    if (current_user.org_id != subject.org_id) and current_user.is_superuser is False:
+        raise HTTPException(
+            status_code=400,
+            detail="Permission Error",
+        )
+
+    all_subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+    all_subject_tag_ids = [tag.id for tag in all_subject_tags]
+    extra_ids = set(tag_input.tag_ids) - set(all_subject_tag_ids)
+    if len(extra_ids) > 0:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid tag ids: {extra_ids}",
+        )
+    subject.tag_ids = tag_input.tag_ids
+    db_session.add(subject)
+    await db_session.commit()
+    await db_session.refresh(subject)
+
+    subject_tags = [
+        subject_tag
+        for subject_tag in all_subject_tags
+        if subject_tag.id in subject.tag_ids
+    ]
+    subject_tag_options = crud.subject_tag.format_options(options=subject_tags)
+    return {**jsonable_encoder(subject), "tags": subject_tag_options}
+
+
+# @depreciated: use subject tags instead
 @router.patch("/{subject_id}/memo", response_model=schemas.SubjectRead)
 async def update_subject_memo(
     subject_id: UUID,
@@ -1896,6 +2028,39 @@ async def get_multi_measure_by_conditions(
             "Content-Type": "application/octet-stream",
         },
     )
+
+
+@router.post("/export_report")
+async def export_report(
+    input_payload: ExportReportInputPayload,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    if input_payload.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail="The user doesn't have enough privileges",
+        )
+
+    for subject_id in input_payload.subject_ids:
+        if not await crud.subject.get(db_session=db_session, id=subject_id):
+            raise HTTPException(
+                status_code=400,
+                detail="The subject with this id does not exist in the system",
+            )
+
+    filename = "sample.pdf"
+    headers = {
+        "Content-Disposition": "inline; filename*=utf-8" '{}"'.format(quote(filename)),
+        "Content-Type": "application/octet-stream",
+    }
+    from io import BytesIO
+
+    with open(filename, "rb") as file:
+        data = BytesIO(file.read())
+    data.seek(0)
+    return StreamingResponse(data, media_type="application/pdf", headers=headers)
 
 
 @router.put("/{subject_id}/activate")

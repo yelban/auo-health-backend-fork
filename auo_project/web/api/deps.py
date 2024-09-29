@@ -129,10 +129,12 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials",
         )
-    user: User = await crud.user.get_by_username(
+    user = await crud.user.get_by_username(
         db_session=db_session,
         username=payload["sub"],
+        relations=["groups", "roles", "actions"],
     )
+    print("debbbbbug", user.roles)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 

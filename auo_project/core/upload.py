@@ -162,7 +162,6 @@ async def post_finish(arbitrary_json):
             traceback.print_exc()
             if file:
                 file_in = FileUpdate(
-                    file_status=FileStatusType.failed.value,
                     memo=str(e),
                 )
                 await crud.file.update(

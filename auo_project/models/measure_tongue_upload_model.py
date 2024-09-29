@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Optional
 from uuid import UUID
 
 from sqlmodel import Field, Relationship
@@ -22,18 +23,37 @@ class MeasureTongueUploadBase(BaseModel):
         nullable=False,
         foreign_key="measure.subjects.id",
     )
-    name: str = Field(None, title="", nullable=True)
-    sid: str = Field(None, title="", nullable=True)
+    branch_id: UUID = Field(
+        index=True,
+        nullable=False,
+        foreign_key="app.auth_branches.id",
+    )
+    field_id: UUID = Field(
+        index=True,
+        nullable=True,  # TODO: change to False after migration
+        foreign_key="app.fields.id",
+    )
+    device_id: str = Field(None, title="舌診擷取設備編號", nullable=True)
+    pad_id: str = Field(None, title="平板編號", nullable=True)
+    name: str = Field(None, title="平板名稱", nullable=True)
+    sid: str = Field(None, title="身分證字號", nullable=True)
     birth_date: date = Field(None, title="", nullable=True)
-    age: int = Field(title="", nullable=False)
-    sex: int = Field(title="", nullable=False)
-    number: str = Field(title="", nullable=False)
-    measure_operator: str = Field(title="", nullable=False)
+    age: int = Field(title="年齡", nullable=False)
+    sex: int = Field(title="性別", nullable=False)
+    number: str = Field(title="檢測編號", nullable=False)
+    measure_operator: str = Field(title="檢測人員", nullable=False)
     color_hash: str = Field(title="sha256", nullable=False)
-    tongue_front_original_loc: str = Field(title="", nullable=False)
-    tongue_back_original_loc: str = Field(title="", nullable=False)
-    tongue_front_corrected_loc: str = Field(None, title="", nullable=True)
-    tongue_back_corrected_loc: str = Field(None, title="", nullable=True)
+    tongue_front_original_loc: str = Field(title="原始舌面照片位置", nullable=False)
+    tongue_back_original_loc: str = Field(title="原始舌背照片位置", nullable=False)
+    tongue_front_corrected_loc: str = Field(None, title="校色舌面照片位置", nullable=True)
+    tongue_back_corrected_loc: str = Field(None, title="校色舌面照片位置", nullable=True)
+    doctor_id: Optional[UUID] = Field(
+        index=True,
+        nullable=True,
+        foreign_key="app.doctors.id",
+        title="醫師編號",
+    )
+    proj_num: str = Field(None, title="Project number", nullable=True)
 
 
 class MeasureTongueUpload(

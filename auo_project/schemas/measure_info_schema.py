@@ -616,6 +616,14 @@ class MeasureInfoUpdate(BaseModel):
         title="左脈率",
     )  # TODO: check 遲/正常/數 區間
     hr_r: int = Field(default=None, nullable=True, title="右脈率")
+    hr_l_type: Optional[int] = Field(
+        default=None,
+        title="左手脈率類型; 遲:0/正常:1/數:2",
+    )
+    hr_r_type: Optional[int] = Field(
+        default=None,
+        title="右手脈率類型; 遲:0/正常:1/數:2",
+    )
     special_l: str = Field(
         default=None,
         max_length=10,
@@ -644,12 +652,30 @@ class MeasureInfoUpdate(BaseModel):
     ver: str = Field(default=None, max_length=100, nullable=True, title="ver.ini")
     is_active: bool = Field(default=True, title="是否啟用")
 
-    six_sec_pw_valid_l_cu: Optional[bool] = Field(default=None, title="左寸是否計入分析")
-    six_sec_pw_valid_l_qu: Optional[bool] = Field(default=None, title="左關是否計入分析")
-    six_sec_pw_valid_l_ch: Optional[bool] = Field(default=None, title="左尺是否計入分析")
-    six_sec_pw_valid_r_cu: Optional[bool] = Field(default=None, title="右寸是否計入分析")
-    six_sec_pw_valid_r_qu: Optional[bool] = Field(default=None, title="右關是否計入分析")
-    six_sec_pw_valid_r_ch: Optional[bool] = Field(default=None, title="右尺是否計入分析")
+    six_sec_pw_valid_l_cu: Optional[bool] = Field(
+        default=None,
+        title="左寸六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_l_qu: Optional[bool] = Field(
+        default=None,
+        title="左關六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_l_ch: Optional[bool] = Field(
+        default=None,
+        title="左尺六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_cu: Optional[bool] = Field(
+        default=None,
+        title="右寸六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_qu: Optional[bool] = Field(
+        default=None,
+        title="右關六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_ch: Optional[bool] = Field(
+        default=None,
+        title="右尺六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
     pulse_28_ids_l_overall: Optional[List[UUID]] = Field(default=None, title="左手總按28脈")
     pulse_28_ids_l_cu: Optional[List[UUID]] = Field(default=None, title="左寸28脈")
     pulse_28_ids_l_qu: Optional[List[UUID]] = Field(default=None, title="左關28脈")
@@ -662,6 +688,11 @@ class MeasureInfoUpdate(BaseModel):
 
 
 class MeasureInfoUpdateInput(BaseModel):
+    has_memo: Optional[bool] = Field(default=None, title="是否有檢測標記")
+    memo: Optional[str] = Field(default=None, title="檢測標記")
+    comment: Optional[str] = Field(default=None, title="診斷內容/檢測紀錄")
+    irregular_hr_l: Optional[int] = Field(default=None, title="左手節律是否異常; 正常:0/異常:1")
+    irregular_hr_r: Optional[int] = Field(default=None, title="右手節律是否異常; 正常:0/異常:1")
     irregular_hr_type_l: Optional[int] = Field(
         None,
         title="左手節律異常類型; 無:null/止無定數:0/止有定數:1",
@@ -669,6 +700,14 @@ class MeasureInfoUpdateInput(BaseModel):
     irregular_hr_type_r: Optional[int] = Field(
         None,
         title="右手節律異常類型; 無:null/止無定數:0/止有定數:1",
+    )
+    hr_l_type: Optional[int] = Field(
+        None,
+        title="左手脈率類型; 遲:0/正常:1/數:2",
+    )
+    hr_r_type: Optional[int] = Field(
+        None,
+        title="右手脈率類型; 遲:0/正常:1/數:2",
     )
     max_amp_depth_of_range_l_cu: Optional[int] = Field(
         default=None,
@@ -724,12 +763,30 @@ class MeasureInfoUpdateInput(BaseModel):
     width_r_cu: Optional[int] = Field(default=None, title="右寸大細; 無:null/細:0/正常:1/大:2")
     width_r_qu: Optional[int] = Field(default=None, title="右關大細; 無:null/細:0/正常:1/大:2")
     width_r_ch: Optional[int] = Field(default=None, title="右尺大細; 無:null/細:0/正常:1/大:2")
-    six_sec_pw_valid_l_cu: Optional[bool] = Field(default=None, title="左寸是否計入分析")
-    six_sec_pw_valid_l_qu: Optional[bool] = Field(default=None, title="左關是否計入分析")
-    six_sec_pw_valid_l_ch: Optional[bool] = Field(default=None, title="左尺是否計入分析")
-    six_sec_pw_valid_r_cu: Optional[bool] = Field(default=None, title="右寸是否計入分析")
-    six_sec_pw_valid_r_qu: Optional[bool] = Field(default=None, title="右關是否計入分析")
-    six_sec_pw_valid_r_ch: Optional[bool] = Field(default=None, title="右尺是否計入分析")
+    six_sec_pw_valid_l_cu: Optional[bool] = Field(
+        default=None,
+        title="左寸六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_l_qu: Optional[bool] = Field(
+        default=None,
+        title="左關六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_l_ch: Optional[bool] = Field(
+        default=None,
+        title="左尺六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_cu: Optional[bool] = Field(
+        default=None,
+        title="右寸六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_qu: Optional[bool] = Field(
+        default=None,
+        title="右關六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_ch: Optional[bool] = Field(
+        default=None,
+        title="右尺六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
     pulse_28_ids_l_overall: Optional[List[UUID]] = Field(default=None, title="左手總按28脈")
     pulse_28_ids_l_cu: Optional[List[UUID]] = Field(default=None, title="左寸28脈")
     pulse_28_ids_l_qu: Optional[List[UUID]] = Field(default=None, title="左關28脈")
@@ -914,12 +971,31 @@ class MeasureDetailRead(BaseModel):
     # 28 脈
     pulse_28: Optional[Pulse28] = Field({}, title="28 脈")
 
-    six_sec_pw_valid_l_cu: Optional[bool] = Field(default=None, title="左寸是否計入分析")
-    six_sec_pw_valid_l_qu: Optional[bool] = Field(default=None, title="左關是否計入分析")
-    six_sec_pw_valid_l_ch: Optional[bool] = Field(default=None, title="左尺是否計入分析")
-    six_sec_pw_valid_r_cu: Optional[bool] = Field(default=None, title="右寸是否計入分析")
-    six_sec_pw_valid_r_qu: Optional[bool] = Field(default=None, title="右關是否計入分析")
-    six_sec_pw_valid_r_ch: Optional[bool] = Field(default=None, title="右尺是否計入分析")
+    six_sec_pw_valid_l_cu: Optional[bool] = Field(
+        default=None,
+        title="左寸六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_l_qu: Optional[bool] = Field(
+        default=None,
+        title="左關六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_l_ch: Optional[bool] = Field(
+        default=None,
+        title="左尺六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_cu: Optional[bool] = Field(
+        default=None,
+        title="右寸六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_qu: Optional[bool] = Field(
+        default=None,
+        title="右關六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+    six_sec_pw_valid_r_ch: Optional[bool] = Field(
+        default=None,
+        title="右尺六秒脈波是否正常，影響是否計入分析; 不計入分析: false, 計入分析: true",
+    )
+
     pulse_memo: Optional[str] = Field(default=None, title="脈象標記")
 
 
@@ -1163,6 +1239,8 @@ class MeasureInfoExtraInfo(BaseModel):
 class MeasureDetailResponse(BaseModel):
     subject: Union[SubjectRead, SubjectSecretRead]
     measure: MeasureDetailRead
+    subject_tags: List[Dict[str, Any]] = Field([], title="選項：受測者標籤")
+    branch: Optional[Any] = Field(None, title="選項：分支資訊")
 
 
 class MultiMeasureDetailResponse(BaseModel):

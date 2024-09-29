@@ -333,8 +333,10 @@ class MeasureInfoBase(BaseModel):
     judge_time: datetime = Field(default=None, nullable=True, title="診斷時間")
     judge_dr: str = Field(default=None, max_length=128, nullable=True, title="診斷醫師")
 
-    hr_l: int = Field(default=None, nullable=True, title="左脈率")  # TODO: check 遲/正常/數 區間
+    hr_l: int = Field(default=None, nullable=True, title="左脈率")
     hr_r: int = Field(default=None, nullable=True, title="右脈率")
+    hr_l_type: int = Field(default=None, nullable=True, title="左脈律類型: 遲:0/正常:1/數:2")
+    hr_r_type: int = Field(default=None, nullable=True, title="右脈律類型: 遲:0/正常:1/數:2")
     special_l: str = Field(default=None, max_length=10, nullable=True, title="左手特殊脈")
     special_r: str = Field(default=None, max_length=10, nullable=True, title="右手特殊脈")
 

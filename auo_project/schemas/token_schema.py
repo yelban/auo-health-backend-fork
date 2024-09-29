@@ -16,5 +16,9 @@ class LoginResponseToken(BaseModel):
     token_type: str
 
 
+class LogoutResponse(BaseModel):
+    status: str
+
+
 # class TokenPayload(BaseModel):
 #     sub: Optional[str] = None

@@ -118,3 +118,78 @@ class AdvanceChartType(str, Enum):
     parameter_six_pulse = "parameter_six_pulse"
     parameter_cross = "parameter_cross"
     six_pulse_cn = "six_pulse_cn"
+
+
+class TongueCCStatus(IntEnum):
+    """
+    0 無狀態
+    1 校色檔生成中
+    2 校色進行中
+    3 校色完成
+    4 校色異常
+    """
+
+    no_status = 0
+    cc_file_generating = 1
+    cc_processing = 2
+    cc_done = 3
+    cc_abnormal = 4
+
+
+TONGUE_CC_STATUS_LABEL = {
+    TongueCCStatus.no_status: "",
+    TongueCCStatus.cc_file_generating: "校色檔生成中",
+    TongueCCStatus.cc_processing: "校色進行中",
+    TongueCCStatus.cc_done: "校色完成",
+    TongueCCStatus.cc_abnormal: "校色異常",
+}
+
+
+class LikeItemType(str, Enum):
+    """
+    tongue_cc_configs 舌象色彩校正
+    subjects 受測者
+    products 產品管理
+    branches 機構/場域管理
+    """
+
+    tongue_cc_configs = "tongue_cc_configs"
+    subjects = "subjects"
+    products = "products"
+    branches = "branches"
+
+
+class TongueSideType(str, Enum):
+    """
+    front 舌面
+    back 舌背
+    """
+
+    front = "front"
+    back = "back"
+
+
+class ReportType(str, Enum):
+    """
+    report_type
+
+    tongue 舌診
+    pulse 脈診
+    """
+
+    tongue = "tongue"
+    pulse = "pulse"
+
+
+class ProductCategoryType(str, Enum):
+    """
+    product_category_type
+
+    inquiry 問診
+    tongue 舌診
+    pulse 脈診
+    """
+
+    inquiry = "問診"
+    tongue = "舌診"
+    pulse = "脈診"

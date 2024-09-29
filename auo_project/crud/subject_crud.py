@@ -50,5 +50,33 @@ class CRUDSubject(CRUDBase[Subject, SubjectCreate, SubjectUpdate]):
         )
         return subject.scalar_one_or_none()
 
+    async def get_sid_by_keyword(
+        self, *, db_session: AsyncSession, org_id: UUID, keyword: str
+    ) -> list[str]:
+        result = await db_session.execute(
+            select(Subject.sid).where(
+                Subject.org_id == org_id,
+                func.upper(Subject.sid).contains(keyword.upper()),
+            ),
+        )
+        subject_sids = [row[0] for row in result.fetchall()]
+        return subject_sids
+
+    async def get_all_by_keyword(
+        self, *, db_session: AsyncSession, org_id: UUID, keyword: str
+    ) -> list[Subject]:
+        """
+        search columns sid, number, name by keyword
+        """
+        subjects = await db_session.execute(
+            select(Subject).where(
+                Subject.org_id == org_id,
+                func.upper(Subject.sid).contains(keyword.upper())
+                | func.upper(Subject.number).contains(keyword.upper())
+                | func.upper(Subject.name).contains(keyword.upper()),
+            ),
+        )
+        return subjects.scalars().all()
+
 
 subject = CRUDSubject(Subject)

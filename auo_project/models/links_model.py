@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlmodel import Field, UniqueConstraint
 
-from auo_project.models.base_model import BaseJoinUUIDModel
+from auo_project.models.base_model import BaseJoinUUIDModel, BaseTimestampModel
 
 
 class LinkGroupUser(BaseJoinUUIDModel, table=True):
@@ -131,6 +131,39 @@ class LinkGroupRole(BaseJoinUUIDModel, table=True):
         default=None,
         nullable=False,
         foreign_key="app.auth_roles.id",
+        primary_key=False,
+        index=True,
+    )
+
+
+class LinkBranchProduct(BaseJoinUUIDModel, BaseTimestampModel, table=True):
+    __tablename__ = "branch_products"
+    __table_args__ = (
+        UniqueConstraint(
+            "branch_id",
+            "product_id",
+            name="app_branch_products_branch_id_product_id_key",
+        ),
+        {"schema": "app"},
+    )
+
+    branch_id: Optional[UUID] = Field(
+        default=None,
+        nullable=False,
+        foreign_key="app.auth_branches.id",
+        primary_key=False,
+        index=True,
+    )
+    product_id: Optional[UUID] = Field(
+        default=None,
+        nullable=False,
+        foreign_key="app.products.id",
+        primary_key=False,
+        index=True,
+    )
+    is_active: bool = Field(
+        default=True,
+        nullable=False,
         primary_key=False,
         index=True,
     )

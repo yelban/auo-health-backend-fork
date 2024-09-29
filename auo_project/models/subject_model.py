@@ -35,6 +35,7 @@ class SubjectBase(BaseModel):
         sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
         nullable=True,
     )
+    deleted_mark: bool = Field(default=False, nullable=False)
     is_active: bool = Field(index=True, nullable=False, default=True)
 
 

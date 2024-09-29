@@ -17,7 +17,7 @@ class DateUtils:
         end_date: Optional[str] = Query(None, title="結束時間"),
     ) -> None:
         if not (time_unit or start_date or end_date):
-            time_unit = "1w"
+            time_unit = "12m"
         self.time_unit = time_unit
         self.start_date = start_date
         self.end_date = end_date

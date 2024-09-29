@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi_async_sqlalchemy import db
 from pydantic.networks import EmailStr
-from sqlalchemy.orm import lazyload
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -35,11 +35,16 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         self,
         db_session: AsyncSession,
         username: str,
+        relations: List[Any] = [],
     ) -> Optional[User]:
+        options = []
+        for relation in relations:
+            if isinstance(relation, str):
+                options.append(selectinload(getattr(self.model, relation)))
+            else:
+                options.append(selectinload(relation))
         users = await db_session.execute(
-            select(User)
-            .where(User.username == username)
-            .options(lazyload(User.uploads), lazyload(User.all_files)),
+            select(User).where(User.username == username).options(*options),
         )
         return users.scalar_one_or_none()
 

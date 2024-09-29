@@ -170,3 +170,33 @@ async def cancel_upload_file(
         await db_session.commit()
 
     return file_id
+
+
+@router.post("/resume-upload/{file_id}")
+async def resume_upload_file(
+    file_id: str,
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Cancel upload file.
+    """
+    file = await crud.file.get(db_session=db_session, id=file_id)
+    if not file:
+        raise HTTPException(status_code=404, detail=f"Not found file id: {file_id}")
+
+    if await crud.upload.is_files_all_complete(
+        db_session=db_session,
+        upload_id=file.upload_id,
+    ):
+        file.upload.upload_status = UploadStatusType.uploading.value
+        db_session.add(file.upload)
+        await db_session.commit()
+
+    file.file_status = FileStatusType.uploading.value
+    db_session.add(file)
+    await db_session.commit()
+
+    return file_id

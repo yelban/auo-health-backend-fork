@@ -1,13 +1,14 @@
 import logging
 
 import sentry_sdk
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import ORJSONResponse
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from auo_project.core.config import settings
+from auo_project.core.exceptions import CustomHTTPException
 from auo_project.core.logging import configure_logging
 from auo_project.web.api.router import api_router
 from auo_project.web.lifetime import register_shutdown_event, register_startup_event
@@ -55,5 +56,15 @@ def get_app() -> FastAPI:
             ],
         )
         app = SentryAsgiMiddleware(app)  # type: ignore
+
+    @app.exception_handler(CustomHTTPException)
+    async def custom_http_exception_handler(request: Request, exc: CustomHTTPException):
+        return ORJSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error_code": exc.error_code,
+                "detail": exc.detail,
+            },
+        )
 
     return app

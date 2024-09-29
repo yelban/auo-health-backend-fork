@@ -1,3 +1,4 @@
+from typing import List
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -31,3 +32,10 @@ class SubjectTagCreate(SubjectTagBase):
 
 class SubjectTagUpdate(BaseModel):
     pass
+
+
+class SubjectTagUpdateInput(BaseModel):
+    tag_ids: List[UUID] = Field(
+        nullable=False,
+        title="標籤編號",
+    )

@@ -16,7 +16,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from auo_project import crud, models, schemas
 from auo_project.core.config import settings
 from auo_project.core.file import get_max_amp_depth_of_range
-from auo_project.core.utils import compare_cn_diff, get_subject_schema, safe_divide
+from auo_project.core.utils import (
+    compare_cn_diff,
+    get_formulas,
+    get_subject_schema,
+    safe_divide,
+)
 from auo_project.schemas.measure_tongue_schema import (
     AdvancedTongueOutput,
     Disease,
@@ -187,8 +192,6 @@ async def get_measure_summary(
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
-    from auo_project.core.utils import get_formulas
-
     (
         max_depth_ratio,
         get_measure_strength,
@@ -369,12 +372,19 @@ async def get_measure_summary(
         db_session=db_session,
     )
 
+    all_subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+
+    branch = await crud.branch.get(
+        db_session=db_session,
+        id=current_user.branch_id,
+    )
     return schemas.MeasureDetailResponse(
         subject=get_subject_schema(org_name=current_user.org.name)(
             **jsonable_encoder(subject),
             standard_measure_info=standard_measure_info,
             tags=[subject_tag_dict.get(tag_id) for tag_id in subject.tag_ids],
         ),
+        branch=branch,
         measure=schemas.MeasureDetailRead(
             measure_time=measure.measure_time,
             measure_operator=measure.measure_operator,
@@ -391,9 +401,18 @@ async def get_measure_summary(
             irregular_hr_r=measure.irregular_hr_r,
             irregular_hr_type_r=measure.irregular_hr_type_r,
             hr_l=measure.hr_l,
-            hr_l_type=get_hr_type(measure.hr_l, measure.hr_r),
+            # TODO: check without formula with Helen
+            hr_l_type=(
+                get_hr_type(measure.hr_l, measure.hr_r)
+                if measure.hr_l_type is None
+                else measure.hr_l_type
+            ),
             hr_r=measure.hr_r,
-            hr_r_type=get_hr_type(measure.hr_r, measure.hr_l),
+            hr_r_type=(
+                get_hr_type(measure.hr_r, measure.hr_l)
+                if measure.hr_r_type is None
+                else measure.hr_r_type
+            ),
             mean_prop_range_1_l_cu=measure.mean_prop_range_1_l_cu,
             mean_prop_range_2_l_cu=measure.mean_prop_range_2_l_cu,
             mean_prop_range_3_l_cu=measure.mean_prop_range_3_l_cu,
@@ -448,42 +467,13 @@ async def get_measure_summary(
                 static_max_amp_hand_position=measure.static_max_amp_r_ch,
                 ratio=max_depth_ratio,
             ),
-            max_amp_depth_of_range_l_cu=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_l_cu,
-                static_range_end_hand_position=measure.static_range_end_l_cu,
-                static_max_amp_hand_position=measure.static_max_amp_l_cu,
-                ratio=max_depth_ratio,
-            ),
-            max_amp_depth_of_range_l_qu=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_l_qu,
-                static_range_end_hand_position=measure.static_range_end_l_qu,
-                static_max_amp_hand_position=measure.static_max_amp_l_qu,
-                ratio=max_depth_ratio,
-            ),
-            max_amp_depth_of_range_l_ch=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_l_ch,
-                static_range_end_hand_position=measure.static_range_end_l_ch,
-                static_max_amp_hand_position=measure.static_max_amp_l_ch,
-                ratio=max_depth_ratio,
-            ),
-            max_amp_depth_of_range_r_cu=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_r_cu,
-                static_range_end_hand_position=measure.static_range_end_r_cu,
-                static_max_amp_hand_position=measure.static_max_amp_r_cu,
-                ratio=max_depth_ratio,
-            ),
-            max_amp_depth_of_range_r_qu=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_r_qu,
-                static_range_end_hand_position=measure.static_range_end_r_qu,
-                static_max_amp_hand_position=measure.static_max_amp_r_qu,
-                ratio=max_depth_ratio,
-            ),
-            max_amp_depth_of_range_r_ch=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_r_ch,
-                static_range_end_hand_position=measure.static_range_end_r_ch,
-                static_max_amp_hand_position=measure.static_max_amp_r_ch,
-                ratio=max_depth_ratio,
-            ),
+            # TODO: check without formula with Helen
+            max_amp_depth_of_range_l_cu=measure.max_amp_depth_of_range_l_cu,
+            max_amp_depth_of_range_l_qu=measure.max_amp_depth_of_range_l_qu,
+            max_amp_depth_of_range_l_ch=measure.max_amp_depth_of_range_l_ch,
+            max_amp_depth_of_range_r_cu=measure.max_amp_depth_of_range_r_cu,
+            max_amp_depth_of_range_r_qu=measure.max_amp_depth_of_range_r_qu,
+            max_amp_depth_of_range_r_ch=measure.max_amp_depth_of_range_r_ch,
             max_amp_value_l_cu=measure.max_amp_value_l_cu,
             max_amp_value_l_qu=measure.max_amp_value_l_qu,
             max_amp_value_l_ch=measure.max_amp_value_l_ch,
@@ -496,60 +486,19 @@ async def get_measure_summary(
             max_slope_value_r_cu=measure.max_slope_value_r_cu,
             max_slope_value_r_qu=measure.max_slope_value_r_qu,
             max_slope_value_r_ch=measure.max_slope_value_r_ch,
-            strength_l_cu=get_measure_strength(
-                measure.max_slope_value_l_cu,
-                measure.max_amp_value_l_cu,
-            ),
-            strength_l_qu=get_measure_strength(
-                measure.max_slope_value_l_qu,
-                measure.max_amp_value_l_qu,
-            ),
-            strength_l_ch=get_measure_strength(
-                measure.max_slope_value_l_ch,
-                measure.max_amp_value_l_ch,
-            ),
-            strength_r_cu=get_measure_strength(
-                measure.max_slope_value_r_cu,
-                measure.max_amp_value_r_cu,
-            ),
-            strength_r_qu=get_measure_strength(
-                measure.max_slope_value_r_qu,
-                measure.max_amp_value_r_qu,
-            ),
-            strength_r_ch=get_measure_strength(
-                measure.max_slope_value_r_ch,
-                measure.max_amp_value_r_ch,
-            ),
-            width_l_cu=get_measure_width(
-                measure.range_length_l_cu,
-                measure.max_amp_value_l_cu,
-                measure.max_slope_value_l_cu,
-            ),
-            width_l_qu=get_measure_width(
-                measure.range_length_l_qu,
-                measure.max_amp_value_l_qu,
-                measure.max_slope_value_l_qu,
-            ),
-            width_l_ch=get_measure_width(
-                measure.range_length_l_ch,
-                measure.max_amp_value_l_ch,
-                measure.max_slope_value_l_ch,
-            ),
-            width_r_cu=get_measure_width(
-                measure.range_length_r_cu,
-                measure.max_amp_value_r_cu,
-                measure.max_slope_value_r_cu,
-            ),
-            width_r_qu=get_measure_width(
-                measure.range_length_r_qu,
-                measure.max_amp_value_r_qu,
-                measure.max_slope_value_r_qu,
-            ),
-            width_r_ch=get_measure_width(
-                measure.range_length_r_ch,
-                measure.max_amp_value_r_ch,
-                measure.max_slope_value_r_ch,
-            ),
+            # TODO: check with Helen
+            strength_l_cu=measure.strength_l_cu,
+            strength_l_qu=measure.strength_l_qu,
+            strength_l_ch=measure.strength_l_ch,
+            strength_r_cu=measure.strength_r_cu,
+            strength_r_qu=measure.strength_r_qu,
+            strength_r_ch=measure.strength_r_ch,
+            width_l_cu=measure.width_l_cu,
+            width_l_qu=measure.width_l_qu,
+            width_l_ch=measure.width_l_ch,
+            width_r_cu=measure.width_r_cu,
+            width_r_qu=measure.width_r_qu,
+            width_r_ch=measure.width_r_ch,
             width_value_l_cu=round(width_value_l_cu, 1) if width_value_l_cu else None,
             width_value_l_qu=round(width_value_l_qu, 1) if width_value_l_qu else None,
             width_value_l_ch=round(width_value_l_ch, 1) if width_value_l_ch else None,
@@ -557,6 +506,13 @@ async def get_measure_summary(
             width_value_r_qu=round(width_value_r_qu, 1) if width_value_r_qu else None,
             width_value_r_ch=round(width_value_r_ch, 1) if width_value_r_ch else None,
             comment=measure.comment,
+            six_sec_pw_valid_l_cu=measure.six_sec_pw_valid_l_cu,
+            six_sec_pw_valid_l_qu=measure.six_sec_pw_valid_l_qu,
+            six_sec_pw_valid_l_ch=measure.six_sec_pw_valid_l_ch,
+            six_sec_pw_valid_r_cu=measure.six_sec_pw_valid_r_cu,
+            six_sec_pw_valid_r_qu=measure.six_sec_pw_valid_r_qu,
+            six_sec_pw_valid_r_ch=measure.six_sec_pw_valid_r_ch,
+            pulse_memo=measure.pulse_memo,
             # TODO: changme
             bcq=(
                 schemas.BCQ(
@@ -648,6 +604,7 @@ async def get_measure_summary(
                 ),
             ),
         ),
+        subject_tags=crud.subject_tag.format_options(options=all_subject_tags),
     )
 
 
@@ -1216,12 +1173,75 @@ async def update_measure(
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
         )
 
-    # TODO: handle irregular_hr_type_l, irregular_hr_type_r, irregular_hr_l, irregular_hr_r
-    # check max_amp_value_l_cu, max_amp_value_l_qu, max_amp_value_l_ch, max_amp_value_r_cu, max_amp_value_r_qu, max_amp_value_r_ch of frontend key
+    if (
+        measure_in.irregular_hr_l is None and measure_in.irregular_hr_type_l is not None
+    ) or (
+        measure_in.irregular_hr_r is None and measure_in.irregular_hr_type_r is not None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="when irregular_hr_l or irregular_hr_r is None, irregular_hr_type_l or irregular_hr_type_r should be None",
+        )
+    elif measure_in.irregular_hr_l not in (0, 1) or measure_in.irregular_hr_r not in (
+        0,
+        1,
+    ):
+        raise HTTPException(status_code=400, detail="irregular_hr allowd: 0, 1")
+    elif (
+        measure_in.irregular_hr_l == 0 and measure_in.irregular_hr_type_l is not None
+    ) or (
+        measure_in.irregular_hr_r == 0 and measure_in.irregular_hr_type_r is not None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="when irregular_hr_l or irregular_hr_r is 0, irregular_hr_type_l or irregular_hr_type_r should be None",
+        )
+    elif (
+        measure_in.irregular_hr_l == 1 and measure_in.irregular_hr_type_l not in (0, 1)
+    ) or (
+        measure_in.irregular_hr_r == 1 and measure_in.irregular_hr_type_r not in (0, 1)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="when irregular_hr = 1, irregular_hr type allowd: 0, 1",
+        )
+
+    if measure_in.memo is not None:
+        if measure_in.memo == "":
+            measure_in.has_memo = False
+        else:
+            measure_in.has_memo = True
+
+    measure_pulse_28_list = await crud.measure_pulse_28_option.get_all(
+        db_session=db_session,
+    )
+    measure_pulse_28_id = set([elm.id for elm in measure_pulse_28_list])
+
+    def is_measure_pulse_28_valid(pulse_28_input: List[UUID], full_id_set: set) -> bool:
+        if pulse_28_input is None:
+            return True
+        return set(pulse_28_input).issubset(full_id_set)
+
+    for column_name, pulse_28_input in [
+        ("pulse_28_ids_l_overall", measure_in.pulse_28_ids_l_overall),
+        ("pulse_28_ids_l_cu", measure_in.pulse_28_ids_l_cu),
+        ("pulse_28_ids_l_qu", measure_in.pulse_28_ids_l_qu),
+        ("pulse_28_ids_l_ch", measure_in.pulse_28_ids_l_ch),
+        ("pulse_28_ids_r_overall", measure_in.pulse_28_ids_r_overall),
+        ("pulse_28_ids_r_cu", measure_in.pulse_28_ids_r_cu),
+        ("pulse_28_ids_r_qu", measure_in.pulse_28_ids_r_qu),
+        ("pulse_28_ids_r_ch", measure_in.pulse_28_ids_r_ch),
+    ]:
+        if not is_measure_pulse_28_valid(pulse_28_input, measure_pulse_28_id):
+            raise HTTPException(
+                status_code=400,
+                detail=f"The ids of {column_name} is invalid",
+            )
+
     await crud.measure_info.update(
         db_session=db_session,
         obj_current=measure,
-        obj_new=schemas.MeasureInfoUpdate(**measure_in.dict(exclude_none=True)),
+        obj_new=schemas.MeasureInfoUpdate(**measure_in.dict(exclude_unset=True)),
     )
     return {"status": "ok"}
 
