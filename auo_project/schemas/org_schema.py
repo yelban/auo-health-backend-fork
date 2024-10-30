@@ -10,6 +10,11 @@ class OrgRead(OrgBase):
     id: UUID
 
 
+class SimpleOrgRead(BaseModel):
+    id: UUID
+    name: str
+
+
 class OrgCreate(OrgBase):
     pass
 

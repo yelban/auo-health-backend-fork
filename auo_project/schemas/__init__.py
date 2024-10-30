@@ -147,7 +147,7 @@ from auo_project.schemas.measure_tongue_upload_schema import (
     MeasureTongueUploadRead,
     MeasureTongueUploadUpdate,
 )
-from auo_project.schemas.org_schema import OrgCreate, OrgRead, OrgUpdate
+from auo_project.schemas.org_schema import OrgCreate, OrgRead, OrgUpdate, SimpleOrgRead
 from auo_project.schemas.product_category_schema import (
     ProductCategoryCreate,
     ProductCategoryRead,
@@ -182,7 +182,13 @@ from auo_project.schemas.recovery_token_schema import (
     RecoveryTokenRead,
     RecoveryTokenUpdate,
 )
-from auo_project.schemas.role_schema import RoleCreate, RoleRead, RoleUpdate
+from auo_project.schemas.role_schema import (
+    ActionItem,
+    RoleActionsUpdate,
+    RoleCreate,
+    RoleRead,
+    RoleUpdate,
+)
 from auo_project.schemas.subject_schema import (
     MeasureListPage,
     SubjectCreate,
@@ -212,6 +218,7 @@ from auo_project.schemas.tongue_cc_config_schema import (
     TongueCCConfigPreviewOutput,
     TongueCCConfigRead,
     TongueCCConfigUpdate,
+    TongueCCConfigUpdateCCStatusInput,
     TongueCCConfigUpdateInput,
 )
 from auo_project.schemas.upload_schema import (
@@ -236,12 +243,15 @@ from auo_project.schemas.user_liked_item_schema import (
     UserLikeItemInput,
 )
 from auo_project.schemas.user_schema import (
+    BatchUserCreateInput,
     UserCreate,
+    UserCreateInput,
     UserRead,
     UserReadWithUploads,
     UserRecoverPassword,
     UserResetPassword,
     UserUpdate,
+    UserUpdateInput,
     UserWithName,
 )
 
@@ -253,6 +263,12 @@ SimpleProductRead.update_forward_refs(ProductCategoryRead=ProductCategoryRead)
 BranchRead.update_forward_refs(
     OrgRead=OrgRead,
     ProductRead=ProductRead,
+)
+SimpleBranchRead.update_forward_refs(
+    SimpleOrgRead=SimpleOrgRead,
+)
+BranchFieldRead.update_forward_refs(
+    SimpleBranchRead=SimpleBranchRead,
 )
 
 UserRead.update_forward_refs(

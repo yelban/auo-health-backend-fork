@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # quantity of workers for uvicorn
-    WORKERS_COUNT: int = 1
+    WORKERS_COUNT: int = 2
     # Enable uvicorn reloading
     RELOAD: bool = False
 

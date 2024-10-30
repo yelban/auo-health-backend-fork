@@ -47,3 +47,4 @@ class SimpleBranchRead(BaseModel):
     has_pulse_product: bool = Field(title="是否購買脈診產品")
     valid_to: datetime = Field(title="有效期間")
     fields: list[SimpleBranchFieldRead] = []
+    org: Optional["SimpleOrgRead"] = None

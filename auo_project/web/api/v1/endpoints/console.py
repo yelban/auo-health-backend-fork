@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from io import BytesIO
+from pathlib import Path
 from typing import Any, List, Optional, Union
 from uuid import UUID
 
@@ -14,7 +15,12 @@ from sqlmodel import String, cast, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
-from auo_project.core.azure import private_blob_service, upload_blob_file
+from auo_project.core.azure import (
+    download_file,
+    internet_blob_service,
+    upload_blob_file,
+)
+from auo_project.core.cc import get_cc
 from auo_project.core.config import settings
 from auo_project.core.constants import (
     TONGUE_CC_STATUS_LABEL,
@@ -23,7 +29,7 @@ from auo_project.core.constants import (
     TongueCCStatus,
 )
 from auo_project.core.pagination import Link, Pagination
-from auo_project.core.utils import get_filters
+from auo_project.core.utils import generate_password, get_filters
 from auo_project.web.api import deps
 
 
@@ -153,12 +159,12 @@ class TongueCCConfigReadForList(BaseModel):
     pad_id: str = Field(title="平板編號")
     cc_status: TongueCCStatus = Field(
         title="校正狀態",
-        description="0 無狀態，1 校色檔生成中，2 校色進行中，3 校色完成，4 校色異常",
+        description="1 校色檔生成中，2 校色進行中，3 校色完成，4 校色異常",
     )
     cc_status_label: Optional[str] = Field(
         default="",
         title="校正狀態名稱",
-        description="0 無狀態，1 校色檔生成中，2 校色進行中，3 校色完成，4 校色異常",
+        description="1 校色檔生成中，2 校色進行中，3 校色完成，4 校色異常",
     )
     file_name: str = Field(title="設定檔名稱")
     last_uploaded_at: datetime = Field(title="最新上傳時間")
@@ -166,6 +172,7 @@ class TongueCCConfigReadForList(BaseModel):
     org_name: str = Field(title="機構名稱")
     branch_name: str = Field(title="分支機構名稱")
     field_name: str = Field(title="場域名稱")
+    field_id: UUID = Field(title="場域編號")
     liked: bool = Field(title="是否已加星號")
 
     @validator("cc_status_label", pre=True, always=True)
@@ -237,6 +244,73 @@ class NestedOrgBranchFields(BaseModel):
     id: UUID
     name: str
     branches: List[schemas.SimpleBranchRead]
+
+
+class RolePage(BaseModel):
+    page: int
+    per_page: int
+    page_count: int
+    total_count: int
+    link: Link
+    items: List[schemas.RoleRead]
+
+
+class RoleListResponse(BaseModel):
+    role: RolePage
+    name_zhs: List[str]
+
+
+class UserPage(BaseModel):
+    page: int
+    per_page: int
+    page_count: int
+    total_count: int
+    link: Link
+    items: List[schemas.UserRead]
+
+
+class UserListResponse(BaseModel):
+    user: UserPage
+    full_names: List[str] = Field(title="姓名")
+    usernames: List[str] = Field(title="帳號")
+    org_names: List[str] = Field(title="機構名稱")
+    role_names: List[str] = Field(title="角色名稱")
+
+
+class UserFilePreviewOutput(BaseModel):
+    users: list[schemas.UserCreateInput]
+
+
+def prepare_action_info(names: list[str]) -> list[dict]:
+    permissions = {}
+    for action_name in names:
+        category, verb = action_name.split(":")
+        permissions.setdefault(
+            category,
+            {
+                "create": False,
+                "read": False,
+                "update": False,
+                "delete": False,
+                "upload": False,
+                "download": False,
+            },
+        )
+        permissions[category][verb] = True
+
+    return [
+        schemas.ActionItem(key=category, value=permissions)
+        for category, permissions in permissions.items()
+    ]
+
+
+def extract_action_info(action_info: list[dict]) -> list[str]:
+    names = []
+    for category in action_info:
+        for verb, value in category["value"].items():
+            if value:
+                names.append(f"{category['key']}:{verb}")
+    return names
 
 
 router = APIRouter()
@@ -951,6 +1025,69 @@ async def create_org_branch_fields(
     return org
 
 
+@router.get("/orgs", response_model=list[schemas.SimpleOrgRead])
+async def read_orgs(
+    keyword: Optional[str] = Query(None, max_length=64, title="搜尋機構名稱"),
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Retrieve Orgs.
+    """
+    if keyword:
+        orgs = await crud.org.get_by_keyword(
+            db_session=db_session,
+            keyword=keyword,
+        )
+    else:
+        orgs = await crud.org.get_active_orgs(db_session=db_session)
+    return orgs
+
+
+@router.get("/orgs/{org_id}/branches/fields", response_model=NestedOrgBranchFields)
+async def read_org(
+    org_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Retrieve Org.
+    """
+    org = await crud.org.get(db_session=db_session, id=org_id, relations=["branches"])
+    if org is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Org not found: {org_id}",
+        )
+
+    branches = []
+    for branch in org.branches:
+        branch_fields = await crud.branch_field.get_all_by_branch_id(
+            db_session=db_session,
+            branch_id=branch.id,
+        )
+        branches.append(
+            schemas.SimpleBranchRead(
+                id=branch.id,
+                org_id=branch.org_id,
+                name=branch.name,
+                has_inquiry_product=branch.has_inquiry_product,
+                has_tongue_product=branch.has_tongue_product,
+                has_pulse_product=branch.has_pulse_product,
+                valid_to=branch.valid_to,
+                fields=branch_fields,
+            ),
+        )
+
+    return NestedOrgBranchFields(
+        id=org.id,
+        name=org.name,
+        branches=branches,
+    )
+
+
 @router.get("/orgs/{org_id}/branches/{branch_id}", response_model=schemas.BranchRead)
 async def read_branch(
     org_id: UUID,
@@ -1453,7 +1590,7 @@ async def get_nested_fields(
     db_session: AsyncSession = Depends(deps.get_db),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ) -> Any:
-    """ """
+    """(Deprecated) (Only for App) Retrieve Orgs, Branches and Fields."""
     result = []
     orgs = await crud.org.get_all(db_session=db_session, relations=["branches"])
     for org in orgs:
@@ -1482,6 +1619,54 @@ async def get_nested_fields(
     return result
 
 
+@router.get("/devices/{device_id}/field", response_model=schemas.BranchFieldRead)
+async def get_field_by_device_id(
+    device_id: str,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Retrieve Field by Device ID or Pad ID.
+    """
+    tongue_cc_config_by_device_id = await crud.tongue_cc_config.get_by_device_id(
+        db_session=db_session,
+        device_id=device_id,
+    )
+    tongue_cc_config_by_pad_id = await crud.tongue_cc_config.get_by_pad_id(
+        db_session=db_session,
+        pad_id=device_id,
+    )
+    tongue_cc_config = tongue_cc_config_by_device_id or tongue_cc_config_by_pad_id
+    if tongue_cc_config is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Field not found by device_id: {device_id}",
+        )
+    field = await crud.branch_field.get(
+        db_session=db_session,
+        id=tongue_cc_config.field_id,
+    )
+    if field is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Field not found by device_id: {device_id}",
+        )
+    branch = await crud.branch.get(
+        db_session=db_session,
+        id=field.branch_id,
+        relations=["org"],
+    )
+    return schemas.BranchFieldRead(
+        **field.dict(),
+        tongue_cc_config=tongue_cc_config,
+        deletable=crud.branch_field.is_deletable(
+            tongue_cc_config=tongue_cc_config,
+        ),
+        branch=branch,
+    )
+
+
 @router.get("/fields/{field_id}", response_model=schemas.BranchFieldRead)
 async def get_field(
     field_id: UUID,
@@ -1489,6 +1674,7 @@ async def get_field(
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ) -> Any:
+
     # TODO: check permission/role
     field = await crud.branch_field.get(
         db_session=db_session,
@@ -1505,6 +1691,57 @@ async def get_field(
     #     field.tongue_cc_config = field.tongue_cc_config[0]
     # TODO: check why response error
     # return jsonable_encoder(field)
+
+    branch = await crud.branch.get(
+        db_session=db_session,
+        id=field.branch_id,
+        relations=["org"],
+    )
+    return schemas.BranchFieldRead(
+        **field.dict(),
+        tongue_cc_config=field.tongue_cc_config,
+        deletable=crud.branch_field.is_deletable(
+            tongue_cc_config=field.tongue_cc_config,
+        ),
+        branch=branch,
+    )
+
+
+@router.post("/fields/{field_id}/reset", response_model=schemas.BranchFieldRead)
+async def reset_field(
+    field_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Reset binding device for field. (Only allowed in dev environment.)
+    """
+    if settings.ENVIRONMENT != "dev":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only allowed in dev environment",
+        )
+    field = await crud.branch_field.get(
+        db_session=db_session,
+        id=field_id,
+        relations=["tongue_cc_config"],
+    )
+    if field is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Field not found: {field_id}",
+        )
+    if field.tongue_cc_config:
+        await crud.tongue_cc_config.remove(
+            db_session=db_session,
+            id=field.tongue_cc_config.id,
+        )
+    field = await crud.branch_field.get(
+        db_session=db_session,
+        id=field_id,
+        relations=["tongue_cc_config"],
+    )
     return field
 
 
@@ -1575,6 +1812,7 @@ async def get_tongue_cc_configs(
             models.Org.name,
             models.Branch.name,
             models.BranchField.name,
+            models.BranchField.id,
         )
         .select_from(models.TongueCCConfig)
         .join(models.Org, models.Org.id == models.TongueCCConfig.org_id)
@@ -1638,6 +1876,7 @@ async def get_tongue_cc_configs(
                     org_name=item[7],
                     branch_name=item[8],
                     field_name=item[9],
+                    field_id=item[10],
                     liked=item[0] in liked_items_ids_set,
                 )
                 for item in items
@@ -1697,6 +1936,7 @@ async def get_tongue_cc_config(
             models.TongueCCConfig.back_contrast_stretch_black_point,
             models.TongueCCConfig.back_contrast_stretch_white_point,
             models.TongueCCConfig.back_gamma,
+            models.BranchField.id,
         )
         .select_from(models.TongueCCConfig)
         .join(models.Org, models.Org.id == models.TongueCCConfig.org_id)
@@ -1751,6 +1991,7 @@ async def get_tongue_cc_config(
         org_name=cc_config[7],
         branch_name=cc_config[8],
         field_name=cc_config[9],
+        field_id=cc_config[28],
         original_image=schemas.TongueImage(
             front=image_url_list[0],
             back=image_url_list[1],
@@ -1790,21 +2031,59 @@ async def preview_cc_image(
 
     cc_config = await crud.tongue_cc_config.get(db_session=db_session, id=config_id)
     column_name = f"{input_payload.front_or_back}_img_loc"
-    file_path = getattr(cc_config, column_name)
+    file_path = Path(getattr(cc_config, column_name))
     if file_path is None:
         raise HTTPException(status_code=404, detail=f"Image not found: {column_name}")
+
+    # download image from azure storage
+    category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+    original_image_downloader = download_file(
+        blob_service_client=internet_blob_service,
+        category=category,
+        file_path=str(file_path),
+    )
+    original_image = BytesIO(original_image_downloader.readall())
+
+    # generate md5 hash by config_id and input_payload
+    import hashlib
+
+    color_hash = hashlib.md5(
+        f"{config_id}{input_payload.dict()}".encode("utf-8"),
+    ).hexdigest()
+
+    # request cc result to cc api server
+
+    cc_image = get_cc(
+        contrast=input_payload.contrast,
+        brightness=input_payload.brightness,
+        gamma=input_payload.gamma,
+        tongue_file=original_image,
+    )
+
+    # upload cc image to azure storage
+    cc_image_file_path = f"tongue_config/{cc_config.org_id}/{cc_config.id}/preview_cc_{color_hash}{file_path.suffix}"
+    print("debug", cc_image_file_path)
+
+    category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+    upload_blob_file(
+        blob_service_client=internet_blob_service,
+        category=category,
+        file_path=cc_image_file_path,
+        object=cc_image,
+        overwrite=True,
+    )
 
     container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
     expiry = datetime.utcnow() + timedelta(minutes=15)
     sas_token = generate_blob_sas(
         account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
         container_name=container_name,
-        blob_name=file_path,
+        blob_name=cc_image_file_path,
         account_key=settings.AZURE_STORAGE_KEY_INTERNET,
         permission=BlobSasPermissions(read=True),
         expiry=expiry,
     )
-    image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+    image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{cc_image_file_path}?{sas_token}"
     return {"preview_cc_image_url": image_url}
 
 
@@ -1815,6 +2094,7 @@ async def preview_cc_image(
 async def update_tongue_cc_config(
     config_id: UUID,
     input_payload: schemas.TongueCCConfigUpdateInput,
+    celery_app=Depends(deps.get_celery_app),
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
@@ -1828,15 +2108,97 @@ async def update_tongue_cc_config(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Tongue CC Config not found: {config_id}",
         )
+
+    cleaned_input_payload = input_payload.dict(exclude_unset=True)
+
+    front_or_back_set = set()
+    for key in cleaned_input_payload.keys():
+        if key.startswith("front") or key.startswith("back"):
+            front_or_back = key.split("_")[0]
+            front_or_back_set.add(front_or_back)
+
+    cc_saved_payload = {
+        "cc_front_saved": True if "front" in front_or_back_set else None,
+        "cc_back_saved": True if "back" in front_or_back_set else None,
+    }
+
+    for front_or_back in front_or_back_set:
+        celery_app.send_task(
+            "auo_project.services.celery.tasks.task_generate_tongue_cc_image",
+            kwargs={
+                "front_or_back": front_or_back,
+                "config_id": config_id,
+            },
+        )
+
+    cc_status = TongueCCStatus.cc_file_generating
+    if (
+        (cc_config.cc_front_saved is True and "back" in front_or_back_set)
+        or (cc_config.cc_back_saved is True and "front" in front_or_back_set)
+        or (cc_config.cc_front_saved is True and cc_config.cc_back_saved is True)
+    ):
+        cc_status = TongueCCStatus.cc_processing
+
     obj_in = schemas.TongueCCConfigUpdate(
-        **input_payload.dict(exclude_unset=True),
-        cc_status=TongueCCStatus.cc_done,
+        **cleaned_input_payload,
+        **cc_saved_payload,
+        cc_status=cc_status,
+    )
+    obj = await crud.tongue_cc_config.update(
+        db_session=db_session,
+        obj_current=cc_config,
+        obj_new=obj_in.dict(exclude_none=True),
+    )
+    return obj
+
+
+@router.post(
+    "/tongue_cc_configs/{config_id}/reset",
+    response_model=schemas.TongueCCConfigRead,
+)
+async def update_tongue_cc_config(
+    config_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Update Tongue CC Config.
+    """
+    cc_config = await crud.tongue_cc_config.get(db_session=db_session, id=config_id)
+    if cc_config is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tongue CC Config not found: {config_id}",
+        )
+
+    obj_in = schemas.TongueCCConfigUpdate(
+        cc_status=TongueCCStatus.cc_file_generating,
+        cc_front_img_loc="",
+        cc_back_img_loc="",
+        cc_front_saved=False,
+        cc_back_saved=False,
+        front_contrast=0,
+        front_brightness=0,
+        front_saturation=0,
+        front_hue=0,
+        front_contrast_stretch_black_point=0,
+        front_contrast_stretch_white_point=0,
+        front_gamma=0.1,
+        back_contrast=0,
+        back_brightness=0,
+        back_saturation=0,
+        back_hue=0,
+        back_contrast_stretch_black_point=0,
+        back_contrast_stretch_white_point=0,
+        back_gamma=0.1,
     )
     obj = await crud.tongue_cc_config.update(
         db_session=db_session,
         obj_current=cc_config,
         obj_new=obj_in,
     )
+
     return obj
 
 
@@ -1845,7 +2207,7 @@ async def create_tongue_cc_config(
     field_id: UUID = Field(..., title="場域編號"),
     device_id: str = Form(..., title="舌診擷取設備編號"),
     pad_id: str = Form(..., title="平板編號"),
-    pad_name: str = Form(..., title="平板名稱"),
+    pad_name: str = Form("", title="平板名稱"),
     tongue_front_file: UploadFile = File(description="舌象正面圖片"),
     tongue_back_file: UploadFile = File(description="舌象背面圖片"),
     db_session: AsyncSession = Depends(deps.get_db),
@@ -1872,20 +2234,28 @@ async def create_tongue_cc_config(
     # check device_id exists
     same_device_cc_config = await crud.tongue_cc_config.get_by_device_id(
         db_session=db_session,
-        org_id=field.branch.org_id,
+        # org_id=field.branch.org_id,
         device_id=device_id,
     )
-    # if same_device_cc_config:
-    #     raise HTTPException(
-    #         status_code=400,
-    #         detail=f"Device id already exists: {device_id}",
-    #     )
 
-    await crud.tongue_cc_config.remove(
+    if same_device_cc_config:
+        await crud.tongue_cc_config.remove(
+            db_session=db_session,
+            id=same_device_cc_config.id,
+            autocommit=False,
+        )
+        await db_session.flush()
+
+    # TODO: pad id is unique
+    tongue_cc_config_by_pad_id = await crud.tongue_cc_config.get_by_pad_id(
         db_session=db_session,
-        id=same_device_cc_config.id,
-        autocommit=False,
+        pad_id=pad_id,
     )
+    if tongue_cc_config_by_pad_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Pad id already exists: {pad_id}",
+        )
 
     obj = await crud.tongue_cc_config.create(
         db_session=db_session,
@@ -1907,14 +2277,14 @@ async def create_tongue_cc_config(
             front_hue=0,
             front_contrast_stretch_black_point=0,
             front_contrast_stretch_white_point=0,
-            front_gamma=0,
+            front_gamma=0.1,
             back_contrast=0,
             back_brightness=0,
             back_saturation=0,
             back_hue=0,
             back_contrast_stretch_black_point=0,
             back_contrast_stretch_white_point=0,
-            back_gamma=0,
+            back_gamma=0.1,
             upload_file_loc="",
             color_hash="",
             last_uploaded_at=datetime.utcnow(),  # TODO: update last_uploaded_at
@@ -1924,20 +2294,20 @@ async def create_tongue_cc_config(
 
     # upload image to azure storage
     try:
-        category = "tongue-config"
-        front_img_loc = f"{obj.org_id}/{obj.id}/T_up.jpg"
+        category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        front_img_loc = f"tongue_config/{obj.org_id}/{obj.id}/T_up.jpg"
         tongue_front_file.file._file.seek(0)
         upload_blob_file(
-            blob_service_client=private_blob_service,
+            blob_service_client=internet_blob_service,
             category=category,
             file_path=front_img_loc,
             object=tongue_front_file.file._file,
             overwrite=True,
         )
-        back_img_loc = f"{obj.org_id}/{obj.id}/T_down.jpg"
+        back_img_loc = f"tongue_config/{obj.org_id}/{obj.id}/T_down.jpg"
         tongue_back_file.file._file.seek(0)
         upload_blob_file(
-            blob_service_client=private_blob_service,
+            blob_service_client=internet_blob_service,
             category=category,
             file_path=back_img_loc,
             object=tongue_back_file.file._file,
@@ -2003,7 +2373,6 @@ async def update_tongue_cc_config(
     if device_id:
         same_device_cc_config = await crud.tongue_cc_config.get_by_device_id(
             db_session=db_session,
-            org_id=field.branch.org_id,
             device_id=device_id,
         )
         if same_device_cc_config and same_device_cc_config.id != config_id:
@@ -2012,22 +2381,23 @@ async def update_tongue_cc_config(
                 id=same_device_cc_config.id,
                 autocommit=False,
             )
+            await db_session.flush()
 
     if tongue_front_file and tongue_back_file:
-        category = "tongue-config"
-        front_img_loc = f"{cc_config.org_id}/{cc_config.id}/T_up.jpg"
+        category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        front_img_loc = f"tongue_config/{cc_config.org_id}/{cc_config.id}/T_up.jpg"
         tongue_front_file.file._file.seek(0)
         upload_blob_file(
-            blob_service_client=private_blob_service,
+            blob_service_client=internet_blob_service,
             category=category,
             file_path=front_img_loc,
             object=tongue_front_file.file._file,
             overwrite=True,
         )
-        back_img_loc = f"{cc_config.org_id}/{cc_config.id}/T_down.jpg"
+        back_img_loc = f"tongue_config/{cc_config.org_id}/{cc_config.id}/T_down.jpg"
         tongue_back_file.file._file.seek(0)
         upload_blob_file(
-            blob_service_client=private_blob_service,
+            blob_service_client=internet_blob_service,
             category=category,
             file_path=back_img_loc,
             object=tongue_back_file.file._file,
@@ -2056,7 +2426,7 @@ async def update_tongue_cc_config(
         device_id=device_id,
         pad_id=pad_id,
         pad_name=pad_name,
-        cc_status=TongueCCStatus.no_status,
+        cc_status=TongueCCStatus.cc_file_generating,
         front_img_loc=front_img_loc,
         back_img_loc=back_img_loc,
         cc_front_img_loc="",
@@ -2067,14 +2437,14 @@ async def update_tongue_cc_config(
         front_hue=0,
         front_contrast_stretch_black_point=0,
         front_contrast_stretch_white_point=0,
-        front_gamma=0,
+        front_gamma=0.1,
         back_contrast=0,
         back_brightness=0,
         back_saturation=0,
         back_hue=0,
         back_contrast_stretch_black_point=0,
         back_contrast_stretch_white_point=0,
-        back_gamma=0,
+        back_gamma=0.1,
     )
     input_payload = (
         basic_info_payload if not param_need_reset else image_reset_input_payload
@@ -2088,7 +2458,6 @@ async def update_tongue_cc_config(
     )
 
     await db_session.commit()
-    # TODO: send task to worker
     return cc_config
 
 
@@ -2141,6 +2510,632 @@ async def deactivate_tongue_cc_configs(
                 db_session=db_session,
                 obj_current=obj,
                 obj_new=schemas.TongueCCConfigUpdate(is_active=False),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.get("/roles", response_model=RoleListResponse)
+async def get_roles(
+    name_zh: Optional[str] = Query(None, max_length=64, title="角色名稱"),
+    liked: Optional[bool] = Query(None, title="是否篩選已加星號項目"),
+    sort_expr: Optional[str] = Query(
+        "-name_zh",
+        title="name 代表由小到大排。-name 代表由大到小排。",
+    ),
+    pagination: Pagination = Depends(),
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    order_expr = []
+    sort_expr_col_map = {
+        "name_zh": models.Role.name_zh,
+    }
+    if sort_expr:
+        for col_str in sort_expr.split(","):
+            if col_str.replace("-", "") not in sort_expr_col_map:
+                continue
+            if col_str.startswith("-"):
+                order_expr.append(cast(sort_expr_col_map[col_str[1:]], String).desc())
+            else:
+                order_expr.append(cast(sort_expr_col_map[col_str], String).asc())
+
+    filters = []
+    query = select(models.Role)
+    if liked:
+        query = query.join(
+            models.UserLikedItem,
+            and_(
+                models.UserLikedItem.item_id == models.Role.id,
+                models.UserLikedItem.item_type == LikeItemType.roles,
+                models.UserLikedItem.user_id == current_user.id,
+            ),
+        )
+
+    role_filters = get_filters(
+        {
+            "name_zh__contains": name_zh,
+            "is_active": True,
+        },
+    )
+    role_filter_expr = models.Role.filter_expr(**role_filters)
+    filters = []
+    filters.extend(role_filter_expr)
+
+    query = (
+        query.where(*filters)
+        .order_by(*order_expr)
+        .offset((pagination.page - 1) * pagination.per_page)
+        .limit(pagination.per_page)
+        .options(selectinload(models.Role.actions))
+    )
+
+    response = await db_session.execute(query)
+    items = response.scalars().all()
+
+    count_query = select(func.count()).select_from(query.subquery())
+    count_response = await db_session.execute(count_query)
+    total_count = count_response.scalar_one()
+
+    if liked:
+        liked_items_ids_set = set([item.id for item in items])
+    else:
+        liked_items = await crud.user_liked_item.get_by_item_type_and_ids(
+            db_session=db_session,
+            user_id=current_user.id,
+            item_type=LikeItemType.products,
+            item_ids=[item.id for item in items],
+            is_active=True,
+        )
+        liked_items_ids_set = set([item.item_id for item in liked_items])
+
+    name_zhs = await crud.role.get_name_zhs(db_session=db_session)
+
+    return RoleListResponse(
+        role=await pagination.paginate2(
+            total_count=total_count,
+            items=[
+                schemas.RoleRead(
+                    id=item.id,
+                    name=item.name,
+                    name_zh=item.name_zh,
+                    description=item.description,
+                    action_items=prepare_action_info(
+                        names=[action.name for action in item.actions],
+                    ),
+                    liked=item.id in liked_items_ids_set,
+                )
+                for item in items
+            ],
+        ),
+        name_zhs=name_zhs,
+    )
+
+
+@router.get("/roles/{role_id}", response_model=schemas.RoleRead)
+async def get_role(
+    role_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    role = await crud.role.get(db_session=db_session, id=role_id)
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Role not found: {role_id}",
+        )
+    return schemas.RoleRead(
+        id=role.id,
+        name=role.name,
+        name_zh=role.name_zh,
+        description=role.description,
+        action_items=prepare_action_info(
+            names=[action.name for action in role.actions],
+        ),
+    )
+
+
+@router.post("/roles/{role_id}/actions", response_model=schemas.RoleRead)
+async def update_role(
+    role_id: UUID,
+    input_payload: schemas.RoleActionsUpdate,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    role = await crud.role.get(db_session=db_session, id=role_id, relations=["actions"])
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Role not found: {role_id}",
+        )
+
+    actual_action_names = set([action.name for action in role.actions])
+    action_infos = extract_action_info(
+        input_payload.actions,
+    )  # e.g. account_mgmt:create, account_mgmt:delete
+    expected_action_names = set(action_infos)
+    to_create_list = list(expected_action_names - actual_action_names)
+    to_delete_list = actual_action_names - expected_action_names
+    for action_name in to_create_list:
+        action = await crud.action.get_by_name(db_session=db_session, name=action_name)
+        if action is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Action not found: {action_name}",
+            )
+        await crud.role.add_action_to_role(
+            db_session=db_session,
+            role_id=role_id,
+            action=action,
+        )
+    for action_name in to_delete_list:
+        action = await crud.action.get_by_name(db_session=db_session, name=action_name)
+        if action is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Action not found: {action_name}",
+            )
+        await crud.role.remove_action_from_role(
+            db_session=db_session,
+            role_id=role_id,
+            action=action,
+        )
+
+    role = await crud.role.get(db_session=db_session, id=role_id)
+    return schemas.RoleRead(
+        id=role.id,
+        name=role.name,
+        name_zh=role.name_zh,
+        description=role.description,
+        action_items=prepare_action_info(
+            names=[action.name for action in role.actions],
+        ),
+    )
+
+
+@router.post("/roles/batch/activate", response_model=schemas.BatchResponse)
+async def activate_roles(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Activate Roles.
+    """
+    # TODO: resume the user permission immediately?
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        obj = await crud.role.get(db_session=db_session, id=obj_id)
+        if obj is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            obj = await crud.role.update(
+                db_session=db_session,
+                obj_current=obj,
+                obj_new=schemas.RoleUpdate(is_active=True),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.post("/roles/batch/deactivate", response_model=schemas.BatchResponse)
+async def deactivate_roles(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Deactivate Roles.
+    """
+    # TODO: remove the user permission immediately?
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        obj = await crud.role.get(db_session=db_session, id=obj_id)
+        if obj is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            obj = await crud.role.update(
+                db_session=db_session,
+                obj_current=obj,
+                obj_new=schemas.RoleUpdate(is_active=False),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.post("/users/files/preview", response_model=UserFilePreviewOutput)
+async def preview_user_file(
+    excel_file: UploadFile = File(..., description="Excel 檔案"),
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    """
+    Preview User File.
+    """
+    try:
+        df = pd.read_excel(BytesIO(await excel_file.read()))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Read excel error: {e}")
+
+    if df.shape[1] != 5:
+        raise HTTPException(status_code=400, detail="欄位數錯誤")
+    df = df.rename(
+        columns={
+            "機構名稱": "org_name",
+            "姓名": "full_name",
+            "帳號": "username",
+            "電話": "mobile",
+            "角色名稱": "role_name",
+        },
+    )
+    df = df.assign(mobile=df["mobile"].fillna("").astype(str))
+    output = []
+    records = df.to_dict(orient="records")
+    for record in records:
+        org = await crud.org.get_by_name(db_session=db_session, name=record["org_name"])
+        if org is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Org not found: {record['org_name']}",
+            )
+
+        role_names = record.get("role_name", "").split(",")
+        roles = await crud.role.get_by_names(db_session=db_session, names=role_names)
+        print("role_names: ", role_names, "roles", roles)
+        role_ids = [role.id for role in roles]
+        output.append(
+            schemas.UserCreateInput(
+                org_id=org.id,
+                username=record["username"],
+                full_name=record["full_name"],
+                mobile=record["mobile"],
+                role_ids=role_ids,
+            ),
+        )
+
+    return UserFilePreviewOutput(users=output)
+
+
+@router.post("/batch/users", response_model=list[schemas.UserRead])
+async def create_batch_user(
+    input_payload: schemas.BatchUserCreateInput,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """ """
+    result_list = []
+    for user_payload in input_payload.users:
+        user = await crud.user.get_by_username(
+            db_session=db_session,
+            username=user_payload.username,
+        )
+        if user:
+            print("User already exists: ", user_payload.username)
+            continue
+        password = generate_password()
+        user_in = schemas.UserCreate(
+            org_id=user_payload.org_id,
+            username=user_payload.username,
+            full_name=user_payload.full_name,
+            mobile=user_payload.mobile,
+            email=user_payload.username,
+            is_active=True,
+            is_superuser=False,
+            password=password,
+        )
+        # TODO: send password by email
+        user = await crud.user.create(db_session=db_session, obj_in=user_in)
+        result_list.append(user)
+    return result_list
+
+
+@router.get("/users", response_model=UserListResponse)
+async def get_users(
+    full_name: Optional[list[str]] = Query(
+        None,
+        title="姓名",
+        alias="full_name[]",
+    ),
+    username: Optional[list[str]] = Query(
+        None,
+        title="帳號名稱",
+        alias="name[]",
+    ),
+    email: Optional[list[str]] = Query(
+        None,
+        title="電子郵件",
+        alias="email[]",
+    ),
+    role_name: Optional[list[str]] = Query(None, title="角色名稱", alias="role_name[]"),
+    liked: Optional[bool] = Query(None, title="是否篩選已加星號項目"),
+    sort_expr: Optional[str] = Query(
+        "-full_name",
+        title="full_name 代表由小到大排。-full_name 代表由大到小排。",
+    ),
+    pagination: Pagination = Depends(),
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    order_expr = []
+    sort_expr_col_map = {
+        "full_name": models.User.full_name,
+        "name": models.User.email,
+        "email": models.User.email,
+    }
+    if sort_expr:
+        for col_str in sort_expr.split(","):
+            if col_str.replace("-", "") not in sort_expr_col_map:
+                continue
+            if col_str.startswith("-"):
+                order_expr.append(cast(sort_expr_col_map[col_str[1:]], String).desc())
+            else:
+                order_expr.append(cast(sort_expr_col_map[col_str], String).asc())
+    filters = []
+    query = select(models.User)
+    if liked:
+        query = query.join(
+            models.UserLikedItem,
+            and_(
+                models.UserLikedItem.item_id == models.User.id,
+                models.UserLikedItem.item_type == LikeItemType.users,
+                models.UserLikedItem.user_id == current_user.id,
+            ),
+        )
+    user_filters = get_filters(
+        {
+            "full_name__in": full_name,
+            "name__in": username,
+            "email__in": email,
+            "is_active": True,
+        },
+    )
+    # TODO: implement
+    role_filters = get_filters(
+        {
+            # "name__in": role_name,
+            "is_active": True,
+        },
+    )
+    user_filter_expr = models.User.filter_expr(**user_filters)
+    role_filter_expr = models.Role.filter_expr(**role_filters)
+    filters = []
+    filters.extend(user_filter_expr)
+    filters.extend(role_filter_expr)
+
+    query = (
+        query.where(*filters)
+        .order_by(*order_expr)
+        .offset((pagination.page - 1) * pagination.per_page)
+        .limit(pagination.per_page)
+        .options(selectinload(models.User.roles), selectinload(models.User.org))
+    )
+
+    response = await db_session.execute(query)
+    items = response.scalars().all()
+
+    count_query = select(func.count()).select_from(query.subquery())
+    count_response = await db_session.execute(count_query)
+    total_count = count_response.scalar_one()
+
+    if liked:
+        liked_items_ids_set = set([item.id for item in items])
+    else:
+        liked_items = await crud.user_liked_item.get_by_item_type_and_ids(
+            db_session=db_session,
+            user_id=current_user.id,
+            item_type=LikeItemType.products,
+            item_ids=[item.id for item in items],
+            is_active=True,
+        )
+        liked_items_ids_set = set([item.item_id for item in liked_items])
+
+    return UserListResponse(
+        user=await pagination.paginate2(
+            total_count=total_count,
+            items=[
+                schemas.UserRead(
+                    id=item.id,
+                    org_id=item.org_id,
+                    full_name=item.full_name,
+                    username=item.username,
+                    email=item.email,
+                    mobile=item.mobile,
+                    roles=[
+                        schemas.RoleRead(
+                            id=role.id,
+                            name=role.name,
+                            name_zh=role.name_zh,
+                            description=role.description,
+                            action_items=[],
+                        )
+                        for role in item.roles
+                    ],
+                    org=item.org,
+                    liked=item.id in liked_items_ids_set,
+                )
+                for item in items
+            ],
+        ),
+        # TODO
+        full_names=[],
+        usernames=[],
+        org_names=[],
+        role_names=[],
+    )
+
+
+@router.get("/users/{user_id}", response_model=schemas.UserRead)
+async def get_user(
+    user_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    user = await crud.user.get(db_session=db_session, id=user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User not found: {user_id}",
+        )
+    return schemas.UserRead(
+        id=user.id,
+        org_id=user.org_id,
+        full_name=user.full_name,
+        username=user.username,
+        email=user.email,
+        mobile=user.mobile,
+        roles=[
+            schemas.RoleRead(
+                id=role.id,
+                name=role.name,
+                name_zh=role.name_zh,
+                description=role.description,
+                action_items=[],
+            )
+            for role in user.roles
+        ],
+        org=user.org,
+    )
+
+
+@router.patch("/users/{user_id}", response_model=schemas.UserRead)
+async def update_user(
+    user_id: UUID,
+    input_payload: schemas.UserUpdateInput,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    user = await crud.user.get(db_session=db_session, id=user_id, relations=["roles"])
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User not found: {user_id}",
+        )
+    roles = user.roles
+    user = await crud.user.update(
+        db_session=db_session,
+        db_obj=user,
+        obj_in=input_payload.dict(exclude_none=True),
+    )
+
+    to_delete_roles = (
+        set()
+        if input_payload.role_ids is None
+        else set([role.id for role in roles]) - set(input_payload.role_ids)
+    )
+    to_create_roles = (
+        set()
+        if input_payload.role_ids is None
+        else set(input_payload.role_ids) - set([role.id for role in roles])
+    )
+
+    for role_id in to_delete_roles:
+        role = await crud.role.get(db_session=db_session, id=role_id)
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Role not found: {role_id}",
+            )
+        await crud.role.remove_role_from_user(
+            db_session=db_session,
+            user=user,
+            role_id=role_id,
+        )
+    for role_id in to_create_roles:
+        role = await crud.role.get(db_session=db_session, id=role_id)
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Role not found: {role_id}",
+            )
+        await crud.role.add_role_to_user(
+            db_session=db_session,
+            user=user,
+            role_id=role_id,
+        )
+
+    user = await crud.user.get(db_session=db_session, id=user_id, relations=["roles"])
+    return schemas.UserRead(
+        id=user.id,
+        org_id=user.org_id,
+        full_name=user.full_name,
+        username=user.username,
+        email=user.email,
+        mobile=user.mobile,
+        roles=[
+            schemas.RoleRead(
+                id=role.id,
+                name=role.name,
+                name_zh=role.name_zh,
+                description=role.description,
+                action_items=[],
+            )
+            for role in user.roles
+        ],
+        org=user.org,
+    )
+
+
+@router.post("/users/batch/activate", response_model=schemas.BatchResponse)
+async def activate_users(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Activate Users.
+    """
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        obj = await crud.user.get(db_session=db_session, id=obj_id)
+        if obj is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            obj = await crud.user.update(
+                db_session=db_session,
+                db_obj=obj,
+                obj_in=schemas.UserUpdate(is_active=True),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.post("/users/batch/deactivate", response_model=schemas.BatchResponse)
+async def deactivate_users(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+) -> Any:
+    """
+    Deactivate Users.
+    """
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        obj = await crud.user.get(db_session=db_session, id=obj_id)
+        if obj is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            obj = await crud.user.update(
+                db_session=db_session,
+                db_obj=obj,
+                obj_in=schemas.UserUpdate(is_active=False),
             )
             result["success"].append({"id": obj_id})
 

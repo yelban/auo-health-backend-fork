@@ -122,7 +122,6 @@ class AdvanceChartType(str, Enum):
 
 class TongueCCStatus(IntEnum):
     """
-    0 無狀態
     1 校色檔生成中
     2 校色進行中
     3 校色完成
@@ -151,12 +150,16 @@ class LikeItemType(str, Enum):
     subjects 受測者
     products 產品管理
     branches 機構/場域管理
+    roles 角色與權限管理
+    users 帳號與權限管理
     """
 
     tongue_cc_configs = "tongue_cc_configs"
     subjects = "subjects"
     products = "products"
     branches = "branches"
+    roles = "roles"
+    users = "users"
 
 
 class TongueSideType(str, Enum):

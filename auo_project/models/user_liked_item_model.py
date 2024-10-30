@@ -1,5 +1,7 @@
 from uuid import UUID
 
+from pydantic import Field
+
 from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
 # revision identifiers, used by Alembic.

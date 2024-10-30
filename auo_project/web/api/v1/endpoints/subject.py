@@ -522,8 +522,21 @@ async def get_subject_measures(
         for subject_tag in all_subject_tags
         if subject_tag.id in subject.tag_ids
     ]
+    liked_items = await crud.user_liked_item.get_by_item_type_and_ids(
+        db_session=db_session,
+        user_id=current_user.id,
+        item_type=LikeItemType.subjects,
+        item_ids=[subject_id],
+        is_active=True,
+    )
+    liked_items_ids_set = set([item.item_id for item in liked_items])
+
     subject_tag_options = crud.subject_tag.format_options(options=subject_tags)
-    subject_dict = {**jsonable_encoder(subject), "tags": subject_tag_options}
+    subject_dict = {
+        **jsonable_encoder(subject),
+        "liked": subject_id in liked_items_ids_set,
+        "tags": subject_tag_options,
+    }
     return schemas.SubjectReadWithMeasures(
         subject=get_subject_schema(org_name=current_user.org.name)(**subject_dict),
         measure=page_result,

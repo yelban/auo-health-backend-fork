@@ -11,9 +11,9 @@ from auo_project.models.field_model import BranchFieldBase
 
 class BranchFieldRead(BranchFieldBase):
     id: UUID
-    # TODO: fixme
     tongue_cc_config: Optional[dict] = None
     deletable: Optional[bool] = Field(title="是否可刪除")
+    branch: Optional["SimpleBranchRead"] = None
 
 
 class BranchFieldCreate(BranchFieldBase):

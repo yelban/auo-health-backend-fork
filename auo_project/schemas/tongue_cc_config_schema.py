@@ -63,6 +63,10 @@ class TongueCCConfigUpdate(BaseModel):
     is_active: Optional[bool] = Field(default=None, example=True)
     front_img_loc: Optional[str] = Field(default=None, title="原始舌面圖片")
     back_img_loc: Optional[str] = Field(default=None, title="原始舌背圖片")
+    cc_front_img_loc: Optional[str] = Field(default=None, title="校色舌面圖片")
+    cc_back_img_loc: Optional[str] = Field(default=None, title="校色舌背圖片")
+    cc_front_saved: Optional[bool] = Field(default=None, title="舌面校色是否已儲存")
+    cc_back_saved: Optional[bool] = Field(default=None, title="舌背校色是否已儲存")
     device_id: Optional[str] = Field(default=None, title="舌診擷取設備編號")
     pad_id: Optional[str] = Field(default=None, title="平板編號")
     pad_name: Optional[str] = Field(default=None, title="平板名稱")
@@ -143,4 +147,11 @@ class TongueCCConfigUpdateInput(BaseModel):
         example=1.0,
         ge=0.1,
         le=2.0,
+    )
+
+
+class TongueCCConfigUpdateCCStatusInput(BaseModel):
+    cc_status: int = Field(
+        ...,
+        title="校色狀態",
     )

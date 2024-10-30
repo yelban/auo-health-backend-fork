@@ -1,3 +1,5 @@
+import random
+import string
 from datetime import date, datetime, time
 from io import StringIO
 from random import randrange
@@ -527,4 +529,11 @@ async def get_formulas(db_session: AsyncSession, org_name: str):
         get_measure_strength,
         get_measure_width,
         get_hr_type,
+    )
+
+
+def generate_password(k: int = 24) -> str:
+
+    return "".join(
+        random.choices(string.ascii_letters + string.digits, k=k),
     )

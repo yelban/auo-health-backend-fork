@@ -146,6 +146,16 @@ class TongueCCConfigBase(BaseModel):
         index=True,
         nullable=False,
     )
+    cc_front_saved: bool = Field(
+        index=False,
+        nullable=True,
+        default=False,
+    )
+    cc_back_saved: bool = Field(
+        index=False,
+        nullable=True,
+        default=False,
+    )
     is_active: bool = Field(
         default=True,
         unique=False,

@@ -52,12 +52,33 @@ class UserCreate(BaseModel):
     password: str  # TODO: SecretStr
 
 
+class UserCreateInput(BaseModel):
+    org_id: UUID = Field(..., title="機構編號")
+    username: str = Field(..., title="帳號")
+    full_name: str = Field(..., title="姓名")
+    mobile: Optional[str] = Field("", title="電話")
+    role_ids: List[UUID] = Field([], title="角色編號")
+
+
+class BatchUserCreateInput(BaseModel):
+    users: List[UserCreateInput]
+
+
 class UserUpdate(BaseModel):
+    org_id: Optional[UUID] = None
     full_name: Optional[str] = None
     mobile: Optional[str] = None
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
+
+
+class UserUpdateInput(BaseModel):
+    full_name: Optional[str] = Field(None, title="姓名")
+    # username: Optional[EmailStr] = Field(None, title="帳號") # TODO: check email valid
+    org_id: Optional[UUID] = Field(None, title="機構編號")
+    role_ids: Optional[List[UUID]] = Field(None, title="角色編號")
+    mobile: Optional[str] = Field(None, title="電話")
 
 
 class UserRecoverPassword(BaseModel):

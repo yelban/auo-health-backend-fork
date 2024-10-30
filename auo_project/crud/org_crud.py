@@ -13,5 +13,18 @@ class CRUDOrg(CRUDBase[Org, OrgCreate, OrgUpdate]):
         names = sorted([row[0] for row in result])
         return names
 
+    async def get_active_orgs(self, db_session: AsyncSession) -> list[Org]:
+        res = await db_session.execute(select(Org).where(Org.is_active == True))
+        return res.scalars().all()
+
+    async def get_by_keyword(self, db_session: AsyncSession, keyword: str) -> list[Org]:
+        res = await db_session.execute(
+            select(Org).where(
+                Org.name.ilike(f"%{keyword}%"),
+                Org.is_active == True,
+            ),
+        )
+        return res.scalars().all()
+
 
 org = CRUDOrg(Org)

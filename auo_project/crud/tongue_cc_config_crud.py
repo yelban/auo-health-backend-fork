@@ -22,13 +22,23 @@ class CRUDTongueCCConfig(
     async def get_by_device_id(
         self,
         db_session: AsyncSession,
-        org_id: UUID,
         device_id: str,
     ) -> Optional[TongueCCConfig]:
         response = await db_session.execute(
             select(TongueCCConfig).where(
-                TongueCCConfig.org_id == org_id,
                 TongueCCConfig.device_id == device_id,
+            ),
+        )
+        return response.scalar_one_or_none()
+
+    async def get_by_pad_id(
+        self,
+        db_session: AsyncSession,
+        pad_id: str,
+    ) -> Optional[TongueCCConfig]:
+        response = await db_session.execute(
+            select(TongueCCConfig).where(
+                TongueCCConfig.pad_id == pad_id,
             ),
         )
         return response.scalar_one_or_none()

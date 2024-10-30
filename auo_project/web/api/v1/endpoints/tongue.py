@@ -918,7 +918,6 @@ async def upload_measure(
 
     cc_config = await crud.tongue_cc_config.get_by_device_id(
         db_session=db_session,
-        org_id=current_user.org_id,
         device_id=device_id,
     )
     if cc_config is None:
