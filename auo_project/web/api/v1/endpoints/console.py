@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
@@ -20,7 +21,7 @@ from auo_project.core.azure import (
     internet_blob_service,
     upload_blob_file,
 )
-from auo_project.core.cc import get_cc
+from auo_project.core.cc import get_tune, get_wb
 from auo_project.core.config import settings
 from auo_project.core.constants import (
     TONGUE_CC_STATUS_LABEL,
@@ -2035,29 +2036,49 @@ async def preview_cc_image(
     if file_path is None:
         raise HTTPException(status_code=404, detail=f"Image not found: {column_name}")
 
-    # download image from azure storage
-    category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
-    original_image_downloader = download_file(
-        blob_service_client=internet_blob_service,
-        category=category,
-        file_path=str(file_path),
-    )
-    original_image = BytesIO(original_image_downloader.readall())
-
     # generate md5 hash by config_id and input_payload
-    import hashlib
-
     color_hash = hashlib.md5(
-        f"{config_id}{input_payload.dict()}".encode("utf-8"),
+        f"{config_id}{input_payload.dict(exclude_none=True)}".encode("utf-8"),
     ).hexdigest()
 
-    # request cc result to cc api server
+    category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
 
-    cc_image = get_cc(
+    # check wb file exists
+    wb_file_path = f"tongue_config/{cc_config.org_id}/{cc_config.id}/{file_path.stem}_WB{file_path.suffix}"
+    wb_blob_client = internet_blob_service.get_blob_client(
+        container=category,
+        blob=str(wb_file_path),
+    )
+    if wb_blob_client.exists():
+        wb_image_downloader = download_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=str(wb_file_path),
+        )
+        wb_image = BytesIO(wb_image_downloader.readall())
+    else:
+        # download image from azure storage
+        original_image_downloader = download_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=str(file_path),
+        )
+        original_image = BytesIO(original_image_downloader.readall())
+        wb_image = get_wb(original_image)
+        upload_blob_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=str(wb_file_path),
+            object=wb_image,
+            overwrite=True,
+        )
+
+    # request cc result to cc api server
+    cc_image = get_tune(
         contrast=input_payload.contrast,
         brightness=input_payload.brightness,
         gamma=input_payload.gamma,
-        tongue_file=original_image,
+        tongue_file=wb_image,
     )
 
     # upload cc image to azure storage
@@ -2210,6 +2231,7 @@ async def create_tongue_cc_config(
     pad_name: str = Form("", title="平板名稱"),
     tongue_front_file: UploadFile = File(description="舌象正面圖片"),
     tongue_back_file: UploadFile = File(description="舌象背面圖片"),
+    celery_app=Depends(deps.get_celery_app),
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
@@ -2323,6 +2345,16 @@ async def create_tongue_cc_config(
             ),
             autocommit=False,
         )
+
+        for front_or_back in ["front", "back"]:
+            celery_app.send_task(
+                "auo_project.services.celery.tasks.task_generate_tongue_wb_image",
+                kwargs={
+                    "front_or_back": front_or_back,
+                    "config_id": obj.id,
+                },
+            )
+
     except Exception as e:
         await crud.tongue_cc_config.remove(db_session=db_session, id=obj.id)
         raise HTTPException(status_code=500, detail=f"Upload image error: {e}")

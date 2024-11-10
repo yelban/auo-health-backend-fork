@@ -484,3 +484,7 @@ class MeasureInfo(BaseUUIDModel, BaseTimestampModel, MeasureInfoBase, table=True
         back_populates="measure_info",
         sa_relationship_kwargs={"lazy": "select", "uselist": True},
     )
+    tongue_upload: "MeasureTongueUpload" = Relationship(
+        back_populates="measure_info",
+        sa_relationship_kwargs={"lazy": "select", "uselist": False},
+    )

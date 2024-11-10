@@ -8,6 +8,12 @@ from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUI
 
 
 class MeasureTongueUploadBase(BaseModel):
+    measure_id: UUID = Field(
+        index=True,
+        unique=True,
+        nullable=False,
+        foreign_key="measure.infos.id",
+    )
     org_id: UUID = Field(
         index=True,
         nullable=False,
@@ -82,6 +88,10 @@ class MeasureTongueUpload(
             "lazy": "selectin",
             "uselist": False,
         },
+    )
+    measure_info: "MeasureInfo" = Relationship(
+        back_populates="tongue_upload",
+        sa_relationship_kwargs={"lazy": "selectin"},
     )
     advanced_tongue2: "MeasureAdvancedTongue2" = Relationship(
         back_populates="tongue_upload",

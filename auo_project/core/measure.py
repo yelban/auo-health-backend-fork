@@ -459,6 +459,9 @@ async def create_merged_measures():
         await db_session.execute("drop table if exists measure.merged_measures")
         await db_session.execute(stmt)
         await db_session.execute(
+            "create role readaccess nologin;",
+        )
+        await db_session.execute(
             "GRANT SELECT ON measure.merged_measures TO readaccess;",
         )
         await db_session.commit()

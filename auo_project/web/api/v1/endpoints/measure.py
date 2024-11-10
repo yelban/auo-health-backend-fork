@@ -1,20 +1,28 @@
+import base64
+import os
 from datetime import datetime, timedelta
-from io import StringIO
+from io import BytesIO, StringIO
+from string import Template
 from typing import Any, Dict, List
+from urllib.parse import quote
 from uuid import UUID
 
 import pandas as pd
+import pdfkit
 import pydash as py_
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.param_functions import Depends
+from fastapi.responses import StreamingResponse
 from numpy.polynomial.polynomial import Polynomial
 from pydantic import BaseModel, Field
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
+from auo_project.core.azure import download_file, internet_blob_service
 from auo_project.core.config import settings
+from auo_project.core.constants import SEX_TYPE_LABEL, ReportType
 from auo_project.core.file import get_max_amp_depth_of_range
 from auo_project.core.utils import (
     compare_cn_diff,
@@ -121,6 +129,10 @@ class CNChart(BaseModel):
     r_ch: ColumnChart = Field(title="右尺")
 
 
+class ExportReportInputPayload(BaseModel):
+    report_types: List[ReportType]
+
+
 def get_poly_points(x, y, degree, step):
     if x.shape[0] == 0 or y.shape[0] == 0:
         return []
@@ -206,6 +218,7 @@ async def get_measure_summary(
             "bcq",
             "statistics",
             "tongue",
+            "tongue_upload",
             "raw",
             "subject",
             "measure_survey_result",
@@ -274,7 +287,7 @@ async def get_measure_summary(
             )
             back_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
 
-    raw_data = measure.raw
+    raw_data = measure.raw or models.MeasureRaw(measure_id=measure_id)
 
     all_chart = {
         "l_cu": get_scatter_chart(raw_data.all_sec_analyze_raw_l_cu),
@@ -323,20 +336,38 @@ async def get_measure_summary(
 
     cn = {
         "overall": {
-            "l_cu": compare_cn_diff(cn_dict["l_cu"], cn_means_dict["l_cu"]),
-            "l_qu": compare_cn_diff(cn_dict["l_qu"], cn_means_dict["l_qu"]),
-            "l_ch": compare_cn_diff(cn_dict["l_ch"], cn_means_dict["l_ch"]),
-            "r_cu": compare_cn_diff(cn_dict["r_cu"], cn_means_dict["r_cu"]),
-            "r_qu": compare_cn_diff(cn_dict["r_qu"], cn_means_dict["r_qu"]),
-            "r_ch": compare_cn_diff(cn_dict["r_ch"], cn_means_dict["r_ch"]),
+            "l_cu": compare_cn_diff(cn_dict.get("l_cu"), cn_means_dict.get("l_cu")),
+            "l_qu": compare_cn_diff(cn_dict.get("l_qu"), cn_means_dict.get("l_qu")),
+            "l_ch": compare_cn_diff(cn_dict.get("l_ch"), cn_means_dict.get("l_ch")),
+            "r_cu": compare_cn_diff(cn_dict.get("r_cu"), cn_means_dict.get("r_cu")),
+            "r_qu": compare_cn_diff(cn_dict.get("r_qu"), cn_means_dict.get("r_qu")),
+            "r_ch": compare_cn_diff(cn_dict.get("r_ch"), cn_means_dict.get("r_ch")),
         },
         "standard_value": {
-            "l_cu": compare_cn_diff(cn_dict["l_cu"], standard_cn_dict.get("l_cu", {})),
-            "l_qu": compare_cn_diff(cn_dict["l_qu"], standard_cn_dict.get("l_qu", {})),
-            "l_ch": compare_cn_diff(cn_dict["l_ch"], standard_cn_dict.get("l_ch", {})),
-            "r_cu": compare_cn_diff(cn_dict["r_cu"], standard_cn_dict.get("r_cu", {})),
-            "r_qu": compare_cn_diff(cn_dict["r_qu"], standard_cn_dict.get("r_qu", {})),
-            "r_ch": compare_cn_diff(cn_dict["r_ch"], standard_cn_dict.get("r_ch", {})),
+            "l_cu": compare_cn_diff(
+                cn_dict.get("l_cu"),
+                standard_cn_dict.get("l_cu", {}),
+            ),
+            "l_qu": compare_cn_diff(
+                cn_dict.get("l_qu"),
+                standard_cn_dict.get("l_qu", {}),
+            ),
+            "l_ch": compare_cn_diff(
+                cn_dict.get("l_ch"),
+                standard_cn_dict.get("l_ch", {}),
+            ),
+            "r_cu": compare_cn_diff(
+                cn_dict.get("r_cu"),
+                standard_cn_dict.get("r_cu", {}),
+            ),
+            "r_qu": compare_cn_diff(
+                cn_dict.get("r_qu"),
+                standard_cn_dict.get("r_qu", {}),
+            ),
+            "r_ch": compare_cn_diff(
+                cn_dict.get("r_ch"),
+                standard_cn_dict.get("r_ch", {}),
+            ),
         },
     }
 
@@ -596,7 +627,7 @@ async def get_measure_summary(
                 ),
             ),
             tongue=schemas.Tongue(
-                exist=True if tongue else False,
+                exist=True if measure.tongue or measure.tongue_upload else False,
                 info=tongue_info,
                 image=schemas.TongueImage(
                     front=front_tongue_image_url or "",
@@ -1065,7 +1096,7 @@ async def get_measure_six_sec_pw(
         ]
         return LineChart(data=data, x_field="x", y_field="y")
 
-    raw_data = measure.raw
+    raw_data = measure.raw or models.MeasureRaw(measure_id=measure_id)
     return {
         "l_cu": gen_data(raw_data.six_sec_l_cu),
         "l_qu": gen_data(raw_data.six_sec_l_qu),
@@ -1482,7 +1513,7 @@ async def get_tongue(
     measure = await crud.measure_info.get(
         db_session=db_session,
         id=measure_id,
-        relations=["tongue"],
+        relations=["tongue", "tongue_upload"],
     )
     if measure is None:
         raise HTTPException(
@@ -1494,7 +1525,7 @@ async def get_tongue(
             status_code=400,
             detail=f"Measure id: {measure_id} is not active",
         )
-    if measure.tongue is None:
+    if measure.tongue is None and measure.tongue_upload is None:
         raise HTTPException(
             status_code=400,
             detail=f"Not found tongue of measure id: {measure_id}",
@@ -1506,9 +1537,25 @@ async def get_tongue(
         relations=[models.Subject.standard_measure_info],
     )
 
-    tongue = measure.tongue
-    front_loc = tongue.up_img_uri
-    back_loc = tongue.down_img_uri
+    if measure.tongue:
+        tongue = measure.tongue
+        front_loc = tongue.up_img_uri
+        back_loc = tongue.down_img_uri
+    elif measure.tongue_upload:
+        tongue_upload = measure.tongue_upload
+        front_loc = (
+            tongue_upload.tongue_front_corrected_loc
+            or tongue_upload.tongue_front_original_loc
+        )
+        back_loc = (
+            tongue_upload.tongue_back_corrected_loc
+            or tongue_upload.tongue_back_original_loc
+        )
+    else:
+        front_loc = ""
+        back_loc = ""
+    front_tongue_image_url = None
+    back_tongue_image_url = None
     if front_loc:
         container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
         file_path = front_loc
@@ -1973,3 +2020,152 @@ async def update_tongue_memo(
         )
 
     return tongue_info
+
+
+@router.post("/{measure_id}/export_report")
+async def export_report(
+    measure_id: UUID,
+    input_payload: ExportReportInputPayload,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+        relations=["tongue", "tongue_upload", "subject"],
+    )
+    if not measure:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+    if measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail="The user doesn't have enough privileges",
+        )
+
+    front_loc = ""
+    back_loc = ""
+    empty_image_base64 = ""
+    if measure.tongue:
+        tongue = measure.tongue
+        front_loc = tongue.up_img_uri
+        back_loc = tongue.down_img_uri
+    elif measure.tongue_upload:
+        tongue_upload = measure.tongue_upload
+        front_loc = (
+            tongue_upload.tongue_front_corrected_loc
+            or tongue_upload.tongue_front_original_loc
+        )
+        back_loc = (
+            tongue_upload.tongue_back_corrected_loc
+            or tongue_upload.tongue_back_original_loc
+        )
+
+    branch = None
+    if measure.tongue_upload:
+        branch = await crud.branch.get(
+            db_session=db_session,
+            id=measure.tongue_upload.branch_id,
+        )
+
+    front_tongue_image_base64 = empty_image_base64
+    back_tongue_image_base64 = empty_image_base64
+    if front_loc:
+        tongue_file_path = front_loc
+        category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        image_downloader = download_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=str(tongue_file_path),
+        )
+        front_tongue_image_base64 = base64.b64encode(image_downloader.readall()).decode(
+            "utf8",
+        )
+
+    if back_loc:
+        tongue_file_path = back_loc
+        category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        image_downloader = download_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=str(tongue_file_path),
+        )
+        back_tongue_image_base64 = base64.b64encode(image_downloader.readall()).decode(
+            "utf8",
+        )
+
+    advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
+        db_session=db_session,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+
+    advanced_tongue = advanced_tongue or schemas.MeasureAdvancedTongue2Read(
+        id=measure_id,
+        measure_id=measure_id,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+
+    def format_array(arr):
+        if isinstance(arr, str):
+            return arr
+        return "、".join(arr)
+
+    with open("/app/src/auo_project/html/health_report/report-PDF.html", "r") as f:
+        html_template = f.read()
+    html_content = Template(html_template)
+    html_content = html_content.substitute(
+        number=measure.subject.number,
+        name=measure.subject.name,
+        sex_label=SEX_TYPE_LABEL.get(measure.subject.sex, "未提供"),
+        birth_date=measure.subject.birth_date.strftime("%Y/%m/%d"),
+        height=measure.height or "",
+        weight=measure.weight or "",
+        sbp=measure.sbp or "",
+        dbp=measure.dbp or "",
+        tongue_front_file=f"data:image/jpeg;base64,{str(front_tongue_image_base64)}",
+        tongue_back_file=f"data:image/jpeg;base64,{str(back_tongue_image_base64)}",
+        tongue_tip=format_array(advanced_tongue.tongue_tip),
+        tongue_status2=format_array(advanced_tongue.tongue_status2),
+        tongue_color=format_array(advanced_tongue.tongue_color),
+        tongue_coating_color=format_array(advanced_tongue.tongue_coating_color),
+        tongue_shap=format_array(advanced_tongue.tongue_shap),
+        tongue_coating_status=format_array(advanced_tongue.tongue_coating_status),
+        tongue_status1=format_array(advanced_tongue.tongue_status1),
+        tongue_coating_bottom=format_array(advanced_tongue.tongue_coating_bottom),
+        summary=advanced_tongue.tongue_summary or "",
+        doctor_name=measure.judge_dr,
+        judge_time=measure.judge_time.strftime("%Y/%m/%d %H:%M:%S"),
+        measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
+        measure_operator=measure.measure_operator,
+        org_name=measure.org.name,
+        branch_name=branch.name if branch else "",
+        address=branch.address if branch else "",
+        contact_phone=branch.contact_phone if branch else "",
+    )
+
+    output_html_file = f"/tmp/report-{measure_id}.html"
+    with open(output_html_file, "wb") as f:
+        f.write(html_content.encode("utf-8"))
+
+    ouput_filename = f"/tmp/report-{measure_id}.pdf"
+
+    options = {"enable-local-file-access": None}
+    pdfkit.from_file(output_html_file, ouput_filename, options=options)
+
+    headers = {
+        "Content-Disposition": "inline; filename*=utf-8"
+        '{}"'.format(quote(ouput_filename)),
+        "Content-Type": "application/octet-stream",
+    }
+
+    with open(ouput_filename, "rb") as file:
+        data = BytesIO(file.read())
+
+    os.remove(ouput_filename)
+    data.seek(0)
+    return StreamingResponse(data, media_type="application/pdf", headers=headers)
