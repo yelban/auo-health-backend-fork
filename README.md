@@ -448,12 +448,13 @@ await save_survey_result("nricm", ["nricm 問卷"])
 
 # 新增使用者
 
-# 改使用者密碼
+
 ```
 poetry run python -m auo_project.cli shell
 await create_user(org_name="x_medical_center", username="vivian.nw.chen@auo.com", password="", email="vivian.nw.chen@auo.com", full_name="Vivian Chen")
 ```
 
+# 改使用者密碼
 ```
 from auo_project.db.session import SessionLocal
 db_session = SessionLocal()
