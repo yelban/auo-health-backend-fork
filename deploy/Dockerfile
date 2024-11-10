@@ -1,6 +1,10 @@
 FROM python:3.9.6-slim-buster
 
-RUN apt-get update -y && apt-get install -y curl && apt-get autoremove -y && apt-get clean -y
+RUN apt-get update -y && \
+   apt-get install -y curl wkhtmltopdf fonts-noto-cjk fonts-noto-cjk-extra && \
+   apt-get autoremove -y && \
+   apt-get clean -y
+
 RUN python -m pip install pip==22.2.2 && \
    pip install poetry==1.2.0
 
