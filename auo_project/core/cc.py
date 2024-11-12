@@ -151,6 +151,10 @@ async def generate_tongue_cc_image(front_or_back: str, config_id: UUID) -> str:
                 if front_or_back == "front"
                 else cc_config.back_gamma
             ),
+            "saturation": 0,
+            "hue": 0,
+            "contrast_stretch_black_point": 100,
+            "contrast_stretch_white_point": 100,
         }
     )
 
