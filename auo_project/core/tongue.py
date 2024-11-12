@@ -4,7 +4,7 @@ from typing import List
 import pandas as pd
 import pydash as py_
 
-from auo_project import schemas
+from auo_project import models, schemas
 
 surface_disease_content = """
 tongue_tip	tongue_color	tongue_shap	tongue_status1	tongue_status2	tongue_coating_color	tongue_coating_status	surface_disease
@@ -105,7 +105,7 @@ def get_surface_disease_records():
 
 def get_tongue_summary(
     tongue_info: schemas.MeasureAdvancedTongue2UpdateInput,
-    tongue_sympotms: List[schemas.MeasureTongueSymptom],
+    tongue_sympotms: List[models.MeasureTongueSymptom],
 ):
     summary_components = [
         ("舌尖", ["tongue_tip"], ""),
