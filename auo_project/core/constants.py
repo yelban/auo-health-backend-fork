@@ -70,10 +70,12 @@ class SexType(IntEnum):
     """
     男 = 0
     女 = 1
+    未知 = -1
     """
 
     male = 0
     female = 1
+    unkwown = -1
 
 
 MEASURE_TIMES = [

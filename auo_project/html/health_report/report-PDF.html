@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@100..900&display=swap" rel="stylesheet">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,8 +13,7 @@
         html,body {
             leading-trim: both;
             text-edge: cap;
-            /* font-family: "Noto Sans TC"; */
-            font-family: "Arial";
+            font-family: "Noto Sans TC", Arial, Helvetica, sans-serif;
         }
         .wrap {
             display: flex;
@@ -28,9 +28,9 @@
             box-sizing: border-box;
             width: 100%;
             height: 0px;
-            border: 4px solid #002864;
+            border: 4px solid var(--Primary-90, #002864);
             border-radius: 2px;
-            margin-block: 8px;
+            margin: 0;
         }
         .container {
             width: 100%;
@@ -50,7 +50,7 @@
         }
 
         .page-title h1 {
-            color: #002864;
+            color: var(--Primary-90, #002864);
             text-align: center;
             font-size: 16px;
             font-style: normal;
@@ -58,26 +58,27 @@
             line-height: 150%; /* 24px */
         }
         .main-container {
-            display: grid;
-            gap: 8px;
             width: 100%;
             page-break-inside: avoid;
         }
         .section {
-            padding-block: 8px;
+            margin: 8px 0;
+            padding: 8px 0;
             border-radius: 4px;
-            border: 1px solid #DCE0E5;
+            border: 1px solid var(--Neutral-30, #DCE0E5);
         }
         .photos {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            border-bottom: 1px solid #DCE0E5;
+            font-size: 0;
+            border-bottom: 1px solid var(--Neutral-30, #DCE0E5);;
             padding: 8px 0;
             margin-bottom: 8px;
+            text-align: center;
         }
         .photos .card {
+            display: inline-block;
             width: 36%;
+            margin-left: 8px;
+            margin-right: 8px;
             border-radius: 4px;
             overflow: hidden;
             background-color: #EDEFF2;
@@ -85,7 +86,7 @@
         }
         .photos .card-header {
             padding: 6px 0 4px 0;
-            color: #14263D;
+            color: var(--Neutral-90, #14263D);
             text-align: center;
             font-size: 10px;
             font-style: normal;
@@ -145,7 +146,7 @@
             align-items: center;
             align-self: stretch;
             border-radius: 4px;
-            background: #002864;
+            background: var(--Primary-90, #002864);
             color: #fff;
 
             font-size: 10px;
@@ -162,11 +163,11 @@
             position: absolute;
             top: 0;
             left: 0;
-            border: 50vw solid #002864;
+            border: 50vw solid var(--Primary-90, #002864);
             z-index: -1;
         }
         .user-info-number {
-            color: #FFF;
+            color: var(--neutral-0100, #FFF);
             width: 60px;
             flex-shrink: 0;
         }
@@ -186,7 +187,7 @@
             justify-content: space-between;
         }
         .main-header .page-title {
-            color: #002864;
+            color: var(--Primary-90, #002864);
             text-align: center;
             font-size: 16px;
             font-style: normal;
@@ -194,7 +195,7 @@
             line-height: 150%; /* 24px */
         }
         .section-title {
-            color: #14263D;
+            color: var(--Neutral-90, #14263D);
             font-size: 10px;
             font-style: normal;
             font-weight: 700;
@@ -228,7 +229,8 @@
             color: #5E6979;
         }
         .item-text {
-            color: #00173B;
+            color: var(--Primary-100, #00173B);
+            font-family: "Noto Sans TC", Arial, Helvetica, sans-serif;
             font-size: 10px;
             font-style: normal;
             font-weight: 700;
@@ -260,7 +262,7 @@
             padding: 8px;
             border-radius: 4px;
             background-color: #F7F8FA;
-            color: #9098A3;
+            color: var(--Neutral-50, #9098A3);
             font-size: 12px;
             font-style: normal;
             font-weight: 700;
@@ -450,7 +452,7 @@
                     <img src="/app/src/auo_project/html/health_report/title-bg.png" class="title-bg-img" alt="">
                 </h2>
                 <div class="fluid-content">
-                    <p class="item-text">$summary
+                    <p class="item-text">$tongue_memo
                     </p>
                 </div>
             </section>
@@ -493,9 +495,9 @@
             <div class="container">
                 <div class="footer-content">
                     <address>
-                        <span>$org_name $branch_name</span>
-                        <span>地址：$address</span>
-                        <span>電話：$contact_phone</span>
+                        <div>$org_name $branch_name</div>
+                        <div>地址：$address</div>
+                        <div>電話：$contact_phone</div>
                     </address>
                 </div>
                 <div class="footer-slg">

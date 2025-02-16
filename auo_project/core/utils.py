@@ -4,6 +4,8 @@ from datetime import date, datetime, time
 from io import StringIO
 from random import randrange
 from typing import Optional, Union
+from io import BytesIO
+from PIL import Image
 
 import dateutil.parser
 import pandas as pd
@@ -537,3 +539,18 @@ def generate_password(k: int = 24) -> str:
     return "".join(
         random.choices(string.ascii_letters + string.digits, k=k),
     )
+
+
+def convert_jpg_to_png(file) -> BytesIO:
+    img = Image.open(file, mode='r')
+    img_format = img.format
+    print(f"img file format: {img_format}")
+    if img_format == "PNG":
+        file.seek(0)
+        return file
+    file.seek(0)
+    img = Image.open(file, mode="r")
+    img_byte_arr = BytesIO()
+    img.save(img_byte_arr, "PNG")
+    img_byte_arr.seek(0)
+    return img_byte_arr

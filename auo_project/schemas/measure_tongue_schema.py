@@ -18,6 +18,8 @@ class MeasureTongueCreate(MeasureTongueBase):
 
 
 class MeasureTongueUpdate(BaseModel):
+    up_img_cc_uri: str = Field(None, title="上舌象圖片校色 URI")
+    down_img_cc_uri: str = Field(None, title="下舌象圖片校色 URI")
     tongue_color: int = Field(None, title="舌色; 無:null/淡白:0/淡紅:1/紅:2/絳:3/青紫:4")
     tongue_shap: List[int] = Field(
         [],
@@ -115,6 +117,7 @@ class TongueSampleImage(BaseModel):
 
 class TongueSampleMeasure(BaseModel):
     image: TongueSampleImage = Field(None, title="舌象圖片")
+    original_image: TongueSampleImage = Field(None, title="原始舌象圖片")
     measure_time: str = Field(None, title="拍攝時間")
     symptom: List[SymptomItem] = Field([], title="症狀/特徵列表")
     summary: str = Field(None, title="舌象概要")

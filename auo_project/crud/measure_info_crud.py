@@ -188,6 +188,7 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
                 MeasureInfo.subject_id == subject_id,
                 MeasureInfo.measure_time >= start_at,
                 MeasureInfo.measure_time < end_at,
+                MeasureInfo.is_active == True,
             ),
         )
         return response.scalar_one_or_none()

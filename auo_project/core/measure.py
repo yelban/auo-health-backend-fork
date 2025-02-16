@@ -459,7 +459,20 @@ async def create_merged_measures():
         await db_session.execute("drop table if exists measure.merged_measures")
         await db_session.execute(stmt)
         await db_session.execute(
-            "create role readaccess nologin;",
+            """
+DO
+$do$
+BEGIN
+   IF EXISTS (
+      SELECT FROM pg_catalog.pg_roles
+      WHERE  rolname = 'readaccess') THEN
+
+      RAISE NOTICE 'Role "readaccess" already exists. Skipping.';
+   ELSE
+      CREATE ROLE readaccess NOLOGIN;
+   END IF;
+END
+$do$;""",
         )
         await db_session.execute(
             "GRANT SELECT ON measure.merged_measures TO readaccess;",

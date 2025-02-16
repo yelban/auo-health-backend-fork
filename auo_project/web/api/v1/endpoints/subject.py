@@ -2067,6 +2067,7 @@ async def export_report(
     headers = {
         "Content-Disposition": "inline; filename*=utf-8" '{}"'.format(quote(filename)),
         "Content-Type": "application/octet-stream",
+        "X-Suggested-Filename": filename,
     }
     from io import BytesIO
 

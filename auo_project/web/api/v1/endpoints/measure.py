@@ -1539,8 +1539,10 @@ async def get_tongue(
 
     if measure.tongue:
         tongue = measure.tongue
-        front_loc = tongue.up_img_uri
-        back_loc = tongue.down_img_uri
+        front_loc = tongue.up_img_cc_uri or tongue.up_img_uri
+        back_loc = tongue.down_img_cc_uri or tongue.down_img_uri
+        front_origin_loc = tongue.up_img_uri
+        back_origin_loc = tongue.down_img_uri
     elif measure.tongue_upload:
         tongue_upload = measure.tongue_upload
         front_loc = (
@@ -1551,11 +1553,18 @@ async def get_tongue(
             tongue_upload.tongue_back_corrected_loc
             or tongue_upload.tongue_back_original_loc
         )
+        front_origin_loc = tongue_upload.tongue_front_original_loc
+        back_origin_loc = tongue_upload.tongue_back_original_loc
     else:
         front_loc = ""
         back_loc = ""
+        front_origin_loc = ""
+        back_origin_loc = ""
     front_tongue_image_url = None
     back_tongue_image_url = None
+    front_tongue_origin_image_url = None
+    back_tongue_origin_image_url = None
+
     if front_loc:
         container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
         file_path = front_loc
@@ -1571,6 +1580,21 @@ async def get_tongue(
         )
         front_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
 
+    if front_origin_loc:
+        container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        file_path = front_origin_loc
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        sas_token = generate_blob_sas(
+            account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
+            container_name=container_name,
+            blob_name=file_path,
+            account_key=settings.AZURE_STORAGE_KEY_INTERNET,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            # TODO: add ip
+        )
+        front_tongue_origin_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+
     if back_loc:
         container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
         file_path = back_loc
@@ -1585,6 +1609,21 @@ async def get_tongue(
             # TODO: add ip
         )
         back_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+
+    if back_origin_loc:
+        container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        file_path = back_origin_loc
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        sas_token = generate_blob_sas(
+            account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
+            container_name=container_name,
+            blob_name=file_path,
+            account_key=settings.AZURE_STORAGE_KEY_INTERNET,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            # TODO: add ip
+        )
+        back_tongue_origin_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
 
     advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
         db_session=db_session,
@@ -1767,6 +1806,10 @@ async def get_tongue(
             image=schemas.TongueImage(
                 front=front_tongue_image_url or "",
                 back=back_tongue_image_url or "",
+            ),
+            original_image=schemas.TongueImage(
+                front=front_tongue_origin_image_url or "",
+                back=back_tongue_origin_image_url or "",
             ),
             measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
             symptom=result2,
@@ -2122,7 +2165,7 @@ async def export_report(
         number=measure.subject.number,
         name=measure.subject.name,
         sex_label=SEX_TYPE_LABEL.get(measure.subject.sex, "未提供"),
-        birth_date=measure.subject.birth_date.strftime("%Y/%m/%d"),
+        birth_date=measure.subject.birth_date.strftime("%Y - %m - %d"),
         height=measure.height or "",
         weight=measure.weight or "",
         sbp=measure.sbp or "",
@@ -2137,10 +2180,10 @@ async def export_report(
         tongue_coating_status=format_array(advanced_tongue.tongue_coating_status),
         tongue_status1=format_array(advanced_tongue.tongue_status1),
         tongue_coating_bottom=format_array(advanced_tongue.tongue_coating_bottom),
-        summary=advanced_tongue.tongue_summary or "",
+        tongue_memo=advanced_tongue.tongue_memo or "",
         doctor_name=measure.judge_dr,
-        judge_time=measure.judge_time.strftime("%Y/%m/%d %H:%M:%S"),
-        measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
+        judge_time=measure.judge_time.strftime("%Y-%m-%d %H:%M:%S"),
+        measure_time=measure.measure_time.strftime("%Y-%m-%d %H:%M:%S"),
         measure_operator=measure.measure_operator,
         org_name=measure.org.name,
         branch_name=branch.name if branch else "",
@@ -2154,13 +2197,22 @@ async def export_report(
 
     ouput_filename = f"/tmp/report-{measure_id}.pdf"
 
-    options = {"enable-local-file-access": None}
+    options = {
+        "page-width": "100mm",
+        "page-height": "140mm",
+        "enable-local-file-access": None,
+    }
     pdfkit.from_file(output_html_file, ouput_filename, options=options)
 
+    download_filename = quote(
+        f"{measure.subject.number}_{measure.measure_time.strftime('%Y%m%d%H%M%S')}.pdf",
+    )
     headers = {
+        "Access-Control-Expose-Headers": "Content-Disposition, X-Suggested-Filename",
         "Content-Disposition": "inline; filename*=utf-8"
-        '{}"'.format(quote(ouput_filename)),
+        '{}"'.format(download_filename),
         "Content-Type": "application/octet-stream",
+        "X-Suggested-Filename": download_filename,
     }
 
     with open(ouput_filename, "rb") as file:

@@ -34,7 +34,8 @@ class MeasureTongueBase(BaseModel):
     tongue_coating_bottom: int = Field(None, title="舌下脈絡; 無:null/正常:0/怒張:1")
     up_img_uri: str = Field(default=None, nullable=True)
     down_img_uri: str = Field(default=None, nullable=True)
-
+    up_img_cc_uri: str = Field(default=None, nullable=True)
+    down_img_cc_uri: str = Field(default=None, nullable=True)
     class Config:
         arbitrary_types_allowed = True
 

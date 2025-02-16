@@ -1153,7 +1153,7 @@ async def process_file(
             obj_path = f"{subject.id}/{measure_info.id}/T_up.jpg"
             up_img_uri = upload_blob_file(
                 blob_service_client=internet_blob_service,
-                category="image",
+                category=settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE,
                 file_path=obj_path,
                 object=result_dict["T_up.jpg"],
             )
@@ -1161,7 +1161,7 @@ async def process_file(
             obj_path = f"{subject.id}/{measure_info.id}/T_down.jpg"
             down_img_uri = upload_blob_file(
                 blob_service_client=internet_blob_service,
-                category="image",
+                category=settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE,
                 file_path=obj_path,
                 object=result_dict["T_down.jpg"],
             )

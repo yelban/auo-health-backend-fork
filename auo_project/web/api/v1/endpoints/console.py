@@ -21,7 +21,9 @@ from auo_project.core.azure import (
     internet_blob_service,
     upload_blob_file,
 )
-from auo_project.core.cc import get_tune, get_wb
+from auo_project.core.cc import get_tune
+from auo_project.core.utils import convert_jpg_to_png
+from auo_project.core.ai import get_color_card_result
 from auo_project.core.config import settings
 from auo_project.core.constants import (
     TONGUE_CC_STATUS_LABEL,
@@ -2043,20 +2045,24 @@ async def preview_cc_image(
 
     category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
 
-    # check wb file exists
-    wb_file_path = f"tongue_config/{cc_config.org_id}/{cc_config.id}/{file_path.stem}_WB{file_path.suffix}"
-    wb_blob_client = internet_blob_service.get_blob_client(
+    # check color card transformation file exists
+    cct_file_path = f"tongue_config/{cc_config.org_id}/{cc_config.id}/{file_path.stem}_CT{file_path.suffix}"
+    cct_blob_client = internet_blob_service.get_blob_client(
         container=category,
-        blob=str(wb_file_path),
+        blob=str(cct_file_path),
     )
-    if wb_blob_client.exists():
-        wb_image_downloader = download_file(
+    cct_image = None
+    if cct_blob_client.exists():
+        print("cct_blob_client exists")
+        cct_image_downloader = download_file(
             blob_service_client=internet_blob_service,
             category=category,
-            file_path=str(wb_file_path),
+            file_path=str(cct_file_path),
         )
-        wb_image = BytesIO(wb_image_downloader.readall())
-    else:
+        cct_image = BytesIO(cct_image_downloader.readall())
+        if cct_image.getbuffer().nbytes == 0:
+            cct_image = None
+    if cct_image is None:
         # download image from azure storage
         original_image_downloader = download_file(
             blob_service_client=internet_blob_service,
@@ -2064,21 +2070,26 @@ async def preview_cc_image(
             file_path=str(file_path),
         )
         original_image = BytesIO(original_image_downloader.readall())
-        wb_image = get_wb(original_image)
-        upload_blob_file(
-            blob_service_client=internet_blob_service,
-            category=category,
-            file_path=str(wb_file_path),
-            object=wb_image,
-            overwrite=True,
-        )
+        cct_image = get_color_card_result(original_image)
+        if cct_image is None:
+            cct_image = convert_jpg_to_png(file=original_image)
+        if cct_image:
+            upload_blob_file(
+                blob_service_client=internet_blob_service,
+                category=category,
+                file_path=str(cct_file_path),
+                object=cct_image,
+                overwrite=True,
+            )
+    print("cct_image size", cct_image.getbuffer().nbytes)
+    cct_image.seek(0)
 
     # request cc result to cc api server
     cc_image = get_tune(
         contrast=input_payload.contrast,
         brightness=input_payload.brightness,
         gamma=input_payload.gamma,
-        tongue_file=wb_image,
+        tongue_file=cct_image,
     )
 
     # upload cc image to azure storage
@@ -2177,14 +2188,14 @@ async def update_tongue_cc_config(
     "/tongue_cc_configs/{config_id}/reset",
     response_model=schemas.TongueCCConfigRead,
 )
-async def update_tongue_cc_config(
+async def reset_tongue_cc_config(
     config_id: UUID,
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ) -> Any:
     """
-    Update Tongue CC Config.
+    Reset Tongue CC Config.
     """
     cc_config = await crud.tongue_cc_config.get(db_session=db_session, id=config_id)
     if cc_config is None:
@@ -2346,14 +2357,14 @@ async def create_tongue_cc_config(
             autocommit=False,
         )
 
-        for front_or_back in ["front", "back"]:
-            celery_app.send_task(
-                "auo_project.services.celery.tasks.task_generate_tongue_wb_image",
-                kwargs={
-                    "front_or_back": front_or_back,
-                    "config_id": obj.id,
-                },
-            )
+        # for front_or_back in ["front", "back"]:
+        #     celery_app.send_task(
+        #         "auo_project.services.celery.tasks.task_generate_tongue_wb_image",
+        #         kwargs={
+        #             "front_or_back": front_or_back,
+        #             "config_id": obj.id,
+        #         },
+        #     )
 
     except Exception as e:
         await crud.tongue_cc_config.remove(db_session=db_session, id=obj.id)
@@ -2373,6 +2384,7 @@ async def update_tongue_cc_config(
     pad_name: Optional[str] = Form(None, title="平板名稱"),
     tongue_front_file: Optional[UploadFile] = File(None, description="舌象正面圖片"),
     tongue_back_file: Optional[UploadFile] = File(None, description="舌象背面圖片"),
+    celery_app=Depends(deps.get_celery_app),
     db_session: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
