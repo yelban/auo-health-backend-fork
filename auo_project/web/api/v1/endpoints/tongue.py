@@ -553,283 +553,6 @@ async def update_tongue_memo(
     return {"tongue_memo": memo.content}
 
 
-# @router.get("/data/sample", response_model=AdvancedTongueOutput)
-# async def get_sample_data(
-#     db_session: AsyncSession = Depends(deps.get_db),
-#     # current_user: models.User = Depends(deps.get_current_active_user),
-# ):
-#     if settings.ENVIRONMENT == "dev":
-#         measure = await crud.measure_info.get(
-#             db_session=db_session,
-#             id="46dc24fe-2ae6-40df-bf2e-7733b7f8dc88",
-#             relations=["subject", "tongue"],
-#         )
-#     else:
-#         measure = await crud.measure_info.get(
-#             db_session=db_session,
-#             id="edf0680d-c4f1-457b-9ff4-ce885d5b9659",
-#             relations=["subject", "tongue"],
-#         )
-#     tongue = measure.tongue
-#     if tongue:
-#         if tongue.up_img_uri:
-#             container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
-#             file_path = "tongue/tongue_example/T_up.jpg"
-#             expiry = datetime.utcnow() + timedelta(minutes=15)
-#             sas_token = generate_blob_sas(
-#                 account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
-#                 container_name=container_name,
-#                 blob_name=file_path,
-#                 account_key=settings.AZURE_STORAGE_KEY_INTERNET,
-#                 permission=BlobSasPermissions(read=True),
-#                 expiry=expiry,
-#                 # TODO: add ip
-#             )
-#             front_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
-
-#         if tongue.down_img_uri:
-#             container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
-#             file_path = "tongue/tongue_example/T_down.jpg"
-#             expiry = datetime.utcnow() + timedelta(minutes=15)
-#             sas_token = generate_blob_sas(
-#                 account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
-#                 container_name=container_name,
-#                 blob_name=file_path,
-#                 account_key=settings.AZURE_STORAGE_KEY_INTERNET,
-#                 permission=BlobSasPermissions(read=True),
-#                 expiry=expiry,
-#                 # TODO: add ip
-#             )
-#             back_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
-
-#     tongue_symptoms = await crud.measure_tongue_symptom.get_all(db_session=db_session)
-#     tongue_symptoms = py_.order_by(tongue_symptoms, ["order"])
-#     tongue_symptom_diseases = await crud.measure_tongue_symptom_disease.get_all(
-#         db_session=db_session,
-#     )
-#     tongue_symptom_diseases_dict = {}
-#     tongue_groups = await crud.measure_tongue_group_symptom.get_all(
-#         db_session=db_session,
-#     )
-#     tongue_groups = sorted(tongue_groups, key=lambda x: (x.item_id, x.group_id))
-#     tongue_group_dict = dict(
-#         [
-#             (f"{item.item_id}:{item.group_id}", item.component_type)
-#             for item in tongue_groups
-#         ],
-#     )
-
-#     for item in tongue_symptom_diseases:
-#         tongue_symptom_diseases_dict[item.item_id] = tongue_symptom_diseases_dict.get(
-#             item.item_id,
-#             {},
-#         )
-#         disease_item = Disease(
-#             value=item.disease_id,
-#             label=item.disease_id,  # TODO; item.disease.disease_name
-#             selected=False,
-#         )
-
-#         if item.symptom_id in tongue_symptom_diseases_dict[item.item_id]:
-#             tongue_symptom_diseases_dict[item.item_id][item.symptom_id].append(
-#                 disease_item,
-#             )
-#         else:
-#             tongue_symptom_diseases_dict[item.item_id][item.symptom_id] = [disease_item]
-
-#     level_map = {
-#         1: "輕",
-#         2: "中",
-#         3: "重",
-#     }
-#     result = {}
-#     result2 = []
-
-#     for item in tongue_symptoms:
-#         append_item = {
-#             "id": item.id,
-#             "item_id": item.item_id,
-#             "item_name": item.item_name,
-#             "group_id": item.group_id or "0",
-#             "symptom_id": item.symptom_id,
-#             "symptom_name": item.symptom_name,
-#             "symptom_description": item.symptom_description,
-#             "level_options": (
-#                 [
-#                     LevelOption(
-#                         label=level_map.get(int(level)),
-#                         value=int(level),
-#                         selected=False,
-#                     )
-#                     for level in item.symptom_levels
-#                 ]
-#                 if item.symptom_levels
-#                 else []
-#             ),
-#             "is_default": item.is_default or False,
-#             "is_normal": item.is_normal or False,
-#             "diseases": tongue_symptom_diseases_dict.get(item.item_id, {}).get(
-#                 item.symptom_id,
-#                 [],
-#             ),
-#             "selected": item.is_default or False,
-#         }
-#         if item.item_id in result:
-#             result[item.item_id].append(append_item)
-#         else:
-#             result[item.item_id] = [append_item]
-
-#         for key, value in result.items():
-#             result2.append(
-#                 {
-#                     "item_id": key,
-#                     "item_name": value[0]["item_name"],
-#                     "symptoms": py_.chain(value)
-#                     .group_by("group_id")
-#                     .map_(
-#                         lambda objs, group_id: {
-#                             "item_id": key,
-#                             "component_id": f"{key}:{group_id}",
-#                             "component_type": tongue_group_dict.get(
-#                                 f"{key}:{group_id}",
-#                                 "radio",
-#                             ),
-#                             "children": py_.map_(
-#                                 objs,
-#                                 lambda x: py_.pick_by(
-#                                     x,
-#                                     [
-#                                         "id",
-#                                         "symptom_id",
-#                                         "symptom_name",
-#                                         "symptom_description",
-#                                         "level_options",
-#                                         "is_default",
-#                                         "is_normal",
-#                                         "selected",
-#                                         "diseases",
-#                                     ],
-#                                 ),
-#                             ),
-#                         },
-#                     )
-#                     .value(),
-#                 },
-#             )
-
-#     return AdvancedTongueOutput(
-#         subject=measure.subject,
-#         measure_tongue=TongueSampleMeasure(
-#             image=TongueSampleImage(
-#                 front=front_tongue_image_url or "",
-#                 back=back_tongue_image_url or "",
-#             ),
-#             measure_time=measure.measure_time.strftime("%Y-%m-%d %H:%M"),
-#             symptom=result2,
-#             summary="內容內容內容內容內容內容內容內容內容內容",
-#             memo="檢測標記",
-#         ),
-#     )
-
-
-# @router.post("/upload/config_zip", response_model=TongueConfigUploadResponse)
-# async def upload_config_zip(
-#     upload_file: UploadFile = File(description="校色 ZIP 檔"),
-#     db_session: AsyncSession = Depends(deps.get_db),
-#     current_user: models.User = Depends(deps.get_current_active_user),
-# ):
-
-#     pickle_sha256_hex = None
-#     color_ini_content = None
-
-#     with ZipFile(upload_file.file._file, mode="r") as config_zip:
-#         infolist = config_zip.infolist()
-#         print(infolist)
-
-#         for file in infolist:
-#             filepath = Path(file.filename)
-#             filename = filepath.name
-#             if filename == "color_correction.pkl":
-#                 with config_zip.open(str(filepath), mode="r") as f:
-#                     pickle_content = f.read()
-#                     pickle_sha256 = hashlib.sha256()
-#                     pickle_sha256.update(pickle_content)
-#                     pickle_sha256_hex = pickle_sha256.hexdigest()
-#             elif filename == "color.ini":
-#                 with config_zip.open(str(filepath), mode="r") as f:
-#                     color_ini_content = f.read()
-
-#     if pickle_sha256_hex and color_ini_content:
-#         # upload to azure blob
-
-#         file_loc = f"{current_user.org_id}/{pickle_sha256_hex}.zip"
-#         upload_file.file._file.seek(0)
-#         upload_blob_file(
-#             blob_service_client=private_blob_service,
-#             category=settings.AZURE_STORAGE_CONTAINER_TONGUE_CONFIG,
-#             file_path=file_loc,
-#             object=upload_file.file._file,
-#             overwrite=True,
-#         )
-
-#         # save to db
-
-#         # pickle_content_base64_zlib = base64.b64encode(
-#         #     zlib.compress(pickle_content, level=9)
-#         # ).decode("utf-8")
-#         measure_tongue_config_upload_in = schemas.MeasureTongueConfigUploadCreate(
-#             org_id=current_user.org_id,
-#             user_id=current_user.id,
-#             color_correction_pkl="",
-#             color_ini=color_ini_content,
-#             file_loc=file_loc,
-#             color_hash=pickle_sha256_hex,
-#         )
-#         measure_tongue_config_upload = await crud.measure_tongue_config_upload.create(
-#             db_session=db_session,
-#             obj_in=measure_tongue_config_upload_in,
-#         )
-
-#         measure_tongue_config = await crud.measure_tongue_config.get_by_org_id(
-#             db_session=db_session,
-#             org_id=current_user.org_id,
-#         )
-#         if measure_tongue_config:
-#             await crud.measure_tongue_config.update(
-#                 db_session=db_session,
-#                 obj_current=measure_tongue_config,
-#                 obj_new=schemas.MeasureTongueConfigUpdate(
-#                     upload_id=measure_tongue_config_upload.id,
-#                 ),
-#             )
-#         else:
-#             await crud.measure_tongue_config.create(
-#                 db_session=db_session,
-#                 obj_in=schemas.MeasureTongueConfigCreate(
-#                     org_id=current_user.org_id,
-#                     upload_id=measure_tongue_config_upload.id,
-#                 ),
-#             )
-
-#         return {
-#             "msg": "File uploaded",
-#             "upload_id": measure_tongue_config_upload.id,
-#             "color_hash": pickle_sha256_hex,
-#         }
-
-#     else:
-#         raise HTTPException(
-#             status_code=422,
-#             detail=[
-#                 {
-#                     "loc": ["color_correction.pkl"],
-#                     "msg": "the file does not exist in the zip file",
-#                     "type": "value_error",
-#                 },
-#             ],
-#         )
-
-
 @router.post("/upload/measure", response_model=schemas.MeasureTongueUploadRead)
 async def upload_measure(
     id: Optional[str] = Form(
@@ -843,49 +566,36 @@ async def upload_measure(
         description="受測者姓名 varchar(128)",
     ),
     birthday: Optional[str] = Form(
-        ...,
+        None,
         min_length=10,
         max_length=10,
         regex="^[0-9]{4}/[0-9]{2}/[0-9]{2}$",
         description="生日，格式為 YYYY/MM/DD",
     ),
-    # TODO: depreciated
-    # age: Optional[int] = Form(..., ge=0, description="年齡。需大於 0。"),
-    sex: Optional[SexType] = Form(..., description="性別。0: 男, 1: 女"),
+    sex: Optional[SexType] = Form(SexType.unkwown, description="性別。0: 男, 1: 女, -1: 未知。"),
     number: str = Form(
         ...,
         max_length=128,
         description="受測者編號或病歷編號 varchar(128)",
     ),
-    proj_num: str = Form(None, max_length=128, description="計畫編號 varchar(128)"),
+    proj_num: Optional[str] = Form(
+        None, max_length=128, description="計畫編號 varchar(128)"
+    ),
     # consult_dr_name: str = Form(None, max_length=128, description="判讀醫師姓名 varchar(128)"),
-    consult_dr_id: UUID = Form(None, description="判讀醫師 ID varchar(128)"),
-    # TODO: depreciated
-    # measure_operator: str = Form(
-    #     None,
-    #     max_length=128,
-    #     description="檢測人員 email varchar(128)",
-    # ),
-    # TODO: depreciated
-    # color_hash: str = Form(
-    #     None,
-    #     min_length=64,
-    #     max_length=64,
-    #     description="校正檔 SHA256 varchar(64)",
-    # ),
+    consult_dr_id: Optional[UUID] = Form(None, description="判讀醫師 ID varchar(128)"),
     tongue_front_file: UploadFile = File(description="舌象正面圖片"),
     tongue_back_file: UploadFile = File(description="舌象背面圖片"),
     # field_id: UUID = Form(
     #     ...,
     #     description="場域 ID UUID",
     # ),
-    device_id: str = Form(
-        ...,
+    device_id: Optional[str] = Form(
+        None,
         max_length=128,
         description="舌診擷取設備編號 varchar(128)",
     ),
-    pad_id: str = Form(
-        ...,
+    pad_id: Optional[str] = Form(
+        None,
         max_length=128,
         description="平板 ID varchar(128)",
     ),
@@ -907,36 +617,36 @@ async def upload_measure(
             ],
         )
     if birth_date is None:
-        raise HTTPException(
-            status_code=422,
-            detail=[
-                {
-                    "loc": ["birthday"],
-                    "msg": "date value is invalid",
-                    "type": "value_error",
-                },
-            ],
-        )
+        birth_date = datetime(1900, 1, 1)
 
-    cc_config = await crud.tongue_cc_config.get_by_device_id(
-        db_session=db_session,
-        device_id=device_id,
-    )
-    if cc_config is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Not found tongue_cc_config by device_id: {device_id}",
+
+    if device_id:
+        cc_config = await crud.tongue_cc_config.get_by_device_id(
+            db_session=db_session,
+            device_id=device_id,
         )
-    field = await crud.branch_field.get(
-        db_session=db_session,
-        id=cc_config.field_id,
-        relations=["branch"],
-    )
-    if field is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Not found field by device_id: {device_id}",
+    if device_id is None and pad_id is not None:
+        cc_config = await crud.tongue_cc_config.get_by_pad_id(
+            db_session=db_session, pad_id=pad_id
         )
+    # 未來不需要 device_id, pad_id 因為不用根據場域校色
+
+    # if cc_config is None:
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail=f"Not found tongue_cc_config by device_id: {device_id} or pad_id: {pad_id}",
+    #     )
+    # field = await crud.branch_field.get(
+    #     db_session=db_session,
+    #     id=cc_config.field_id,
+    #     relations=["branch"],
+    # )
+    # if field is None:
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail=f"Not found field by device_id: {device_id}",
+    #     )
+
     # TODO: check permission rule
     # print("current_user.org_id", current_user.org_id, "field.branch.org_id", field.branch.org_id)
     # if field.branch.org_id != current_user.org_id:
@@ -944,7 +654,7 @@ async def upload_measure(
     #         status_code=400,
     #         detail=f"Permission Error",
     #     )
-    org_id = field.branch.org_id
+    org_id = current_user.org_id
 
     doctor = None
     doctor_id = None
@@ -1005,11 +715,12 @@ async def upload_measure(
         obj_in=measure_info_in,
     )
 
+    # 是否需要紀錄 branch id? 以現階段來說不用
     tongue_upload_in = schemas.MeasureTongueUploadCreate(
         measure_id=measure_info.id,
-        org_id=field.branch.org_id,
-        branch_id=field.branch_id,
-        field_id=field.id,
+        org_id=current_user.org_id,
+        branch_id=None,
+        field_id=None,
         owner_id=current_user.id,
         subject_id=subject.id,
         name=name,

@@ -1,11 +1,16 @@
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Query
 from fastapi.param_functions import Depends
+from fastapi.encoders import jsonable_encoder
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel import select
+
 
 from auo_project import crud, models
 from auo_project.web.api import deps
+from auo_project.core.utils import get_filters
 
 router = APIRouter()
 
@@ -54,7 +59,7 @@ async def search_dr(
     return crud.doctor.format_options(doctors=doctors, add_all=False)
 
 
-@router.get("/subject")
+@router.get("/subject", response_model=list[models.Subject])
 async def search_subject(
     keyword: str = Query(..., title="搜尋關鍵字"),
     db_session: AsyncSession = Depends(deps.get_db),
@@ -63,8 +68,44 @@ async def search_subject(
 ) -> Any:
     """
     Search subject by keyword using colunms: sid, name, number
+    When keyword length is 8 and all words are number, it will convert the number to yyyymmdd and search subjects measured at the date.
     """
     # 搜尋身分證字號、護照號碼、病歷編號、姓名
+    if len(keyword) == 8 and all(
+        map(lambda x: isinstance(x, str) and x.isdigit(), keyword)
+    ):
+        try:
+
+            measure_date = datetime.strptime(keyword, "%Y%m%d")
+            start_date = measure_date
+            end_date = measure_date + timedelta(hours=24) + timedelta(microseconds=-1)
+            measure_filters = get_filters(
+                {
+                    "is_active": True,
+                    "org_id": current_user.org_id,
+                    "measure_time__ge": start_date,
+                    "measure_time__le": end_date,
+                }
+            )
+            measure_expressions = models.MeasureInfo.filter_expr(**measure_filters)
+            subquery = (
+                select(models.Subject)
+                .join(models.MeasureInfo)
+                .where(*measure_expressions)
+                .distinct()
+                .subquery()
+            )
+            query = select(models.Subject).join(
+                subquery, models.Subject.id == subquery.c.id
+            ).order_by(models.Subject.last_measure_time.asc())
+            response = await db_session.execute(query)
+            subjects = response.scalars().all()
+            # update last_measure_time as keyword
+            subjects = [{**jsonable_encoder(subject), "last_measure_time": measure_date} for subject in subjects]
+            return subjects
+        except Exception as e:
+            print(f"error: {e}")
+
     subjects = await crud.subject.get_all_by_keyword(
         db_session=db_session,
         org_id=current_user.org_id,

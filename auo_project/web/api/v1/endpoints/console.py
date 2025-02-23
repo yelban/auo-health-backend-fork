@@ -22,7 +22,7 @@ from auo_project.core.azure import (
     upload_blob_file,
 )
 from auo_project.core.cc import get_tune
-from auo_project.core.utils import convert_jpg_to_png
+from auo_project.core.utils import convert_jpg_to_png, delete_subject_func
 from auo_project.core.ai import get_color_card_result
 from auo_project.core.config import settings
 from auo_project.core.constants import (

@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlmodel import or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,6 +15,17 @@ from auo_project.schemas.measure_tongue_upload_schema import (
 class CRUDMeasureTongueUpload(
     CRUDBase[MeasureTongueUpload, MeasureTongueUploadCreate, MeasureTongueUploadUpdate],
 ):
+    async def get_by_subject_id(
+        self, db_session: AsyncSession, subject_id: UUID
+    ) -> list[MeasureTongueUpload]:
+        response = await db_session.execute(
+            select(MeasureTongueUpload).where(
+                MeasureTongueUpload.subject_id == subject_id
+            ),
+        )
+
+        return response.scalars().all()
+
     async def get_unprocessed_rows(
         self,
         db_session: AsyncSession,
