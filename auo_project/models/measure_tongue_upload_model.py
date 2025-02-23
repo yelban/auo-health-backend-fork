@@ -29,14 +29,16 @@ class MeasureTongueUploadBase(BaseModel):
         nullable=False,
         foreign_key="measure.subjects.id",
     )
-    branch_id: UUID = Field(
+    branch_id: Optional[UUID] = Field(
+        default=None,
         index=True,
-        nullable=False,
+        nullable=True,
         foreign_key="app.auth_branches.id",
     )
-    field_id: UUID = Field(
+    field_id: Optional[UUID] = Field(
+        default=None,
         index=True,
-        nullable=True,  # TODO: change to False after migration
+        nullable=True,
         foreign_key="app.fields.id",
     )
     device_id: str = Field(None, title="舌診擷取設備編號", nullable=True)
