@@ -11,9 +11,10 @@ def get_color_card_result(raw_image) -> BytesIO:
     raw_image.seek(0)
     files = {"raw_image": raw_image}
     response = requests.post(
-        api_endpoint, files=files, params={"method": "linear_scale_v2"},
+        api_endpoint, files=files, params={"method": "lab_v2"},
     )
     if response.status_code == 200:
+        print(f"status_code: {response.status_code}")
         output_stream = BytesIO(response.content)
         output_stream.seek(0)
         return output_stream
