@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import UUID
 
 import requests
+from PIL import Image
 
 from auo_project import crud, schemas
 from auo_project.core.ai import get_ai_tongue_result, get_color_card_result
@@ -238,12 +239,6 @@ async def process_tongue_image(tongue_upload_id: UUID) -> str:
         db_session=db_session,
         id=tongue_upload_id,
     )
-    cc_config = await crud.tongue_cc_config.get_by_field_id(
-        db_session=db_session,
-        field_id=tongue_upload.field_id,
-    )
-    if not cc_config:
-        raise Exception("Config not found")
 
     tongue_front_original_loc = Path(tongue_upload.tongue_front_original_loc)
     tongue_back_original_loc = Path(tongue_upload.tongue_back_original_loc)
@@ -265,33 +260,19 @@ async def process_tongue_image(tongue_upload_id: UUID) -> str:
 
     png_front_image = convert_jpg_to_png(file=front_tongue_file)
     png_back_image = convert_jpg_to_png(file=back_tongue_file)
-
+    print("get_color_card_result start")
     color_transform_front_image = get_color_card_result(raw_image=png_front_image)
     color_transform_back_image = get_color_card_result(raw_image=png_back_image)
+    print("get_color_card_result end")
+
     if color_transform_front_image is None:
         color_transform_front_image = png_front_image
     if color_transform_back_image is None:
         color_transform_back_image = png_back_image
 
-    # cc_front_image = get_tune(
-    #     contrast=cc_config.front_contrast,
-    #     brightness=cc_config.front_brightness,
-    #     gamma=cc_config.front_gamma,
-    #     tongue_file=color_transform_front_image,
-    # )
-
-    # cc_back_image = get_tune(
-    #     contrast=cc_config.back_contrast,
-    #     brightness=cc_config.back_brightness,
-    #     gamma=cc_config.back_gamma,
-    #     tongue_file=color_transform_back_image,
-    # )
-
     cc_front_image = color_transform_front_image
     cc_back_image = color_transform_back_image
 
-    # cc_front_file_path = f"{tongue_front_original_loc.parent}/{tongue_front_original_loc.stem}_cc{tongue_front_original_loc.suffix}"
-    # cc_back_file_path = f"{tongue_back_original_loc.parent}/{tongue_back_original_loc.stem}_cc{tongue_back_original_loc.suffix}"
     cc_front_file_path = f"{tongue_front_original_loc.parent}/{tongue_front_original_loc.stem}_cc.png"
     cc_back_file_path = f"{tongue_back_original_loc.parent}/{tongue_back_original_loc.stem}_cc.png"
 
@@ -324,7 +305,6 @@ async def process_tongue_image(tongue_upload_id: UUID) -> str:
     )
 
     cc_front_image.seek(0)
-    from PIL import Image
 
     print(f"cc_front_image format: {Image.open(cc_front_image, mode='r').format}")
     print(f"cc_front_image size: {cc_front_image.getbuffer().nbytes}")
