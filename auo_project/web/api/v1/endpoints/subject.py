@@ -39,6 +39,7 @@ from auo_project.core.utils import (
     get_pct_cmp_overall_and_standard,
     get_subject_schema,
     safe_divide,
+    delete_subject_func,
 )
 from auo_project.models import MeasureInfo, Org
 from auo_project.web.api import deps
@@ -547,7 +548,9 @@ async def get_subject_measures(
             {"value": True, "key": "不規律"},
         ],
         has_bcqs=[{"value": True, "key": "有"}, {"value": False, "key": "無"}],
-        pass_rates=[{"value": pct, "key": f"{pct}% 以上"} for pct in range(10, 110, 10)],
+        pass_rates=[
+            {"value": pct, "key": f"{pct}% 以上"} for pct in range(10, 110, 10)
+        ],
         subject_tags=crud.subject_tag.format_options(options=all_subject_tags),
         normal_spec=[
             {"column": "irregular_hrs", "range": [0, 1]},
@@ -816,9 +819,9 @@ async def get_multi_measure_summary(
 
     mean_statistic_model_dict = {}
     for key, val in mean_statistic_dict.items():
-        mean_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        mean_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     cv_statistic_model_dict = {}
     for key, val in cv_statistic_dict.items():
@@ -828,9 +831,9 @@ async def get_multi_measure_summary(
 
     std_statistic_model_dict = {}
     for key, val in std_statistic_dict.items():
-        std_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        std_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     # TODO: add CV and STD
     means_dict = await crud.measure_cn_mean.get_dict_by_sex(
@@ -1228,9 +1231,9 @@ async def get_multi_measure_summary_data(
 
     mean_statistic_model_dict = {}
     for key, val in mean_statistic_dict.items():
-        mean_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        mean_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     cv_statistic_model_dict = {}
     for key, val in cv_statistic_dict.items():
@@ -1240,9 +1243,9 @@ async def get_multi_measure_summary_data(
 
     std_statistic_model_dict = {}
     for key, val in std_statistic_dict.items():
-        std_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        std_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     hands = ["r", "l"]
     positions = ["cu", "qu", "ch"]
@@ -1676,9 +1679,9 @@ async def get_multi_measure_by_conditions(
 
     mean_statistic_model_dict = {}
     for key, val in mean_statistic_dict.items():
-        mean_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        mean_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     cv_statistic_model_dict = {}
     for key, val in cv_statistic_dict.items():
@@ -1688,9 +1691,9 @@ async def get_multi_measure_by_conditions(
 
     std_statistic_model_dict = {}
     for key, val in std_statistic_dict.items():
-        std_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        std_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     hands = ["r", "l"]
     positions = ["cu", "qu", "ch"]
@@ -2135,21 +2138,31 @@ async def delete_subject(
             status_code=400,
             detail="The user doesn't have enough privileges",
         )
-    subject = await crud.subject.get(db_session=db_session, id=subject_id)
-    if subject is None:
-        raise HTTPException(
-            status_code=400,
-            detail="The subject with this id does not exist in the system",
-        )
-    measures = await crud.measure_info.get_by_subject_id(
-        db_session=db_session,
-        subject_id=subject_id,
-    )
-    for measure in measures:
-        # bcq = measure.bcq
-        await crud.measure_info.remove(db_session=db_session, id=measure.id)
+    
+    subject = await delete_subject_func(db_session=db_session, subject_id=subject_id, operator_id=current_user.id)
+    # subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    # if subject is None:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail="The subject with this id does not exist in the system",
+    #     )
+    # measures = await crud.measure_info.get_by_subject_id(
+    #     db_session=db_session,
+    #     subject_id=subject_id,
+    # )
+    # for measure in measures:
+    #     # bcq = measure.bcq
+    #     await crud.measure_info.remove(db_session=db_session, id=measure.id)
 
-    await crud.subject.remove(db_session=db_session, id=subject_id)
+    # await crud.subject.remove(db_session=db_session, id=subject_id)
+    # await crud.deleted_subject.create(
+    #     db_session=db_session,
+    #     obj_in=schemas.DeletedSubjectCreate(
+    #         org_id=current_user.org_id,
+    #         number=subject.number,
+    #         operator_id=current_user.id,
+    #     ),
+    # )
 
     return {"subject_id": subject_id, "subject": subject, "measures": measures}
 
@@ -2184,17 +2197,18 @@ async def batch_deactivate_subjects(
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
+    """
+    The API would delete the subject directly and the action cannot be reverted.
+    """
+
     result = {"success": [], "failure": []}
     for obj_id in body.ids:
         subject = await crud.subject.get(db_session=db_session, id=obj_id)
         if subject is None:
             result["failure"].append({"id": obj_id, "reason": "not found"})
         else:
-            subject = await crud.subject.update(
-                db_session=db_session,
-                obj_current=subject,
-                obj_new=schemas.SubjectUpdate(is_active=False),
-            )
+            # 在前端 api 不調整的情況下改成真的刪除
+            subject = await delete_subject_func(db_session=db_session, subject_id=subject.id, operator_id=current_user.id)
             result["success"].append({"id": obj_id})
 
     return result

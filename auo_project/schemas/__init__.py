@@ -254,6 +254,9 @@ from auo_project.schemas.user_schema import (
     UserUpdateInput,
     UserWithName,
 )
+from auo_project.schemas.deleted_subject_schema import (
+    DeletedSubjectCreate, DeletedSubjectRead, DeletedSubjectUpdate
+)
 
 # https://lightrun.com/answers/tiangolo-sqlmodel-are-many-to-many-link-supported-with-fastapi
 

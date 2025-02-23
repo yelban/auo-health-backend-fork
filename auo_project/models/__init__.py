@@ -49,7 +49,7 @@ from auo_project.models.upload_model import Upload
 from auo_project.models.user_branch_model import UserBranch
 from auo_project.models.user_liked_item_model import UserLikedItem
 from auo_project.models.user_model import User
-
+from auo_project.models.deleted_subject_model import DeletedSubject
 
 def load_all_models():
     pass

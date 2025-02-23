@@ -47,4 +47,4 @@ from auo_project.crud.upload_crud import upload
 from auo_project.crud.user_branch_crud import user_branch
 from auo_project.crud.user_crud import user
 from auo_project.crud.user_liked_item_crud import user_liked_item
-from auo_project.crud.user_role_crud import user_role
+from auo_project.crud.deleted_subject_crud import deleted_subject

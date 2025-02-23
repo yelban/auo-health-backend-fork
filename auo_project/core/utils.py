@@ -1,3 +1,4 @@
+from uuid import UUID
 import random
 import string
 from datetime import date, datetime, time
@@ -7,13 +8,14 @@ from typing import Optional, Union
 from io import BytesIO
 from PIL import Image
 
+from fastapi import HTTPException
 import dateutil.parser
 import pandas as pd
 import pydash as py_
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import text
 
-from auo_project import schemas
+from auo_project import schemas, crud, models
 from auo_project.core.constants import MAX_DEPTH_RATIO
 from auo_project.db.session import AsyncSession
 
@@ -554,3 +556,33 @@ def convert_jpg_to_png(file) -> BytesIO:
     img.save(img_byte_arr, "PNG")
     img_byte_arr.seek(0)
     return img_byte_arr
+
+async def delete_subject_func(db_session: AsyncSession, subject_id: UUID, operator_id: UUID) -> models.Subject:
+    subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    if subject is None:
+        raise HTTPException(
+            status_code=400,
+            detail="The subject with this id does not exist in the system",
+        )
+
+    tongue_uploads = await crud.measure_tongue_upload.get_by_subject_id(db_session=db_session, subject_id=subject_id)
+    for tongue_upload in tongue_uploads:
+        await crud.measure_tongue_upload.remove(db_session=db_session, id=tongue_upload.id)
+
+    measures = await crud.measure_info.get_by_subject_id(
+        db_session=db_session,
+        subject_id=subject_id,
+    )
+    for measure in measures:
+        await crud.measure_info.remove(db_session=db_session, id=measure.id)
+
+    await crud.subject.remove(db_session=db_session, id=subject_id)
+    await crud.deleted_subject.create(
+        db_session=db_session,
+        obj_in=schemas.DeletedSubjectCreate(
+            org_id=subject.org_id,
+            number=subject.number,
+            operator_id=operator_id,
+        ),
+    )
+    return subject
