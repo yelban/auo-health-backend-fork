@@ -101,5 +101,5 @@ class User(BaseUUIDModel, BaseTimestampModel, UserBase, table=True):
     )
     user_branches: List["UserBranch"] = Relationship(
         back_populates="user",
-        sa_relationship_kwargs={"lazy": "select"},
+        sa_relationship_kwargs={"lazy": "selectin"},
     )

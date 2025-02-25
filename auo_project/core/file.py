@@ -668,6 +668,7 @@ async def process_file(
             subject_id=subject.id,
             file_id=file.id,
             org_id=file.owner.org_id,
+            branch_id=file.owner.branch_id,
             uid=infos.uid,
             number=infos.number,
             has_measure=True,

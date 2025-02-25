@@ -178,6 +178,7 @@ async def get_subject(
     measure_base_filters = {
         "is_active": True,
         "org_id": None if current_user.is_superuser else current_user.org_id,
+        "branch_id__in": crud.user.get_branches_list(user=current_user),
     }
     measure_filters = get_filters(
         {
@@ -455,6 +456,7 @@ async def get_subject_measures(
                 measure_memo.replace("contains__", "") if measure_memo else None
             ),
             "org_id": None if current_user.is_superuser else current_user.org_id,
+            "branch_id__in": crud.user.get_branches_list(user=current_user),
         },
     )
     print("filters", filters)
@@ -2138,8 +2140,10 @@ async def delete_subject(
             status_code=400,
             detail="The user doesn't have enough privileges",
         )
-    
-    subject = await delete_subject_func(db_session=db_session, subject_id=subject_id, operator_id=current_user.id)
+
+    subject = await delete_subject_func(
+        db_session=db_session, subject_id=subject_id, operator_id=current_user.id,
+    )
     # subject = await crud.subject.get(db_session=db_session, id=subject_id)
     # if subject is None:
     #     raise HTTPException(
@@ -2208,7 +2212,11 @@ async def batch_deactivate_subjects(
             result["failure"].append({"id": obj_id, "reason": "not found"})
         else:
             # 在前端 api 不調整的情況下改成真的刪除
-            subject = await delete_subject_func(db_session=db_session, subject_id=subject.id, operator_id=current_user.id)
+            subject = await delete_subject_func(
+                db_session=db_session,
+                subject_id=subject.id,
+                operator_id=current_user.id,
+            )
             result["success"].append({"id": obj_id})
 
     return result

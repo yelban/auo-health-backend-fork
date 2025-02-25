@@ -4,8 +4,11 @@ from uuid import UUID
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from auo_project import crud
 from auo_project.crud.base_crud import CRUDBase
+from auo_project.models.user_model import User
 from auo_project.models.subject_model import Subject
+from auo_project.models.measure_info_model import MeasureInfo
 from auo_project.schemas.subject_schema import SubjectCreate, SubjectUpdate
 
 
@@ -51,10 +54,21 @@ class CRUDSubject(CRUDBase[Subject, SubjectCreate, SubjectUpdate]):
         return subject.scalar_one_or_none()
 
     async def get_sid_by_keyword(
-        self, *, db_session: AsyncSession, org_id: UUID, keyword: str
+        self, *, db_session: AsyncSession, org_id: UUID, keyword: str, user: User
     ) -> list[str]:
+        branch_ids = crud.user.get_branches_list(user=user)
+        subquery_filters = [MeasureInfo.branch_id.in_(branch_ids)] if branch_ids else []
+        subquery = (
+            select(Subject)
+            .join(MeasureInfo)
+            .where(*subquery_filters)
+            .distinct()
+            .subquery()
+        )
         result = await db_session.execute(
-            select(Subject.sid).where(
+            select(Subject.sid)
+            .join(subquery, Subject.id == subquery.c.id)
+            .where(
                 Subject.org_id == org_id,
                 func.upper(Subject.sid).contains(keyword.upper()),
             ),
@@ -63,13 +77,24 @@ class CRUDSubject(CRUDBase[Subject, SubjectCreate, SubjectUpdate]):
         return subject_sids
 
     async def get_all_by_keyword(
-        self, *, db_session: AsyncSession, org_id: UUID, keyword: str
+        self, *, db_session: AsyncSession, org_id: UUID, keyword: str, user: User
     ) -> list[Subject]:
         """
         search columns sid, number, name by keyword
         """
+        branch_ids = crud.user.get_branches_list(user=user)
+        subquery_filters = [MeasureInfo.branch_id.in_(branch_ids)] if branch_ids else []
+        subquery = (
+            select(Subject)
+            .join(MeasureInfo)
+            .where(*subquery_filters)
+            .distinct()
+            .subquery()
+        )
         subjects = await db_session.execute(
-            select(Subject).where(
+            select(Subject)
+            .join(subquery, Subject.id == subquery.c.id)
+            .where(
                 Subject.org_id == org_id,
                 func.upper(Subject.sid).contains(keyword.upper())
                 | func.upper(Subject.number).contains(keyword.upper())

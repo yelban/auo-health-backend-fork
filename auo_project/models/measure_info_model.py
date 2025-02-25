@@ -28,7 +28,13 @@ class MeasureInfoBase(BaseModel):
         index=True,
         nullable=False,
         foreign_key="app.auth_orgs.id",
-        title="檢測單位編號",
+        title="檢測機構編號",
+    )
+    branch_id: UUID = Field(
+        index=True,
+        nullable=False,
+        foreign_key="app.auth_branches.id",
+        title="檢測分支機構編號",
     )
     uid: str = Field(nullable=True, max_length=128, title="脈診儀 UID", default=None)
     number: str = Field(nullable=True, max_length=128, title="病歷號碼", default=None)

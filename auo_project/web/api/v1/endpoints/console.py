@@ -2870,6 +2870,7 @@ async def create_batch_user(
         password = generate_password()
         user_in = schemas.UserCreate(
             org_id=user_payload.org_id,
+            branch_id=user_payload.branch_id,
             username=user_payload.username,
             full_name=user_payload.full_name,
             mobile=user_payload.mobile,

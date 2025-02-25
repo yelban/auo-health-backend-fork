@@ -579,7 +579,7 @@ async def upload_measure(
         description="受測者編號或病歷編號 varchar(128)",
     ),
     proj_num: Optional[str] = Form(
-        None, max_length=128, description="計畫編號 varchar(128)"
+        None, max_length=128, description="計畫編號 varchar(128)",
     ),
     # consult_dr_name: str = Form(None, max_length=128, description="判讀醫師姓名 varchar(128)"),
     consult_dr_id: Optional[UUID] = Form(None, description="判讀醫師 ID varchar(128)"),
@@ -627,7 +627,7 @@ async def upload_measure(
         )
     if device_id is None and pad_id is not None:
         cc_config = await crud.tongue_cc_config.get_by_pad_id(
-            db_session=db_session, pad_id=pad_id
+            db_session=db_session, pad_id=pad_id,
         )
     # 未來不需要 device_id, pad_id 因為不用根據場域校色
 
@@ -690,7 +690,7 @@ async def upload_measure(
     measure_time = datetime.utcnow() + timedelta(hours=8)
     measure_info_in = schemas.MeasureInfoCreate(
         subject_id=subject.id,
-        # branch_id=field.branch_id,
+        branch_id=current_user.branch_id,
         file_id=None,
         org_id=org_id,
         number=number,

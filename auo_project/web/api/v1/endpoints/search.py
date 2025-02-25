@@ -31,6 +31,7 @@ async def search_subject_id(
         db_session=db_session,
         org_id=current_user.org_id,
         keyword=keyword,
+        user=current_user,
     )
     return subject_sids
 
@@ -68,14 +69,16 @@ async def search_subject(
 ) -> Any:
     """
     Search subject by keyword using colunms: sid, name, number
-    When keyword length is 8 and all words are number, it will convert the number to yyyymmdd and search subjects measured at the date.
+    When keyword length is 8 and start with 8 number, it will convert the number to yyyymmdd and search subjects measured at the date.
     """
+    # print(len(keyword), keyword[0] == "D", all(
+    #     map(lambda x: isinstance(x, str) and x.isdigit(), keyword[1:])
+    # ))
     # 搜尋身分證字號、護照號碼、病歷編號、姓名
     if len(keyword) == 8 and all(
-        map(lambda x: isinstance(x, str) and x.isdigit(), keyword)
+        map(lambda x: isinstance(x, str) and x.isdigit(), keyword),
     ):
         try:
-
             measure_date = datetime.strptime(keyword, "%Y%m%d")
             start_date = measure_date
             end_date = measure_date + timedelta(hours=24) + timedelta(microseconds=-1)
@@ -85,7 +88,8 @@ async def search_subject(
                     "org_id": current_user.org_id,
                     "measure_time__ge": start_date,
                     "measure_time__le": end_date,
-                }
+                    "branch_id__in": crud.user.get_branches_list(user=current_user),
+                },
             )
             measure_expressions = models.MeasureInfo.filter_expr(**measure_filters)
             subquery = (
@@ -95,14 +99,20 @@ async def search_subject(
                 .distinct()
                 .subquery()
             )
-            query = select(models.Subject).join(
-                subquery, models.Subject.id == subquery.c.id
-            ).order_by(models.Subject.last_measure_time.asc())
+            query = (
+                select(models.Subject)
+                .join(subquery, models.Subject.id == subquery.c.id)
+                .order_by(models.Subject.last_measure_time.asc())
+            )
             response = await db_session.execute(query)
             subjects = response.scalars().all()
             # update last_measure_time as keyword
-            subjects = [{**jsonable_encoder(subject), "last_measure_time": measure_date} for subject in subjects]
-            return subjects
+            subjects = [
+                {**jsonable_encoder(subject), "last_measure_time": measure_date}
+                for subject in subjects
+            ]
+            if subjects:
+                return subjects
         except Exception as e:
             print(f"error: {e}")
 
@@ -110,5 +120,6 @@ async def search_subject(
         db_session=db_session,
         org_id=current_user.org_id,
         keyword=keyword,
+        user=current_user,
     )
     return subjects

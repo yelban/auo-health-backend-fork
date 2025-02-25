@@ -193,5 +193,21 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     def is_active(self, user: User) -> bool:
         return user.is_active
 
+    def is_org_manager(self, user: User) -> bool:
+        return self.has_requires(
+            user=user,
+            roles=["MeasureManager"],
+        )
+
+    def get_branches_list(self, user: User) -> list[str]:
+        """
+        when the user is superuser or org manager, the list will return [].
+        """
+        return (
+            []
+            if self.is_org_manager(user=user) or user.is_superuser
+            else [x.branch_id for x in user.user_branches]
+        )
+
 
 user = CRUDUser(User)

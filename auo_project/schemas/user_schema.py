@@ -43,6 +43,7 @@ class UserWithName(UserBase):
 
 class UserCreate(BaseModel):
     org_id: UUID
+    branch_id: UUID
     username: str
     full_name: str
     mobile: str
@@ -54,6 +55,7 @@ class UserCreate(BaseModel):
 
 class UserCreateInput(BaseModel):
     org_id: UUID = Field(..., title="機構編號")
+    branch_id: UUID = Field(..., title="分支機構編號")
     username: str = Field(..., title="帳號")
     full_name: str = Field(..., title="姓名")
     mobile: Optional[str] = Field("", title="電話")
