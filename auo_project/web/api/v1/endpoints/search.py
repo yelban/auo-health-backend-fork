@@ -6,6 +6,7 @@ from fastapi.param_functions import Depends
 from fastapi.encoders import jsonable_encoder
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
+from sqlalchemy import func
 
 
 from auo_project import crud, models
@@ -93,23 +94,23 @@ async def search_subject(
             )
             measure_expressions = models.MeasureInfo.filter_expr(**measure_filters)
             subquery = (
-                select(models.Subject)
+                select(models.Subject.id, func.max(models.MeasureInfo.measure_time).label("measure_time"))
                 .join(models.MeasureInfo)
                 .where(*measure_expressions)
-                .distinct()
+                .group_by(models.Subject.id)
                 .subquery()
             )
             query = (
-                select(models.Subject)
+                select(models.Subject, subquery.c.measure_time)
                 .join(subquery, models.Subject.id == subquery.c.id)
-                .order_by(models.Subject.last_measure_time.asc())
+                .order_by(subquery.c.measure_time.asc())
             )
             response = await db_session.execute(query)
-            subjects = response.scalars().all()
+            subjects = response.all()
             # update last_measure_time as keyword
             subjects = [
-                {**jsonable_encoder(subject), "last_measure_time": measure_date}
-                for subject in subjects
+                {**jsonable_encoder(subject), "last_measure_time": measure_time}
+                for subject, measure_time in subjects
             ]
             if subjects:
                 return subjects
