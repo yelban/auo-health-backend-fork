@@ -70,7 +70,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             updated_at=datetime.utcnow(),
         )
         db_session.add(db_obj)
-        
+
         user_branch_obj = UserBranch(user_id=db_obj.id, org_id=obj_in.org_id, branch_id=obj_in.branch_id, is_active=True)
         db_session.add(user_branch_obj)
         if autocommit:
