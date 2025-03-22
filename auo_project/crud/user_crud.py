@@ -12,7 +12,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from auo_project.core.security import get_password_hash, verify_password
 from auo_project.crud.base_crud import CRUDBase
 from auo_project.models.user_model import User
+from auo_project.models.user_branch_model import UserBranch
 from auo_project.schemas.user_schema import UserCreate, UserUpdate
+from auo_project.schemas.user_branch_schema import UserBranchCreate
 
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
@@ -57,6 +59,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     ) -> User:
         db_obj = User(
             org_id=obj_in.org_id,
+            branch_id=obj_in.branch_id,
             username=obj_in.username,
             full_name=obj_in.full_name,
             mobile=obj_in.mobile,
@@ -67,9 +70,14 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             updated_at=datetime.utcnow(),
         )
         db_session.add(db_obj)
+        
+        user_branch_obj = UserBranch(user_id=db_obj.id, org_id=obj_in.org_id, branch_id=obj_in.branch_id, is_active=True)
+        db_session.add(user_branch_obj)
         if autocommit:
             await db_session.commit()
             await db_session.refresh(db_obj)
+            await db_session.refresh(user_branch_obj)
+
         return db_obj
 
     async def create_with_role(
