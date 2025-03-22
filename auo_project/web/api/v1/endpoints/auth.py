@@ -197,7 +197,7 @@ async def request_recovery_token(
             message = {
                 "content": {
                     "subject": "密碼重設驗證碼",
-                    "html": f"<html><div>您好 {user.username},<br/>請輸入您的驗證碼:<br/><strong>{recovery_token}</strong></div></html>",
+                    "html": f"<html><div>您好 {user.username},<br/>請輸入您的驗證碼:<br/><strong>{recovery_token.token}</strong></div></html>",
                 },
                 "recipients": {
                     "to": [{"address": user.email, "displayName": user.username}],

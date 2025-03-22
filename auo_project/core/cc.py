@@ -265,34 +265,30 @@ async def process_tongue_image(tongue_upload_id: UUID) -> str:
     color_transform_back_image = get_color_card_result(raw_image=png_back_image)
     print("get_color_card_result end")
 
-    if color_transform_front_image is None:
-        color_transform_front_image = png_front_image
-    if color_transform_back_image is None:
-        color_transform_back_image = png_back_image
+    cc_front_image = color_transform_front_image or png_front_image
+    cc_back_image = color_transform_back_image or png_back_image
 
-    cc_front_image = color_transform_front_image
-    cc_back_image = color_transform_back_image
+    cc_front_file_path = f"{tongue_front_original_loc.parent}/{tongue_front_original_loc.stem}_cc.png" if color_transform_front_image else None
+    cc_back_file_path = f"{tongue_back_original_loc.parent}/{tongue_back_original_loc.stem}_cc.png" if color_transform_back_image else None
 
-    cc_front_file_path = f"{tongue_front_original_loc.parent}/{tongue_front_original_loc.stem}_cc.png"
-    cc_back_file_path = f"{tongue_back_original_loc.parent}/{tongue_back_original_loc.stem}_cc.png"
-
-
-    upload_blob_file(
-        blob_service_client=internet_blob_service,
-        category=category,
-        file_path=cc_front_file_path,
-        object=cc_front_image,
-        overwrite=True,
-    )
-    print(f"saved cc_front_image {cc_front_file_path}")
-    upload_blob_file(
-        blob_service_client=internet_blob_service,
-        category=category,
-        file_path=cc_back_file_path,
-        object=cc_back_image,
-        overwrite=True,
-    )
-    print(f"saved cc_back_image {cc_back_file_path}")
+    if color_transform_front_image:
+        upload_blob_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=cc_front_file_path,
+            object=color_transform_front_image,
+            overwrite=True,
+        )
+        print(f"saved cc_front_image {cc_front_file_path}")
+    if color_transform_back_image:
+        upload_blob_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=cc_back_file_path,
+            object=cc_back_image,
+            overwrite=True,
+        )
+        print(f"saved cc_back_image {cc_back_file_path}")
 
     obj_in = schemas.MeasureTongueUploadUpdate(
         tongue_front_corrected_loc=cc_front_file_path,

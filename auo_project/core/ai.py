@@ -20,6 +20,7 @@ def get_color_card_result(raw_image) -> BytesIO:
         return output_stream
     else:
         print("error", response.status_code, response.text)
+        return None
 
 
 def get_ai_tongue_result(masked_file) -> dict:

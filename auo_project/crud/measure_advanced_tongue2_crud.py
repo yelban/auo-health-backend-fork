@@ -36,7 +36,6 @@ class CRUDMeasureAdvancedTongue2(
         tongue = await db_session.execute(
             select(MeasureAdvancedTongue2).where(
                 MeasureAdvancedTongue2.info_id == info_id,
-                MeasureAdvancedTongue2.owner_id == owner_id,
             ),
         )
         return tongue.scalar_one_or_none()

@@ -26,6 +26,7 @@ class CRUDUserBranch(CRUDBase[UserBranch, UserBranchCreate, UserBranchUpdate]):
                 UserBranch.user_id == user_id,
                 UserBranch.is_active == True,
             )
+            .order_by(UserBranch.created_at.asc(), UserBranch.branch_id.asc())
             .options(joinedload(UserBranch.branch), joinedload(UserBranch.org)),
         )
         return user_branch.scalars().all()

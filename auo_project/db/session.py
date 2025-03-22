@@ -16,14 +16,6 @@ engine = create_async_engine(
     max_overflow=settings.DB_POOL_SIZE + 5,
     connect_args=conn_args,
 )
-# engine = create_async_engine(
-#     settings.ASYNC_DATABASE_URI,
-#     echo=True,
-#     future=True,
-#     pool_size=settings.DB_POOL_SIZE,
-#     max_overflow=settings.DB_POOL_SIZE + 5,
-#     connect_args=conn_args,
-# )
 
 SessionLocal = sessionmaker(
     autocommit=False,

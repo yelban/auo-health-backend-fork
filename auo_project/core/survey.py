@@ -379,14 +379,13 @@ class AUOInternalSurveyHandler(BaseSurveyFileHandler):
 class NRICMSurveyHandler(BaseSurveyFileHandler):
     def __init__(self, survey_name: str) -> None:
         qa_basic_df = pd.read_excel(
-            f"20240105 中醫診斷數位化群體性研究自評問卷 20231212-20231226_processed.xlsx",
+            f"20241119 中醫診斷數位化群體性研究自評問卷_processed.xlsx",
             sheet_name=0,
         )
         qa_before_measure_df = pd.read_excel(
-            f"20240105 中醫診斷數位化群體性研究自評問卷 20231212-20231226_processed.xlsx",
+            f"20241119 中醫診斷數位化群體性研究自評問卷_processed.xlsx",
             sheet_name=1,
         )
-
         qa_mapping_basic_df = pd.read_excel("問卷題號對照 - 內測v2.xlsx", sheet_name=0)
         qa_mapping_before_measure_df = pd.read_excel(
             "問卷題號對照 - 內測v2.xlsx",
@@ -1420,6 +1419,167 @@ def process_bcq(values):
     return bcq_result, has_bcq
 
 
+def process_bcq_by_profile(question_values, age, gender):
+    # 20240325_BCQ依性別與年齡層的選題與縮減題數_for 友達
+    question_api_resp = {
+        "status": "OK",
+        "message": "",
+        "data": {
+            "itemsInfo": {
+                "M-0-yang_hsu": [36, 5, 22, 3, 9],
+                "M-0-ying_hsu": [
+                    26,
+                    11,
+                    38,
+                    2,
+                    20,
+                ],
+                "M-0-tang_yu": [
+                    5,
+                    14,
+                    1,
+                    12,
+                ],
+                "M-1-yang_hsu": [
+                    36,
+                    22,
+                    5,
+                    3,
+                    15,
+                ],
+                "M-1-ying_hsu": [
+                    11,
+                    26,
+                    38,
+                    32,
+                    2,
+                ],
+                "M-1-tang_yu": [
+                    14,
+                    5,
+                    1,
+                    12,
+                ],
+                "M-2-yang_hsu": [
+                    36,
+                    22,
+                    15,
+                    3,
+                    24,
+                ],
+                "M-2-ying_hsu": [
+                    18,
+                    32,
+                    11,
+                    26,
+                    38,
+                ],
+                "M-2-tang_yu": [
+                    1,
+                    14,
+                    12,
+                    5,
+                ],
+                "F-0-yang_hsu": [
+                    36,
+                    5,
+                    3,
+                    15,
+                    22,
+                ],
+                "F-0-ying_hsu": [
+                    11,
+                    26,
+                    8,
+                    4,
+                    20,
+                ],
+                "F-0-tang_yu": [
+                    5,
+                    14,
+                    4,
+                    7,
+                ],
+                "F-1-yang_hsu": [
+                    36,
+                    22,
+                    15,
+                    3,
+                    5,
+                ],
+                "F-1-ying_hsu": [
+                    11,
+                    26,
+                    16,
+                    4,
+                    20,
+                ],
+                "F-1-tang_yu": [
+                    14,
+                    5,
+                    4,
+                    16,
+                ],
+                "F-2-yang_hsu": [
+                    36,
+                    22,
+                    3,
+                    15,
+                    24,
+                ],
+                "F-2-ying_hsu": [
+                    11,
+                    20,
+                    26,
+                    32,
+                    23,
+                ],
+                "F-2-tang_yu": [
+                    20,
+                    16,
+                    4,
+                    14,
+                ],
+            },
+        },
+    }
+
+    gender_group = ""
+    age_group = ""
+    questions_mapping = {
+        "M0": {
+            "yang": question_api_resp["data"]["itemsInfo"]["M-0-yang_hsu"],
+            "yin": question_api_resp["data"]["itemsInfo"]["M-0-ying_hsu"],
+            "phlegm": question_api_resp["data"]["itemsInfo"]["M-0-tang_yu"],
+        },
+        "M1": {
+            "yang": question_api_resp["data"]["itemsInfo"]["M-1-yang_hsu"],
+            "yin": question_api_resp["data"]["itemsInfo"]["M-1-ying_hsu"],
+            "phlegm": question_api_resp["data"]["itemsInfo"]["M-1-tang_yu"],
+        },
+        "M2": {
+            "yang": question_api_resp["data"]["itemsInfo"]["M-2-yang_hsu"],
+            "yin": question_api_resp["data"]["itemsInfo"]["M-2-ying_hsu"],
+            "phlegm": question_api_resp["data"]["itemsInfo"]["M-2-tang_yu"],
+        },
+        "F0": {
+            "yang": question_api_resp["data"]["itemsInfo"]["F-0-yang_hsu"],
+            "yin": question_api_resp["data"]["itemsInfo"]["F-0-ying_hsu"],
+            "phlegm": question_api_resp["data"]["itemsInfo"]["F-0-tang_yu"],
+        },
+        "F1": {
+            "yang": question_api_resp["data"]["itemsInfo"]["F-1-yang_hsu"],
+            "yin": question_api_resp["data"]["itemsInfo"]["F-1-ying_hsu"],
+            "phlegm": question_api_resp["data"]["itemsInfo"]["F-1-tang_yu"],
+        },
+        "F2": {
+            "yang": question_api_resp["data"]["itemsInfo"]["F-2-yang_hsu"],
+            "yin": question_api_resp["data"]["itemsInfo"]["F-2-ying_hsu"],
+            "phlegm": question_api_resp["data"]["itemsInfo"]["F-2-tang_yu"],
+        },
+    }
+
+
 def process_psqi(values):
     # note: values is pd.Series
     if len(values) == 19:
@@ -2234,8 +2394,12 @@ async def save_survey_result(org_name: str, survey_name_list: List[str] = None):
     }
 
     file_handler_measure_range_map = {
-        "nricm 問卷": (datetime(2023, 12, 12), datetime(2024, 2, 1)),
+        # "nricm 問卷": (datetime(2023, 12, 12), datetime(2024, 2, 1)),
+        # "nricm 問卷": (datetime(2024, 2, 1), datetime(2024, 4, 6)),
+        # "nricm 問卷": (datetime(2024, 5, 1), datetime(2024, 8, 19)),
+        "nricm 問卷": (datetime(2024, 10, 1), datetime(2024, 12, 9)),
     }
+    
 
     for survey_name in survey_name_list:
         survey = await crud.measure_survey.get_by_name(
@@ -2271,8 +2435,6 @@ async def save_survey_result(org_name: str, survey_name_list: List[str] = None):
             subject_id = None
             measure_id = None
             print("survey_result.number", survey_result.number)
-            if survey_result.number.upper() in ("KA014"):
-                continue
             subject = await crud.subject.get_by_number_and_org_id(
                 db_session=db_session,
                 org_id=org.id,
