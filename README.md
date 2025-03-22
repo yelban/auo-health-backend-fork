@@ -406,8 +406,21 @@ await save_survey_result("nricm", ["nricm 問卷"])
 
 
 ```
+## 建立使用者
+
+每個使用者都需要給訂一個分支機構 branch id（請修改 brand_id, password），分支機構會影響能夠在前台看到的檢測資料，以及控制單人單次分析中是否顯示脈診（has_pulse_product）與舌診（has_tongue_product）資訊，若在使用者 app.auth_user_branches 同時有多個分支機構，後端會以 created_at ASC, branch_id ASC 排序，讓前端取第一筆作為是否顯示判斷。
+
 poetry run python -m auo_project.cli shell
-await create_user(org_name="x_medical_center", username="vivian.nw.chen@auo.com", password="", email="vivian.nw.chen@auo.com", full_name="Vivian Chen")
+
+await create_user(org_name="x_medical_center", branch_id="", username="vivian.nw.chen@auo.com", password="", email="vivian.nw.chen@auo.com", full_name="Vivian Chen")
+
+## 新增使用者權限（清單請見 app.auth_roles）
+### 檢測資料管理員（該角色能檢視組織底下所有分支機構檢測資料，若無此角色使用者僅能在前台看到同一分支機構的檢測資料）
+
+INSERT INTO "app"."auth_user_roles"("user_id","role_id")
+VALUES
+(E'32354713-dbee-49e4-815a-66a82c38feb0',E'1494f52aa-868f-4a4e-87ff-d1270c540bb4');
+
 ```
 
 # 改使用者密碼
@@ -426,7 +439,22 @@ user = await crud.user.update(
 
 ```
 
-# VM 環境
+# 新增組織/分支機構
+可參考 migration/20250216.sql
+
+```
+INSERT INTO "app"."auth_orgs"("name","description","created_at","updated_at","id","vatid","address","city","state","country","zip_code","contact_name","contact_email","contact_phone","sales_name","sales_email","sales_phone","valid_to","api_url","valid_from","is_active")
+VALUES
+(E'makuang',E'馬光醫療網',E'2025-02-16 07:12:04',E'2025-02-16 07:12:04',E'23f3c378-0333-44f3-8f90-3c374b3115cc',NULL,E'',E'',E'',E'',E'',E'',E'',E'',E'',E'',E'',E'3001-12-31 23:59:59',E'',E'2025-02-16 07:12:04',TRUE);
+
+INSERT INTO "app"."auth_branches"("id","org_id","name","vatid","address","city","state","country","zip_code","contact_name","contact_email","contact_phone","has_inquiry_product","has_tongue_product","has_pulse_product","valid_to","created_at","updated_at","is_active","valid_from","sales_name","sales_email","sales_phone")
+VALUES
+(E'011659d0-83b2-4437-84e8-28ee174efec1',E'23f3c378-0333-44f3-8f90-3c374b3115cc',E'博愛馬光中醫婦幼診所',E'',E'',E'',E'',E'',E'',E'聯絡人1',E'xxx@gmail.com',E'0912345679',FALSE,TRUE,FALSE,E'3001-12-31 23:59:59',E'2025-02-16 07:13:33',E'2025-02-16 07:13:33',TRUE,E'2025-02-16 07:13:33',E'',E'',E''),
+(E'c976f2a8-7787-4a65-8cec-0303d89171c8',E'23f3c378-0333-44f3-8f90-3c374b3115cc',E'光華馬光中醫診所',E'',E'',E'',E'',E'',E'',E'聯絡人1',E'xxx@gmail.com',E'0912345679',FALSE,TRUE,FALSE,E'3001-12-31 23:59:59',E'2025-02-16 07:13:33',E'2025-02-16 07:13:33',TRUE,E'2025-02-16 07:13:33',E'',E'',E''),
+(E'2efbbf06-9206-478f-90b9-88fc8667b6be',E'23f3c378-0333-44f3-8f90-3c374b3115cc',E'佑昌馬光中醫診所',E'',E'',E'',E'',E'',E'',E'聯絡人1',E'xxx@gmail.com',E'0912345679',FALSE,TRUE,FALSE,E'3001-12-31 23:59:59',E'2025-02-16 07:13:33',E'2025-02-16 07:13:33',TRUE,E'2025-02-16 07:13:33',E'',E'',E'');
+```
+
+# 虛擬機 VM 環境
 ```
 # https://docs.docker.com/engine/install/ubuntu/
 sudo apt-get remove docker docker-engine docker.io containerd runc
