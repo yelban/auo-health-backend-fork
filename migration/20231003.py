@@ -375,6 +375,23 @@ async def run_all_measures():
         )
 
 
+async def update_bcq():
+    from sqlalchemy import text
+
+    query = text(
+        """
+update measure.infos
+set has_bcq = true
+from measure.bcqs where measure.bcqs.measure_id = measure.infos.id
+;
+""",
+    )
+    db_session = SessionLocal()
+    await db_session.execute(query)
+    await db_session.commit()
+    await db_session.close()
+
+
 # """
 # select *
 # from measure.infos as a

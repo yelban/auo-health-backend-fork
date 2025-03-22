@@ -1,14 +1,23 @@
+from uuid import UUID
+import random
+import string
 from datetime import date, datetime, time
 from io import StringIO
 from random import randrange
 from typing import Optional, Union
+from io import BytesIO
+from PIL import Image
 
+from fastapi import HTTPException
 import dateutil.parser
 import pandas as pd
 import pydash as py_
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import text
 
-from auo_project import schemas
+from auo_project import schemas, crud, models
+from auo_project.core.constants import MAX_DEPTH_RATIO
+from auo_project.db.session import AsyncSession
 
 
 def mask_credential_name(s: str):
@@ -208,7 +217,7 @@ def safe_parse_dt(s):
     try:
         return dateutil.parser.parse(s)
     except Exception as e:
-        print(e)
+        print("safe_parse_dt", e)
         return None
 
 
@@ -283,10 +292,13 @@ def get_measure_strength(max_slop, max_amp_value):
 def get_measure_width(range_length, max_amp_value, max_slop):
     if range_length is None or max_amp_value is None:
         return None
+    # 細
     if range_length / 0.2 < 25 and (max_amp_value >= 20 or max_slop > 180):
         return 0
+    # 大
     elif range_length / 0.2 < 25 and (max_amp_value < 20 or max_slop < 100):
         return 2
+    # 正常
     else:
         return 1
 
@@ -451,6 +463,126 @@ def get_max_amp_value(select_static: float, analyze_raw_file_content: str) -> fl
 
 
 def get_subject_schema(org_name: str):
-    if org_name == "nricm":
+    if org_name in ("nricm", "tongue_label"):
         return schemas.SubjectRead
     return schemas.SubjectSecretRead
+
+
+async def get_formulas(db_session: AsyncSession, org_name: str):
+    if org_name in ("auo_health"):
+        resp = await db_session.execute(
+            text(
+                """
+            select
+                max_depth_ratio,
+                strength_code,
+                width_code,
+                hr_type_code
+            from measure.custom_formulas
+            """,
+            ),
+        )
+        formulas = resp.fetchone()
+
+        if formulas is None:
+            return (
+                MAX_DEPTH_RATIO,
+                get_measure_strength,
+                get_measure_width,
+                get_subject_schema,
+            )
+
+        max_depth_ratio = MAX_DEPTH_RATIO
+        try:
+            max_depth_ratio = tuple(map(int, formulas[0].split(":")))
+            if len(max_depth_ratio) != 3:
+                raise Exception("max_depth_ratio length must be 3")
+            print("max_depth_ratio", max_depth_ratio)
+        except Exception as e:
+            print("max_depth_ratio error:", e)
+
+        ns = {}
+        get_custom_strength = get_measure_strength
+        try:
+            exec(formulas[1], {"__builtins__": {}}, ns)
+            get_custom_strength = ns["get_custom_strength"]
+        except Exception as e:
+            print("strength_code_string error:", e)
+
+        get_custom_width = get_measure_width
+        try:
+            exec(formulas[2], {"__builtins__": {}}, ns)
+            get_custom_width = ns["get_custom_width"]
+        except Exception as e:
+            print("width_code_string error:", e)
+
+        get_custom_hr_type = get_hr_type
+        try:
+            exec(formulas[3], {"__builtins__": {}}, ns)
+            get_custom_hr_type = ns["get_custom_hr_type"]
+        except Exception as e:
+            print("hr_type_code_string error:", e)
+        return (
+            max_depth_ratio,
+            get_custom_strength,
+            get_custom_width,
+            get_custom_hr_type,
+        )
+    return (
+        MAX_DEPTH_RATIO,
+        get_measure_strength,
+        get_measure_width,
+        get_hr_type,
+    )
+
+
+def generate_password(k: int = 24) -> str:
+
+    return "".join(
+        random.choices(string.ascii_letters + string.digits, k=k),
+    )
+
+
+def convert_jpg_to_png(file) -> BytesIO:
+    img = Image.open(file, mode='r')
+    img_format = img.format
+    print(f"img file format: {img_format}")
+    if img_format == "PNG":
+        file.seek(0)
+        return file
+    file.seek(0)
+    img = Image.open(file, mode="r")
+    img_byte_arr = BytesIO()
+    img.save(img_byte_arr, "PNG")
+    img_byte_arr.seek(0)
+    return img_byte_arr
+
+async def delete_subject_func(db_session: AsyncSession, subject_id: UUID, operator_id: UUID) -> models.Subject:
+    subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    if subject is None:
+        raise HTTPException(
+            status_code=400,
+            detail="The subject with this id does not exist in the system",
+        )
+
+    tongue_uploads = await crud.measure_tongue_upload.get_by_subject_id(db_session=db_session, subject_id=subject_id)
+    for tongue_upload in tongue_uploads:
+        await crud.measure_tongue_upload.remove(db_session=db_session, id=tongue_upload.id)
+
+    measures = await crud.measure_info.get_by_subject_id(
+        db_session=db_session,
+        subject_id=subject_id,
+    )
+    for measure in measures:
+        await crud.measure_info.remove(db_session=db_session, id=measure.id)
+
+    await crud.subject.remove(db_session=db_session, id=subject_id)
+    await crud.deleted_subject.create(
+        db_session=db_session,
+        obj_in=schemas.DeletedSubjectCreate(
+            org_id=subject.org_id,
+            number=subject.number,
+            operator_id=operator_id,
+        ),
+    )
+    return subject

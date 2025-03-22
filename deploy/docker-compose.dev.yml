@@ -10,7 +10,7 @@ services:
     - .:/app/src/
     environment:
       # Enables autoreload.
-      RELOAD: "True"
+      RELOAD: "False"
 
   db:
     ports:
@@ -20,6 +20,11 @@ services:
 
 
   celeryworker:
+    volumes:
+      # Adds current directory as volume.
+    - .:/app/src/
+
+  celerybeatworker:
     volumes:
       # Adds current directory as volume.
     - .:/app/src/

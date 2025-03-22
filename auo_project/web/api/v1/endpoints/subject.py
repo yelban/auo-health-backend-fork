@@ -11,9 +11,10 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.param_functions import Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
-from sqlmodel import String, cast, extract, func, select
+from sqlmodel import String, cast, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
@@ -24,6 +25,8 @@ from auo_project.core.constants import (
     POSITION_TYPE_LABEL,
     RANGE_TYPE_LABEL,
     SEX_TYPE_LABEL,
+    LikeItemType,
+    ReportType,
     SexType,
 )
 from auo_project.core.dateutils import DateUtils
@@ -36,6 +39,7 @@ from auo_project.core.utils import (
     get_pct_cmp_overall_and_standard,
     get_subject_schema,
     safe_divide,
+    delete_subject_func,
 )
 from auo_project.models import MeasureInfo, Org
 from auo_project.web.api import deps
@@ -61,6 +65,14 @@ class SubjectPage(BaseModel):
 class SubjectListResponse(BaseModel):
     subject: SubjectPage
     measure_times: List[Dict[str, Any]]
+    proj_nums: List[Dict[str, Any]] = Field(default=[], title="計畫編號")
+    sids: List[Dict[str, Any]] = Field(default=[], title="身分證字號")
+    numbers: List[Dict[str, Any]] = Field(default=[], title="受測者編號")
+    names: List[Dict[str, Any]] = Field(default=[], title="姓名")
+    tags: List[Dict[str, Any]] = Field(default=[], title="受測者標籤")
+    measure_operators: List[Dict[str, Any]] = Field(default=[], title="檢測人員")
+    irregular_hrs: List[Dict[str, Any]] = Field(default=[], title="節律標記")
+    sexes: List[Dict[str, Any]] = Field(default=[], title="生理性別")
 
 
 class MultiMeasuresBody(BaseModel):
@@ -69,22 +81,54 @@ class MultiMeasuresBody(BaseModel):
     survey_names: List[str] = []
 
 
+class ExportReportInputPayload(BaseModel):
+    org_id: UUID
+    subject_ids: List[UUID]
+    report_types: List[ReportType]
+
+
+# 下拉選單：計畫編號、受測者編號、身分證字號、姓名、受測者標籤、檢測人員
 @router.get("/", response_model=SubjectListResponse)
 async def get_subject(
-    number: Optional[str] = Query(None, regex="contains__", title="受測者編號"),
-    sid: Optional[str] = Query(None, regex="contains__", title="ID"),
-    name: Optional[str] = Query(None, regex="contains__", title="姓名"),
-    sex: Optional[SexType] = Query(None, title="性別：男=0, 女=1）"),
-    memo: Optional[str] = Query(None, regex="contains__", title="受測者標記"),
-    birth_date: Optional[str] = Query(None, regex="[0-9\-]+", title="出生年月日"),
+    proj_num: Optional[List[str]] = Query([], title="計畫編號", alias="proj_num[]"),
+    number: Optional[List[str]] = Query([], title="受測者編號", alias="number[]"),
+    sid: Optional[List[str]] = Query([], title="身分證字號 ID", alias="sid[]"),
+    name: Optional[List[str]] = Query([], title="姓名", alias="name[]"),
+    birth_date: Optional[str] = Query(
+        None,
+        regex="^(YYYY|[0-9]{4})-(MM|[0-9]{2})-(DD|[0-9]{2})$",
+        title="出生年月日",
+    ),
+    sex: Optional[List[SexType]] = Query(
+        [],
+        title="生理性別：男=0, 女=1）",
+        alias="sex[]",
+    ),
+    tag: Optional[List[UUID]] = Query([], title="受測者標籤", alias="tag[]"),
+    measure_operator: Optional[List[str]] = Query(
+        [],
+        title="檢測人員",
+        alias="measure_operator[]",
+    ),
+    irregular_hr: Optional[List[bool]] = Query(
+        [],
+        title="節律標記",
+        alias="irregular_hr[]",
+    ),
+    bmi: Optional[List[str]] = Query(
+        [],
+        regex="(ge|le)__",
+        title="BMI",
+        alias="bmi[]",
+    ),  # measure bmi
+    memo: Optional[str] = Query(None, regex="contains__", title="檢測標記"),
+    liked: Optional[bool] = Query(
+        None,
+        title="是否篩選已加星號項目",
+    ),
     sort_expr: Optional[str] = Query(
         None,
         title="updated_at 代表由小到大排。-updated_at 代表由大到小排。",
-    ),
-    specific_months: Optional[List[int]] = Query(
-        [],
-        alias="specific_months[]",
-        title="指定月份",
     ),
     dateutils: DateUtils = Depends(),
     pagination: Pagination = Depends(),
@@ -94,64 +138,117 @@ async def get_subject(
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
     start_date, end_date = dateutils.get_dates()
-    if birth_date:
-        try:
-            birth_date = datetime.strptime(birth_date.replace("-", ""), "%Y%m%d")
-        except Exception:
-            raise HTTPException(status_code=400, detail="date format error")
+    birth_date_like = (
+        birth_date.replace("YYYY", "%").replace("MM", "%").replace("DD", "%")
+        if birth_date
+        else None
+    )
 
-    filters = {
-        "name__contains": name.replace("contains__", "") if name else None,
-        "sid__contains": sid.replace("contains__", "") if sid else None,
-        "birth_date": birth_date,
-        "sex": sex,
-        "memo__contains": memo.replace("contains__", "") if memo else None,
+    bmi_start = py_.head(list(filter(lambda x: x.startswith("ge"), bmi)))
+    bmi_end = py_.head(list(filter(lambda x: x.startswith("le"), bmi)))
+    irregular_hr = (
+        [0 if e == False else 1 for e in irregular_hr] if irregular_hr else []
+    )
+
+    subject_base_filters = {
+        "is_active": True,
+        "org_id": None if current_user.is_superuser else current_user.org_id,
     }
-    filters = dict([(k, v) for k, v in filters.items() if v is not None and v != []])
-    filter_expr = models.Subject.filter_expr(**filters)
-    if number:
-        filter_expr.append(
-            cast(models.Subject.number, String).ilike(
-                f'%{number.replace("contains__", "")}%',
-            ),
-        )
+
+    subject_filters = {
+        **subject_base_filters,
+        "proj_num__in": proj_num,
+        "number__in": number,
+        "sid__in": sid,
+        "name__in": name,
+        "sex__in": sex,
+    }
+    subject_base_filters = get_filters(subject_base_filters)
+    subject_filters = get_filters(subject_filters)
+    filter_expr = models.Subject.filter_expr(**subject_filters)
+    if birth_date_like:
+        filter_expr += [cast(models.Subject.birth_date, String).like(birth_date_like)]
+    if tag:
+        filter_expr += [models.Subject.tag_ids.overlap(tag)]
+
     sort_expr = sort_expr.split(",") if sort_expr else ["-last_measure_time"]
     sort_expr = [e.replace("+", "") for e in sort_expr]
     order_expr = models.Subject.order_expr(*sort_expr)
 
-    time_filters = get_filters(
+    measure_base_filters = {
+        "is_active": True,
+        "org_id": None if current_user.is_superuser else current_user.org_id,
+        "branch_id__in": crud.user.get_branches_list(user=current_user),
+    }
+    measure_filters = get_filters(
         {
+            **measure_base_filters,
+            "measure_operator__in": measure_operator,
+            "bmi__ge": bmi_start and int(bmi_start.replace("ge__", "")),
+            "bmi__le": bmi_end and int(bmi_end.replace("le__", "")),
+            "irregular_hr__in": irregular_hr,
+            "memo__contains": (memo.replace("contains__", "") if memo else None),
             "measure_time__ge": start_date,
             "measure_time__le": end_date,
         },
     )
-    org_fileters = get_filters(
-        {
-            "org_id": current_user.org_id,
-        },
-    )
-    org_expressions = models.MeasureInfo.filter_expr(**org_fileters)
-    time_expressions = models.MeasureInfo.filter_expr(**time_filters)
-    if specific_months:
-        time_expressions.append(
-            extract("month", models.MeasureInfo.measure_time).in_(specific_months),
+
+    measure_expressions = models.MeasureInfo.filter_expr(**measure_filters)
+
+    if crud.user.has_requires(user=current_user, groups=["user", "subject"]) and (
+        crud.user.has_requires(
+            user=current_user,
+            groups=["admin", "manager"],
         )
-    subquery = (
-        select(models.Subject)
-        .join(MeasureInfo)
-        .where(*time_expressions, *org_expressions)
-        .distinct()
-        .subquery()
+        is False
+    ):
+        file_filters = get_filters(
+            {
+                "owner_id": current_user.id,
+            },
+        )
+        file_expressions = models.File.filter_expr(**file_filters)
+        subquery = (
+            select(models.Subject)
+            .join(MeasureInfo)
+            .join(models.File)
+            .where(*measure_expressions, *file_expressions)
+            .distinct()
+            .subquery()
+        )
+    else:
+        subquery = (
+            select(models.Subject)
+            .join(MeasureInfo)
+            .where(*measure_expressions)
+            .distinct()
+            .subquery()
+        )
+
+    query = select(models.Subject).join(subquery, models.Subject.id == subquery.c.id)
+    if liked:
+        query = query.join(
+            models.UserLikedItem,
+            and_(
+                models.UserLikedItem.item_id == models.Subject.id,
+                models.UserLikedItem.item_type == LikeItemType.subjects,
+                models.UserLikedItem.user_id == current_user.id,
+            ),
+        )
+    query = query.where(*filter_expr).options(
+        selectinload(models.Subject.standard_measure_info),
     )
 
-    query = (
-        select(models.Subject)
-        .join(subquery, models.Subject.id == subquery.c.id)
-        .where(*filter_expr)
-        .options(
-            selectinload(models.Subject.standard_measure_info),
-        )
-    )
+    subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+    subject_tag_options = crud.subject_tag.format_options(options=subject_tags)
+    subject_tag_dict = {
+        tag.id: {
+            "value": tag.id,
+            "key": tag.name,
+            "type": tag.tag_type,
+        }
+        for tag in subject_tags
+    }
 
     items = await crud.subject.get_multi(
         db_session=db_session,
@@ -160,53 +257,147 @@ async def get_subject(
         skip=(pagination.page - 1) * pagination.per_page,
         limit=pagination.per_page,
     )
+
+    if liked:
+        liked_items_ids_set = set([item.id for item in items])
+    else:
+        liked_items = await crud.user_liked_item.get_by_item_type_and_ids(
+            db_session=db_session,
+            user_id=current_user.id,
+            item_type=LikeItemType.subjects,
+            item_ids=[item.id for item in items],
+            is_active=True,
+        )
+        liked_items_ids_set = set([item.item_id for item in liked_items])
+
+    # enrich subject tags and liked
+    item_dicts = [
+        {
+            **jsonable_encoder(item),
+            "tags": list(
+                filter(
+                    lambda x: x is not None,
+                    [subject_tag_dict.get(tag_id) for tag_id in item.tag_ids],
+                ),
+            ),
+            "liked": item.id in liked_items_ids_set,
+        }
+        for item in items
+    ]
     subject_schema = get_subject_schema(org_name=current_user.org.name)
-    items = [subject_schema.from_orm(item) for item in items]
+    items = [subject_schema(**item_dict) for item_dict in item_dicts]
     resp = await db_session.execute(select(func.count()).select_from(query.subquery()))
     total_count = resp.scalar_one()
 
+    # 下拉選單：計畫編號、受測者編號、身分證字號、姓名、受測者標籤、檢測人員
+    def format_option_key_value(query_result):
+        return sorted(
+            [
+                {"value": result[0], "key": result[0]}
+                for result in query_result.fetchall()
+                if result[0]
+            ],
+            key=lambda x: x["key"],
+        )
+
+    async def get_option_list(db_session):
+        dropdown_filters1 = MeasureInfo.filter_expr(**measure_base_filters)
+        dropdown_filters2 = models.Subject.filter_expr(**subject_base_filters)
+        measure_dropdown_query = (
+            select(MeasureInfo)
+            .join(models.Subject)
+            .where(*dropdown_filters1, *dropdown_filters2)
+        )
+
+        measure_operators_query = select(
+            func.distinct(measure_dropdown_query.c.measure_operator),
+        ).select_from(measure_dropdown_query.subquery())
+        measure_operators_result = await db_session.execute(measure_operators_query)
+        measure_operators = format_option_key_value(measure_operators_result)
+
+        subject_dropdown_query = (
+            select(models.Subject)
+            .join(MeasureInfo)
+            .where(*dropdown_filters1, *dropdown_filters2)
+        )
+        proj_nums_query = select(
+            func.distinct(subject_dropdown_query.c.proj_num),
+        ).select_from(
+            subject_dropdown_query.subquery(),
+        )
+        proj_nums_result = await db_session.execute(proj_nums_query)
+        proj_nums = format_option_key_value(proj_nums_result)
+
+        sids_query = select(func.distinct(subject_dropdown_query.c.sid)).select_from(
+            subject_dropdown_query.subquery(),
+        )
+        sids_result = await db_session.execute(sids_query)
+        sids = format_option_key_value(sids_result)
+
+        names_query = select(func.distinct(subject_dropdown_query.c.name)).select_from(
+            subject_dropdown_query.subquery(),
+        )
+        names_result = await db_session.execute(names_query)
+        names = format_option_key_value(names_result)
+
+        numbers_query = select(
+            func.distinct(subject_dropdown_query.c.number),
+        ).select_from(subject_dropdown_query.subquery())
+        numbers_result = await db_session.execute(numbers_query)
+        numbers = format_option_key_value(numbers_result)
+
+        return {
+            "proj_nums": proj_nums,
+            "measure_operators": measure_operators,
+            "sids": sids,
+            "names": names,
+            "numbers": numbers,
+            "tags": subject_tag_options,
+        }
+
+    dropdown_options = await get_option_list(db_session=db_session)
     return SubjectListResponse(
         subject=await pagination.paginate2(total_count, items),
         measure_times=MEASURE_TIMES,
+        proj_nums=dropdown_options["proj_nums"],
+        sids=dropdown_options["sids"],
+        names=dropdown_options["names"],
+        numbers=dropdown_options["numbers"],
+        tags=dropdown_options["tags"],
+        measure_operators=dropdown_options["measure_operators"],
+        irregular_hrs=[
+            {"value": False, "key": "規律"},
+            {"value": True, "key": "不規律"},
+        ],
+        pass_rates=[{"value": pct, "key": f"{pct}%"} for pct in range(10, 110, 10)],
+        sexes=[{"value": 0, "key": "男"}, {"value": 1, "key": "女"}],
     )
 
 
 @router.get("/{subject_id}/measures", response_model=schemas.SubjectReadWithMeasures)
 async def get_subject_measures(
     subject_id: UUID,
-    specific_months: Optional[List[int]] = Query(
-        [],
-        alias="specific_months[]",
-        title="指定月份",
-    ),
-    org_id: Optional[List[str]] = Query(
-        [],
-        title="檢測單位",
-    ),
     measure_operator: Optional[List[str]] = Query(
         [],
         title="檢測人員",
         alias="measure_operator[]",
     ),
-    consult_dr: Optional[List[str]] = Query(
-        [],
-        title="諮詢醫師",
-        alias="consult_dr[]",
-    ),  # judge_dr
+    measure_memo: Optional[str] = Query(None, regex="contains__", title="檢測標記"),
     irregular_hr: Optional[List[bool]] = Query(
         [],
         title="節律標記",
         alias="irregular_hr[]",
     ),
-    proj_num: Optional[str] = Query(None, title="計畫編號"),
-    has_memos: Optional[str] = Query(None, title="檢測標記"),
-    has_bcqs: Optional[str] = Query(None, title="BCQ 檢測"),
-    age: Optional[List[str]] = Query([], regex="(ge|le)__", title="年齡", alias="age[]"),
-    bmi: Optional[List[str]] = Query([], regex="(ge|le)__", title="BMI", alias="bmi[]"),
-    not_include_low_pass_rates: Optional[List[bool]] = Query(
+    has_bcq: Optional[List[bool]] = Query(
         [],
-        title="排除通過率低項目",
-        alias="not_include_low_pass_rates[]",
+        title="BCQ 檢測/體質量表",
+        alias="has_bcq[]",
+    ),
+    # TODO: implement filter by pass rate
+    pass_rate: Optional[List[int]] = Query(
+        [],
+        title="脈波通過率",
+        alias="pass_rate[]",
     ),
     sort_expr: Optional[str] = Query(
         "-measure_time",
@@ -229,6 +420,11 @@ async def get_subject_measures(
             status_code=400,
             detail=f"Not found subject id: {subject_id}",
         )
+    if subject.is_active is False:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Subject is not active.",
+        )
 
     # TODO: make frontend remove +
     sort_expr = sort_expr.split(",") if sort_expr else ["-updated_at"]
@@ -242,55 +438,31 @@ async def get_subject_measures(
     order_expr += org_order_expr
     # TODO: implement
     # TODO: add division constraint
-    has_memos = (
-        [True if e == "true" else False for e in has_memos.split(",")]
-        if has_memos
-        else []
-    )
-    has_bcqs = (
-        [True if e == "true" else False for e in has_bcqs.split(",")]
-        if has_bcqs
-        else []
-    )
     start_date, end_date = dateutils.get_dates()
-    age_start = py_.head(list(filter(lambda x: x.startswith("ge"), age)))
-    age_end = py_.head(list(filter(lambda x: x.startswith("le"), age)))
-    bmi_start = py_.head(list(filter(lambda x: x.startswith("ge"), bmi)))
-    bmi_end = py_.head(list(filter(lambda x: x.startswith("le"), bmi)))
     irregular_hr = (
         [0 if e == False else 1 for e in irregular_hr] if irregular_hr else []
     )
-    has_low_pass_rate = [not x for x in not_include_low_pass_rates]
     expressions = []
     filters = get_filters(
         {
+            "is_active": True,
             "subject_id": subject_id,
             "measure_time__ge": start_date,
             "measure_time__le": end_date,
-            "age__ge": age_start and int(age_start.replace("ge__", "")),
-            "age__le": age_end and int(age_end.replace("le__", "")),
-            "bmi__ge": bmi_start and int(bmi_start.replace("ge__", "")),
-            "bmi__le": bmi_end and int(bmi_end.replace("le__", "")),
-            # TODO: filter org_id by user permission
-            "org_id__in": org_id,
             "measure_operator__in": measure_operator,
-            "judge_dr__in": consult_dr,
             "irregular_hr__in": irregular_hr,
-            "proj_num": proj_num,
-            "has_memo__in": has_memos,
-            "has_bcq__in": has_bcqs,
-            "has_low_pass_rate__in": has_low_pass_rate,
-            "org_id": current_user.org_id,
+            "has_bcq__in": has_bcq,
+            "memo__contains": (
+                measure_memo.replace("contains__", "") if measure_memo else None
+            ),
+            "org_id": None if current_user.is_superuser else current_user.org_id,
+            "branch_id__in": crud.user.get_branches_list(user=current_user),
         },
     )
     print("filters", filters)
     expressions = models.MeasureInfo.filter_expr(**filters)
     org_expressions = []
     print("expressions", expressions)
-    if specific_months:
-        expressions.append(
-            extract("month", models.MeasureInfo.measure_time).in_(specific_months),
-        )
     base_query = select(MeasureInfo).where(MeasureInfo.subject_id == subject_id)
     query = (
         select(MeasureInfo).join(Org).where(*expressions, *org_expressions).distinct()
@@ -304,7 +476,11 @@ async def get_subject_measures(
         skip=(pagination.page - 1) * pagination.per_page,
         limit=pagination.per_page,
     )
-
+    tongue_measures = await crud.measure_advanced_tongue2.get_by_owner_id(
+        db_session=db_session,
+        owner_id=current_user.id,
+    )
+    tongue_measure_ids = {tongue_measure.info_id for tongue_measure in tongue_measures}
     measures = [
         schemas.MeasureInfoReadByList(
             id=measure.id,
@@ -317,7 +493,10 @@ async def get_subject_measures(
             has_memo=measure.has_memo,
             age=measure.age,
             bmi=measure.bmi,
+            sbp=measure.sbp,
+            dbp=measure.dbp,
             bcq=measure.has_bcq,
+            has_tongue_measure=measure.id in tongue_measure_ids,
             is_standard_measure=(subject.standard_measure_id == measure.id),
         )
         for measure in measures
@@ -327,8 +506,8 @@ async def get_subject_measures(
     total_count = resp.scalar_one()
     page_result = await pagination.paginate2(total_count, measures)
 
-    # TODO: user, division mapping
-    org_names = [{"value": current_user.org.id, "key": current_user.org.name}]
+    # # TODO: user, division mapping
+    # org_names = [{"value": current_user.org.id, "key": current_user.org.name}]
 
     measure_operators_query = select(
         func.distinct(base_query.c.measure_operator),
@@ -340,43 +519,142 @@ async def get_subject_measures(
         if operator[0]
     ]
 
-    consult_dr_query = select(func.distinct(base_query.c.judge_dr)).select_from(
-        base_query.subquery(),
-    )
-    consult_drs_result = await db_session.execute(consult_dr_query)
-    consult_drs = [
-        {"value": consult_dr[0], "key": consult_dr[0]}
-        for consult_dr in consult_drs_result.fetchall()
-        if consult_dr[0]
+    all_subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+    subject_tags = [
+        subject_tag
+        for subject_tag in all_subject_tags
+        if subject_tag.id in subject.tag_ids
     ]
-
-    proj_nums_query = select(func.distinct(base_query.c.proj_num)).select_from(
-        base_query.subquery(),
+    liked_items = await crud.user_liked_item.get_by_item_type_and_ids(
+        db_session=db_session,
+        user_id=current_user.id,
+        item_type=LikeItemType.subjects,
+        item_ids=[subject_id],
+        is_active=True,
     )
-    proj_nums_result = await db_session.execute(proj_nums_query)
-    proj_nums = [
-        {"value": proj_num[0], "key": proj_num[0]}
-        for proj_num in proj_nums_result.fetchall()
-        if proj_num[0]
-    ]
+    liked_items_ids_set = set([item.item_id for item in liked_items])
 
+    subject_tag_options = crud.subject_tag.format_options(options=subject_tags)
+    subject_dict = {
+        **jsonable_encoder(subject),
+        "liked": subject_id in liked_items_ids_set,
+        "tags": subject_tag_options,
+    }
     return schemas.SubjectReadWithMeasures(
-        subject=get_subject_schema(org_name=current_user.org.name)(**subject.dict()),
+        subject=get_subject_schema(org_name=current_user.org.name)(**subject_dict),
         measure=page_result,
         measure_times=MEASURE_TIMES,
-        org_names=org_names,
         measure_operators=measure_operators,
-        consult_drs=consult_drs,
-        irregular_hrs=[{"value": False, "key": "規律"}, {"value": True, "key": "不規律"}],
-        proj_nums=proj_nums,
-        has_memos=[{"value": True, "key": "有"}, {"value": False, "key": "無"}],
-        not_include_low_pass_rates=[
-            {"value": True, "key": "是"},
-            {"value": False, "key": "否"},
+        irregular_hrs=[
+            {"value": False, "key": "規律"},
+            {"value": True, "key": "不規律"},
+        ],
+        has_bcqs=[{"value": True, "key": "有"}, {"value": False, "key": "無"}],
+        pass_rates=[
+            {"value": pct, "key": f"{pct}% 以上"} for pct in range(10, 110, 10)
+        ],
+        subject_tags=crud.subject_tag.format_options(options=all_subject_tags),
+        normal_spec=[
+            {"column": "irregular_hrs", "range": [0, 1]},
+            {"column": "bmi", "range": [18.5, 24]},
+            {"column": "sbp", "range": [90, 130]},
+            {"column": "dbp", "range": [60, 80]},
         ],
     )
 
 
+@router.patch("/{subject_id}")
+async def update_subject(
+    subject_id: UUID,
+    subject_in: schemas.SubjectUpdateInput,
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    if not subject:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found subject id: {subject_id}",
+        )
+
+    if current_user.org_id != subject.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Permission Error",
+        )
+
+    # if number already exists, raise error
+    same_number_subject = await crud.subject.get_by_number_and_org_id(
+        db_session=db_session,
+        org_id=current_user.org_id,
+        number=subject_in.number,
+    )
+    # TODO: check whether need merge different subjects to the one
+    if same_number_subject and same_number_subject.id != subject_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Number already exists: {subject_in.number}",
+        )
+
+    subject = await crud.subject.update(
+        db_session=db_session,
+        obj_current=subject,
+        obj_new=subject_in.dict(exclude_none=True),
+    )
+    return subject
+
+
+@router.patch("/{subject_id}/tags", response_model=schemas.SubjectRead)
+async def update_subject_tags(
+    subject_id: UUID,
+    tag_input: schemas.SubjectTagUpdateInput,
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    subject = await crud.subject.get(
+        db_session=db_session,
+        id=subject_id,
+        relations=[models.Subject.standard_measure_info],
+    )
+    if not subject:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found subject id: {subject_id}",
+        )
+
+    if (current_user.org_id != subject.org_id) and current_user.is_superuser is False:
+        raise HTTPException(
+            status_code=400,
+            detail="Permission Error",
+        )
+
+    all_subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+    all_subject_tag_ids = [tag.id for tag in all_subject_tags]
+    extra_ids = set(tag_input.tag_ids) - set(all_subject_tag_ids)
+    if len(extra_ids) > 0:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid tag ids: {extra_ids}",
+        )
+    subject.tag_ids = tag_input.tag_ids
+    db_session.add(subject)
+    await db_session.commit()
+    await db_session.refresh(subject)
+
+    subject_tags = [
+        subject_tag
+        for subject_tag in all_subject_tags
+        if subject_tag.id in subject.tag_ids
+    ]
+    subject_tag_options = crud.subject_tag.format_options(options=subject_tags)
+    return {**jsonable_encoder(subject), "tags": subject_tag_options}
+
+
+# @depreciated: use subject tags instead
 @router.patch("/{subject_id}/memo", response_model=schemas.SubjectRead)
 async def update_subject_memo(
     subject_id: UUID,
@@ -543,9 +821,9 @@ async def get_multi_measure_summary(
 
     mean_statistic_model_dict = {}
     for key, val in mean_statistic_dict.items():
-        mean_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        mean_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     cv_statistic_model_dict = {}
     for key, val in cv_statistic_dict.items():
@@ -555,9 +833,9 @@ async def get_multi_measure_summary(
 
     std_statistic_model_dict = {}
     for key, val in std_statistic_dict.items():
-        std_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        std_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     # TODO: add CV and STD
     means_dict = await crud.measure_cn_mean.get_dict_by_sex(
@@ -766,91 +1044,91 @@ async def get_multi_measure_summary(
                 score_yang=measure.bcq.percentage_yang if measure.bcq else None,
                 score_yin=measure.bcq.percentage_yin if measure.bcq else None,
                 score_phlegm=measure.bcq.percentage_phlegm if measure.bcq else None,
-                score_yang_head=measure.bcq.percentage_yang_head
-                if measure.bcq
-                else None,
-                score_yang_chest=measure.bcq.percentage_yang_chest
-                if measure.bcq
-                else None,
-                score_yang_limbs=measure.bcq.percentage_yang_limbs
-                if measure.bcq
-                else None,
-                score_yang_abdomen=measure.bcq.percentage_yang_abdomen
-                if measure.bcq
-                else None,
-                score_yang_surface=measure.bcq.percentage_yang_surface
-                if measure.bcq
-                else None,
+                score_yang_head=(
+                    measure.bcq.percentage_yang_head if measure.bcq else None
+                ),
+                score_yang_chest=(
+                    measure.bcq.percentage_yang_chest if measure.bcq else None
+                ),
+                score_yang_limbs=(
+                    measure.bcq.percentage_yang_limbs if measure.bcq else None
+                ),
+                score_yang_abdomen=(
+                    measure.bcq.percentage_yang_abdomen if measure.bcq else None
+                ),
+                score_yang_surface=(
+                    measure.bcq.percentage_yang_surface if measure.bcq else None
+                ),
                 score_yin_head=measure.bcq.percentage_yin_head if measure.bcq else None,
-                score_yin_limbs=measure.bcq.percentage_yin_limbs
-                if measure.bcq
-                else None,
+                score_yin_limbs=(
+                    measure.bcq.percentage_yin_limbs if measure.bcq else None
+                ),
                 score_yin_gt=measure.bcq.percentage_yin_gt if measure.bcq else None,
-                score_yin_surface=measure.bcq.percentage_yin_surface
-                if measure.bcq
-                else None,
-                score_yin_abdomen=measure.bcq.percentage_yin_abdomen
-                if measure.bcq
-                else None,
-                score_phlegm_trunk=measure.bcq.percentage_phlegm_trunk
-                if measure.bcq
-                else None,
-                score_phlegm_surface=measure.bcq.percentage_phlegm_surface
-                if measure.bcq
-                else None,
-                score_phlegm_head=measure.bcq.percentage_phlegm_head
-                if measure.bcq
-                else None,
-                score_phlegm_gt=measure.bcq.percentage_phlegm_gt
-                if measure.bcq
-                else None,
+                score_yin_surface=(
+                    measure.bcq.percentage_yin_surface if measure.bcq else None
+                ),
+                score_yin_abdomen=(
+                    measure.bcq.percentage_yin_abdomen if measure.bcq else None
+                ),
+                score_phlegm_trunk=(
+                    measure.bcq.percentage_phlegm_trunk if measure.bcq else None
+                ),
+                score_phlegm_surface=(
+                    measure.bcq.percentage_phlegm_surface if measure.bcq else None
+                ),
+                score_phlegm_head=(
+                    measure.bcq.percentage_phlegm_head if measure.bcq else None
+                ),
+                score_phlegm_gt=(
+                    measure.bcq.percentage_phlegm_gt if measure.bcq else None
+                ),
                 percentage_yang=measure.bcq.percentage_yang if measure.bcq else None,
                 percentage_yin=measure.bcq.percentage_yin if measure.bcq else None,
-                percentage_phlegm=measure.bcq.percentage_phlegm
-                if measure.bcq
-                else None,
-                percentage_yang_head=measure.bcq.percentage_yang_head
-                if measure.bcq
-                else None,
-                percentage_yang_chest=measure.bcq.percentage_yang_chest
-                if measure.bcq
-                else None,
-                percentage_yang_limbs=measure.bcq.percentage_yang_limbs
-                if measure.bcq
-                else None,
-                percentage_yang_abdomen=measure.bcq.percentage_yang_abdomen
-                if measure.bcq
-                else None,
-                percentage_yang_surface=measure.bcq.percentage_yang_surface
-                if measure.bcq
-                else None,
-                percentage_yin_head=measure.bcq.percentage_yin_head
-                if measure.bcq
-                else None,
-                percentage_yin_limbs=measure.bcq.percentage_yin_limbs
-                if measure.bcq
-                else None,
-                percentage_yin_gt=measure.bcq.percentage_yin_gt
-                if measure.bcq
-                else None,
-                percentage_yin_surface=measure.bcq.percentage_yin_surface
-                if measure.bcq
-                else None,
-                percentage_yin_abdomen=measure.bcq.percentage_yin_abdomen
-                if measure.bcq
-                else None,
-                percentage_phlegm_trunk=measure.bcq.percentage_phlegm_trunk
-                if measure.bcq
-                else None,
-                percentage_phlegm_surface=measure.bcq.percentage_phlegm_surface
-                if measure.bcq
-                else None,
-                percentage_phlegm_head=measure.bcq.percentage_phlegm_head
-                if measure.bcq
-                else None,
-                percentage_phlegm_gt=measure.bcq.percentage_phlegm_gt
-                if measure.bcq
-                else None,
+                percentage_phlegm=(
+                    measure.bcq.percentage_phlegm if measure.bcq else None
+                ),
+                percentage_yang_head=(
+                    measure.bcq.percentage_yang_head if measure.bcq else None
+                ),
+                percentage_yang_chest=(
+                    measure.bcq.percentage_yang_chest if measure.bcq else None
+                ),
+                percentage_yang_limbs=(
+                    measure.bcq.percentage_yang_limbs if measure.bcq else None
+                ),
+                percentage_yang_abdomen=(
+                    measure.bcq.percentage_yang_abdomen if measure.bcq else None
+                ),
+                percentage_yang_surface=(
+                    measure.bcq.percentage_yang_surface if measure.bcq else None
+                ),
+                percentage_yin_head=(
+                    measure.bcq.percentage_yin_head if measure.bcq else None
+                ),
+                percentage_yin_limbs=(
+                    measure.bcq.percentage_yin_limbs if measure.bcq else None
+                ),
+                percentage_yin_gt=(
+                    measure.bcq.percentage_yin_gt if measure.bcq else None
+                ),
+                percentage_yin_surface=(
+                    measure.bcq.percentage_yin_surface if measure.bcq else None
+                ),
+                percentage_yin_abdomen=(
+                    measure.bcq.percentage_yin_abdomen if measure.bcq else None
+                ),
+                percentage_phlegm_trunk=(
+                    measure.bcq.percentage_phlegm_trunk if measure.bcq else None
+                ),
+                percentage_phlegm_surface=(
+                    measure.bcq.percentage_phlegm_surface if measure.bcq else None
+                ),
+                percentage_phlegm_head=(
+                    measure.bcq.percentage_phlegm_head if measure.bcq else None
+                ),
+                percentage_phlegm_gt=(
+                    measure.bcq.percentage_phlegm_gt if measure.bcq else None
+                ),
             ),
             # bcq=measure.bcq or {},
         )
@@ -955,9 +1233,9 @@ async def get_multi_measure_summary_data(
 
     mean_statistic_model_dict = {}
     for key, val in mean_statistic_dict.items():
-        mean_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        mean_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     cv_statistic_model_dict = {}
     for key, val in cv_statistic_dict.items():
@@ -967,9 +1245,9 @@ async def get_multi_measure_summary_data(
 
     std_statistic_model_dict = {}
     for key, val in std_statistic_dict.items():
-        std_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        std_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     hands = ["r", "l"]
     positions = ["cu", "qu", "ch"]
@@ -978,9 +1256,9 @@ async def get_multi_measure_summary_data(
         schemas.DF1Schema(
             measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
             number=subject.number,
-            birth_date=subject.birth_date.strftime("%Y-%m-%d")
-            if subject.birth_date
-            else None,
+            birth_date=(
+                subject.birth_date.strftime("%Y-%m-%d") if subject.birth_date else None
+            ),
             sex_label=SEX_TYPE_LABEL.get(subject.sex),
             bmi=measure.bmi,
             hand=HAND_TYPE_LABEL.get(hand),
@@ -1403,9 +1681,9 @@ async def get_multi_measure_by_conditions(
 
     mean_statistic_model_dict = {}
     for key, val in mean_statistic_dict.items():
-        mean_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        mean_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     cv_statistic_model_dict = {}
     for key, val in cv_statistic_dict.items():
@@ -1415,9 +1693,9 @@ async def get_multi_measure_by_conditions(
 
     std_statistic_model_dict = {}
     for key, val in std_statistic_dict.items():
-        std_statistic_model_dict[
-            key
-        ] = crud.measure_statistic.get_flat_statistic_model2(val)
+        std_statistic_model_dict[key] = (
+            crud.measure_statistic.get_flat_statistic_model2(val)
+        )
 
     hands = ["r", "l"]
     positions = ["cu", "qu", "ch"]
@@ -1426,9 +1704,11 @@ async def get_multi_measure_by_conditions(
         schemas.DF1Schema(
             measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
             number=subject_dict[measure.subject_id].number.upper(),
-            birth_date=subject_dict[measure.subject_id].birth_date.strftime("%Y-%m-%d")
-            if subject_dict[measure.subject_id].birth_date
-            else None,
+            birth_date=(
+                subject_dict[measure.subject_id].birth_date.strftime("%Y-%m-%d")
+                if subject_dict[measure.subject_id].birth_date
+                else None
+            ),
             sex_label=SEX_TYPE_LABEL.get(subject_dict[measure.subject_id].sex),
             bmi=measure.bmi,
             hand=HAND_TYPE_LABEL.get(hand),
@@ -1766,3 +2046,177 @@ async def get_multi_measure_by_conditions(
             "Content-Type": "application/octet-stream",
         },
     )
+
+
+@router.post("/export_report")
+async def export_report(
+    input_payload: ExportReportInputPayload,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    if input_payload.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail="The user doesn't have enough privileges",
+        )
+
+    for subject_id in input_payload.subject_ids:
+        if not await crud.subject.get(db_session=db_session, id=subject_id):
+            raise HTTPException(
+                status_code=400,
+                detail="The subject with this id does not exist in the system",
+            )
+
+    filename = "sample.pdf"
+    headers = {
+        "Content-Disposition": "inline; filename*=utf-8" '{}"'.format(quote(filename)),
+        "Content-Type": "application/octet-stream",
+        "X-Suggested-Filename": filename,
+    }
+    from io import BytesIO
+
+    with open(filename, "rb") as file:
+        data = BytesIO(file.read())
+    data.seek(0)
+    return StreamingResponse(data, media_type="application/pdf", headers=headers)
+
+
+@router.put("/{subject_id}/activate")
+async def activate_subject(
+    subject_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    if subject is None:
+        raise HTTPException(
+            status_code=400,
+            detail="The subject with this id does not exist in the system",
+        )
+    await crud.subject.update(
+        db_session=db_session,
+        obj_current=subject,
+        obj_new=schemas.SubjectUpdate(is_active=True),
+    )
+
+    return {"subject_id": subject_id}
+
+
+@router.put("/{subject_id}/deactivate")
+async def deactivate_subject(
+    subject_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    if subject is None:
+        raise HTTPException(
+            status_code=400,
+            detail="The subject with this id does not exist in the system",
+        )
+    await crud.subject.update(
+        db_session=db_session,
+        obj_current=subject,
+        obj_new=schemas.SubjectUpdate(is_active=False),
+    )
+
+    return {"subject_id": subject_id}
+
+
+@router.delete(
+    "/{subject_id}",
+)
+async def delete_subject(
+    subject_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    if current_user.is_superuser is False:
+        raise HTTPException(
+            status_code=400,
+            detail="The user doesn't have enough privileges",
+        )
+
+    subject = await delete_subject_func(
+        db_session=db_session, subject_id=subject_id, operator_id=current_user.id,
+    )
+    # subject = await crud.subject.get(db_session=db_session, id=subject_id)
+    # if subject is None:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail="The subject with this id does not exist in the system",
+    #     )
+    # measures = await crud.measure_info.get_by_subject_id(
+    #     db_session=db_session,
+    #     subject_id=subject_id,
+    # )
+    # for measure in measures:
+    #     # bcq = measure.bcq
+    #     await crud.measure_info.remove(db_session=db_session, id=measure.id)
+
+    # await crud.subject.remove(db_session=db_session, id=subject_id)
+    # await crud.deleted_subject.create(
+    #     db_session=db_session,
+    #     obj_in=schemas.DeletedSubjectCreate(
+    #         org_id=current_user.org_id,
+    #         number=subject.number,
+    #         operator_id=current_user.id,
+    #     ),
+    # )
+
+    return {"subject_id": subject_id, "subject": subject, "measures": measures}
+
+
+@router.post("/batch/activate", response_model=schemas.BatchResponse)
+async def batch_activate_subjects(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        subject = await crud.subject.get(db_session=db_session, id=obj_id)
+        if subject is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            subject = await crud.subject.update(
+                db_session=db_session,
+                obj_current=subject,
+                obj_new=schemas.SubjectUpdate(is_active=True),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.post("/batch/deactivate", response_model=schemas.BatchResponse)
+async def batch_deactivate_subjects(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    """
+    The API would delete the subject directly and the action cannot be reverted.
+    """
+
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        subject = await crud.subject.get(db_session=db_session, id=obj_id)
+        if subject is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            # 在前端 api 不調整的情況下改成真的刪除
+            subject = await delete_subject_func(
+                db_session=db_session,
+                subject_id=subject.id,
+                operator_id=current_user.id,
+            )
+            result["success"].append({"id": obj_id})
+
+    return result

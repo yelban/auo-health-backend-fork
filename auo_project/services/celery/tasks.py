@@ -1,6 +1,13 @@
+from uuid import UUID
+
 from asgiref.sync import async_to_sync
 from celery.schedules import crontab
 
+from auo_project.core.cc import (
+    generate_tongue_cc_image,
+    generate_tongue_wb_image,
+    process_tongue_image,
+)
 from auo_project.core.measure import (
     create_merged_measures,
     update_measure_cn_means,
@@ -74,3 +81,18 @@ def task_update_uploading_upload_status():
 @celery_app.task()
 def task_create_merged_measures():
     async_to_sync(create_merged_measures)()
+
+
+@celery_app.task(retry_kwargs={"max_retries": 3})
+def task_generate_tongue_wb_image(front_or_back: str, config_id: UUID):
+    async_to_sync(generate_tongue_wb_image)(front_or_back, config_id)
+
+
+@celery_app.task(retry_kwargs={"max_retries": 3})
+def task_generate_tongue_cc_image(front_or_back: str, config_id: UUID):
+    async_to_sync(generate_tongue_cc_image)(front_or_back, config_id)
+
+
+@celery_app.task(retry_kwargs={"max_retries": 3})
+def task_process_tongue_image(tongue_upload_id: UUID):
+    async_to_sync(process_tongue_image)(tongue_upload_id)

@@ -16,10 +16,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
 from auo_project.core.azure import (
-    blob_service,
     download_zip_file,
     internet_blob_service,
-    upload_internet_file,
+    private_blob_service,
+    upload_blob_file,
 )
 from auo_project.core.config import settings
 from auo_project.core.constants import (
@@ -301,9 +301,9 @@ def serialize(df):
     return
 
 
-def read_statistics_txt(content) -> List[schemas.FileStatistics]:
+def read_statistics_csv(content) -> List[schemas.FileStatistics]:
     # skip header
-    lines = content.split("\r\n")[1:]
+    lines = content.replace("NA", "").split("\r\n")[1:]
     columns = [
         "statistic",
         "id",
@@ -351,8 +351,9 @@ def read_statistics_txt(content) -> List[schemas.FileStatistics]:
             continue
         parts = line.strip(",").split(",")
         if len(parts) < 4:
+            print(parts)
             raise Exception(
-                f"statistics.txt each line should be more than 4 columns but only {len(parts)}.",
+                f"statistics.csv each line should be more than 4 columns but only {len(parts)}.",
             )
         result.append(schemas.FileStatistics(**dict(zip(columns[: len(parts)], parts))))
     return result
@@ -480,9 +481,25 @@ def read_file(zip_file: Union[BytesIO, str]):
                         result_dict[f"{side}/{file_name}"] = df
 
                 elif file_name == statistics_file:
-                    result_dict[file_name] = read_statistics_txt(
-                        content=content.decode("utf8"),
-                    )
+                    try:
+                        result_dict[file_name] = read_statistics_csv(
+                            content=content.decode("utf8"),
+                        )
+                    except Exception as e:
+                        print("read plain statistics file error: ", e)
+                        try:
+                            result_dict[file_name] = read_statistics_csv(
+                                content=decrypt(
+                                    settings.TXT_FILE_AES_KEY,
+                                    settings.TXT_FILE_AES_IV,
+                                    content,
+                                ).decode("utf8"),
+                            )
+                        except Exception as e:
+                            print("read enctrypted statistics file error: ", e)
+                            raise Exception(
+                                f"read enctrypted statistics file error: {e}",
+                            )
 
                 elif file_name in image_file_list:
                     result_dict[file_name] = BytesIO(content)
@@ -509,7 +526,9 @@ async def process_file(
     try:
         result_dict = read_file(zip_file)
     except Exception as e:
-        print("file error: ", e)
+        import traceback
+
+        print("file error: ", e, traceback.format_exc())
         return {"error_msg": result_dict.get("error_msg", str(e))}
 
     if not result_dict:
@@ -540,8 +559,8 @@ async def process_file(
     if not subject:
         subject_in = schemas.SubjectCreate(
             org_id=file.owner.org_id,
-            sid=infos.id,
-            name=infos.name,
+            sid=infos.number,  # security concern
+            name=infos.number,  # security concern
             birth_date=infos.birth_date,
             sex=infos.sex,
             last_measure_time=infos.measure_time,
@@ -558,7 +577,7 @@ async def process_file(
             last_measure_time=max(infos.measure_time, subject.last_measure_time)
             if subject.last_measure_time
             else infos.measure_time,
-            sid=infos.id,
+            sid=infos.number,  # security concern
         )
         subject = await crud.subject.update(
             db_session=db_session,
@@ -649,6 +668,7 @@ async def process_file(
             subject_id=subject.id,
             file_id=file.id,
             org_id=file.owner.org_id,
+            branch_id=file.owner.branch_id,
             uid=infos.uid,
             number=infos.number,
             has_measure=True,
@@ -883,15 +903,16 @@ async def process_file(
             obj_in=measure_info_in,
         )
     else:
+        has_bcq = "BCQ.txt" in result_dict or measure_info.bcq is not None
         # TODO: check if survey data exists, if exists, update measure info
         measure_info_in = schemas.MeasureInfoUpdate(
             subject_id=subject.id,
             file_id=file.id,
             org_id=file.owner.org_id,
             uid=infos.uid,
-            number=infos.name,
+            number=infos.number,
             has_measure=True,
-            has_bcq="BCQ.txt" in result_dict,
+            has_bcq=has_bcq,
             has_tongue="T_up.jpg" in result_dict or "T_down.jpg" in result_dict,
             has_low_pass_rate=has_low_pass_rate,
             measure_time=infos.measure_time,
@@ -1131,17 +1152,17 @@ async def process_file(
         down_img_uri = None
         if "T_up.jpg" in result_dict:
             obj_path = f"{subject.id}/{measure_info.id}/T_up.jpg"
-            up_img_uri = upload_internet_file(
+            up_img_uri = upload_blob_file(
                 blob_service_client=internet_blob_service,
-                category="image",
+                category=settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE,
                 file_path=obj_path,
                 object=result_dict["T_up.jpg"],
             )
         if "T_down.jpg" in result_dict:
             obj_path = f"{subject.id}/{measure_info.id}/T_down.jpg"
-            down_img_uri = upload_internet_file(
+            down_img_uri = upload_blob_file(
                 blob_service_client=internet_blob_service,
-                category="image",
+                category=settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE,
                 file_path=obj_path,
                 object=result_dict["T_down.jpg"],
             )
@@ -1231,7 +1252,7 @@ async def get_and_write(
         raise Exception(f"not found file id: {file_id}")
 
     # download blob
-    downloader = download_zip_file(blob_service, file.location)
+    downloader = download_zip_file(private_blob_service, file.location)
     zip_file = BytesIO(downloader.readall())
     result = await process_file(file, zip_file, overwrite, db_session)
     # TODO: design error log table

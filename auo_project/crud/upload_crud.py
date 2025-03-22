@@ -30,7 +30,11 @@ class CRUDUpload(CRUDBase[Upload, UploadCreate, UploadUpdate]):
         return upload
 
     async def cancel(self, *, db_session: Optional[AsyncSession], upload_id: UUID):
-        upload = await super().get(db_session=db_session, id=upload_id)
+        upload = await super().get(
+            db_session=db_session,
+            id=upload_id,
+            relations=["all_files"],
+        )
         if not upload:
             return
         for file in upload.all_files:
@@ -48,7 +52,11 @@ class CRUDUpload(CRUDBase[Upload, UploadCreate, UploadUpdate]):
         db_session: AsyncSession,
         upload_id: UUID,
     ) -> bool:
-        upload = await super().get(db_session=db_session, id=upload_id)
+        upload = await super().get(
+            db_session=db_session,
+            id=upload_id,
+            relations=["all_files"],
+        )
         if not upload:
             return False
         return all(
@@ -65,7 +73,11 @@ class CRUDUpload(CRUDBase[Upload, UploadCreate, UploadUpdate]):
         db_session: AsyncSession,
         upload_id: UUID,
     ) -> bool:
-        upload = await super().get(db_session=db_session, id=upload_id)
+        upload = await super().get(
+            db_session=db_session,
+            id=upload_id,
+            relations=["all_files"],
+        )
         if not upload:
             return False
         return all(
@@ -82,7 +94,11 @@ class CRUDUpload(CRUDBase[Upload, UploadCreate, UploadUpdate]):
         db_session: AsyncSession,
         upload_id: UUID,
     ) -> bool:
-        upload = await super().get(db_session=db_session, id=upload_id)
+        upload = await super().get(
+            db_session=db_session,
+            id=upload_id,
+            relations=["all_files"],
+        )
         if not upload:
             return False
 
@@ -108,7 +124,11 @@ class CRUDUpload(CRUDBase[Upload, UploadCreate, UploadUpdate]):
         )
 
     async def get_display_file_number(self, db_session: AsyncSession, upload_id: UUID):
-        upload = await super().get(db_session=db_session, id=upload_id)
+        upload = await super().get(
+            db_session=db_session,
+            id=upload_id,
+            relations=["all_files"],
+        )
         if not upload:
             return 0
         return sum(

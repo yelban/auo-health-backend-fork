@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi_async_sqlalchemy import db
 from pydantic.networks import EmailStr
-from sqlalchemy.orm import lazyload
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -35,11 +35,16 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         self,
         db_session: AsyncSession,
         username: str,
+        relations: List[Any] = [],
     ) -> Optional[User]:
+        options = []
+        for relation in relations:
+            if isinstance(relation, str):
+                options.append(selectinload(getattr(self.model, relation)))
+            else:
+                options.append(selectinload(relation))
         users = await db_session.execute(
-            select(User)
-            .where(User.username == username)
-            .options(lazyload(User.uploads), lazyload(User.all_files)),
+            select(User).where(User.username == username).options(*options),
         )
         return users.scalar_one_or_none()
 
@@ -187,6 +192,22 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
     def is_active(self, user: User) -> bool:
         return user.is_active
+
+    def is_org_manager(self, user: User) -> bool:
+        return self.has_requires(
+            user=user,
+            roles=["MeasureManager"],
+        )
+
+    def get_branches_list(self, user: User) -> list[str]:
+        """
+        when the user is superuser or org manager, the list will return [].
+        """
+        return (
+            []
+            if self.is_org_manager(user=user) or user.is_superuser
+            else [x.branch_id for x in user.user_branches]
+        )
 
 
 user = CRUDUser(User)

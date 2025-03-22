@@ -2,7 +2,7 @@ from typing import List
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlmodel import ARRAY, INTEGER, Column, Field, UniqueConstraint
+from sqlmodel import ARRAY, INTEGER, Column, Field, Relationship, UniqueConstraint
 
 from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
@@ -88,4 +88,9 @@ class MeasureAdvancedTongue(
             name="advanced_tongues_measure_id_owner_id_key",
         ),
         {"schema": "measure"},
+    )
+
+    measure_info: "MeasureInfo" = Relationship(
+        back_populates="advanced_tongue",
+        sa_relationship_kwargs={"lazy": "selectin"},
     )

@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # quantity of workers for uvicorn
-    WORKERS_COUNT: int = 1
+    WORKERS_COUNT: int = 2
     # Enable uvicorn reloading
     RELOAD: bool = False
 
@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     RABBITMQ_DEFAULT_VHOST: str
 
     STREAMLIT_PASSWORD: Optional[str] = None
+
+    BCQ_MODEL_API_URL: str = "https://auoyourator-health-consultation.azurewebsites.net"
 
     DB_POOL_SIZE = 83
     POOL_SIZE = max(DB_POOL_SIZE // WORKERS_COUNT, 5)
@@ -150,6 +152,7 @@ class Settings(BaseSettings):
     AZURE_STORAGE_KEY: str
     AZURE_STORAGE_CONTAINER: str
     AZURE_STORAGE_CONTAINER_RAW_ZIP: str
+    AZURE_STORAGE_CONTAINER_TONGUE_CONFIG: str = "tongue-config"
 
     AZURE_STORAGE_ACCOUNT_INTERNET: str
     AZURE_STORAGE_KEY_INTERNET: str

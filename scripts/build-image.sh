@@ -1,3 +1,3 @@
 #! /usr/bin/env bash
 
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --project-directory . build
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prd.yml -f deploy/docker-compose.dev.yml --project-directory . build

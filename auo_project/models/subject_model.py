@@ -2,7 +2,9 @@ from datetime import date, datetime
 from typing import List
 from uuid import UUID
 
-from sqlmodel import Field, Relationship
+import sqlmodel
+from sqlalchemy.dialects import postgresql
+from sqlmodel import Column, Field, Relationship
 
 from auo_project.models.base_model import BaseModel, BaseTimestampModel, BaseUUIDModel
 
@@ -28,6 +30,12 @@ class SubjectBase(BaseModel):
     last_measure_time: datetime = Field(default=None, nullable=True)
     proj_num: str = Field(default=None, nullable=True)
     number: str = Field(default=None, nullable=True)
+    tag_ids: List[UUID] = Field(
+        default=[],
+        sa_column=Column(postgresql.ARRAY(sqlmodel.sql.sqltypes.GUID())),
+        nullable=True,
+    )
+    deleted_mark: bool = Field(default=False, nullable=False)
     is_active: bool = Field(index=True, nullable=False, default=True)
 
 

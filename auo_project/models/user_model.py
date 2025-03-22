@@ -14,6 +14,11 @@ class UserBase(BaseModel):
         nullable=False,
         foreign_key="app.auth_orgs.id",
     )
+    branch_id: Optional[UUID] = Field(
+        index=True,
+        nullable=False,
+        foreign_key="app.auth_branches.id",
+    )
     subscription_id: Optional[UUID] = Field(
         default=None,
         foreign_key="app.subscriptions.id",
@@ -55,6 +60,10 @@ class User(BaseUUIDModel, BaseTimestampModel, UserBase, table=True):
         back_populates="users",
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+    branch: Optional["Branch"] = Relationship(
+        back_populates="users",
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
     actions: List["Action"] = Relationship(
         back_populates="users",
         link_model=LinkUserAction,
@@ -74,12 +83,23 @@ class User(BaseUUIDModel, BaseTimestampModel, UserBase, table=True):
         back_populates="users",
         sa_relationship_kwargs={"lazy": "selectin"},
     )
-    uploads: List["Upload"] = Relationship(back_populates="owner")
+    uploads: List["Upload"] = Relationship(
+        back_populates="owner",
+        sa_relationship_kwargs={"lazy": "select"},
+    )
     all_files: List["File"] = Relationship(
         back_populates="owner",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "select"},
     )
     recipes: List["Recipe"] = Relationship(
         back_populates="owner",
         sa_relationship_kwargs={"lazy": "select"},
+    )
+    tongue_uploads: List["MeasureTongueUpload"] = Relationship(
+        back_populates="owner",
+        sa_relationship_kwargs={"lazy": "select"},
+    )
+    user_branches: List["UserBranch"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"lazy": "selectin"},
     )

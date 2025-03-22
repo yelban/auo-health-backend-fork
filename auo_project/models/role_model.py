@@ -13,12 +13,19 @@ class RoleBase(BaseModel):
         index=True,
         nullable=False,
     )
+    name_zh: str = Field(
+        max_length=64,
+        unique=True,
+        index=True,
+        nullable=False,
+    )
     description: str = Field(
         max_length=128,
         unique=False,
         index=False,
         nullable=False,
     )
+    is_active: bool = Field(index=True, nullable=False, default=True)
 
 
 class Role(BaseUUIDModel, BaseTimestampModel, RoleBase, table=True):

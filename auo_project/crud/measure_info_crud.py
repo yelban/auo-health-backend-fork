@@ -54,6 +54,14 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
         )
         return response.scalar_one_or_none()
 
+    async def get_by_subject_id(
+        self, db_session, *, subject_id: UUID
+    ) -> Optional[List[MeasureInfo]]:
+        response = await db_session.execute(
+            select(MeasureInfo).where(MeasureInfo.subject_id == subject_id),
+        )
+        return response.scalars().all()
+
     # TODO: add permission filter
     async def get_proj_num(
         self,
@@ -164,6 +172,24 @@ class CRUDMeasureInfo(CRUDBase[MeasureInfo, MeasureInfoCreate, MeasureInfoUpdate
                 ).asc(),
             )
             .limit(1),
+        )
+        return response.scalar_one_or_none()
+
+    async def get_by_measure_time_range(
+        self,
+        db_session: AsyncSession,
+        *,
+        subject_id: UUID,
+        start_at: datetime,
+        end_at: datetime,
+    ) -> Optional[MeasureInfo]:
+        response = await db_session.execute(
+            select(MeasureInfo).where(
+                MeasureInfo.subject_id == subject_id,
+                MeasureInfo.measure_time >= start_at,
+                MeasureInfo.measure_time < end_at,
+                MeasureInfo.is_active == True,
+            ),
         )
         return response.scalar_one_or_none()
 

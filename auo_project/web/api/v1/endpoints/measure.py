@@ -1,32 +1,67 @@
+import base64
+import os
 from datetime import datetime, timedelta
-from io import StringIO
+from io import BytesIO, StringIO
+from string import Template
 from typing import Any, Dict, List
+from urllib.parse import quote
 from uuid import UUID
 
 import pandas as pd
+import pdfkit
+import pydash as py_
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.param_functions import Depends
+from fastapi.responses import StreamingResponse
 from numpy.polynomial.polynomial import Polynomial
 from pydantic import BaseModel, Field
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from auo_project import crud, models, schemas
+from auo_project.core.azure import download_file, internet_blob_service
 from auo_project.core.config import settings
-from auo_project.core.constants import MAX_DEPTH_RATIO
+from auo_project.core.constants import SEX_TYPE_LABEL, ReportType
 from auo_project.core.file import get_max_amp_depth_of_range
 from auo_project.core.utils import (
     compare_cn_diff,
-    get_hr_type,
-    get_measure_strength,
-    get_measure_width,
+    get_formulas,
     get_subject_schema,
     safe_divide,
+)
+from auo_project.schemas.measure_tongue_schema import (
+    AdvancedTongueOutput,
+    Disease,
+    LevelOption,
+    TongueSampleMeasure,
 )
 from auo_project.web.api import deps
 
 router = APIRouter()
+
+
+def get_pusle_28():
+    pulse_names = "革 洪 散 虛 芤 濡 平 牢 弱 微 伏 大 小 代 疾 促 動 數 緩 遲 結 弦 緊 實 長 短 滑 澀".split(
+        " ",
+    )
+    from uuid import uuid4
+
+    pusle_elmenets = [
+        schemas.Pulse28Elmenet(
+            value=uuid4(),
+            label=name,
+            description="",
+            selected=False,
+        )
+        for name in pulse_names
+    ]
+    return schemas.OneSidePulse(
+        overall=pusle_elmenets,
+        cu=pusle_elmenets,
+        qu=pusle_elmenets,
+        ch=pusle_elmenets,
+    )
 
 
 class Memo(BaseModel):
@@ -75,6 +110,10 @@ class MeasureSixSecPWResponse(BaseModel):
     r_cu: LineChart = Field(title="右寸")
     r_qu: LineChart = Field(title="右關")
     r_ch: LineChart = Field(title="右尺")
+    exclude_analytics: List[str] = Field(
+        [],
+        title="不計入分析項目: l_cu, l_qu, l_ch, r_cu, r_qu, r_ch",
+    )
 
 
 class ColumnChart(BaseChart):
@@ -88,6 +127,10 @@ class CNChart(BaseModel):
     r_cu: ColumnChart = Field(title="右寸")
     r_qu: ColumnChart = Field(title="右關")
     r_ch: ColumnChart = Field(title="右尺")
+
+
+class ExportReportInputPayload(BaseModel):
+    report_types: List[ReportType]
 
 
 def get_poly_points(x, y, degree, step):
@@ -161,6 +204,13 @@ async def get_measure_summary(
     current_user: models.User = Depends(deps.get_current_active_user),
     ip_allowed: bool = Depends(deps.get_ip_allowed),
 ):
+    (
+        max_depth_ratio,
+        get_measure_strength,
+        get_measure_width,
+        get_hr_type,
+    ) = await get_formulas(db_session=db_session, org_name=current_user.org.name)
+
     measure = await crud.measure_info.get(
         db_session=db_session,
         id=measure_id,
@@ -168,6 +218,7 @@ async def get_measure_summary(
             "bcq",
             "statistics",
             "tongue",
+            "tongue_upload",
             "raw",
             "subject",
             "measure_survey_result",
@@ -178,7 +229,7 @@ async def get_measure_summary(
             status_code=400,
             detail=f"Not found measure id: {measure_id}",
         )
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -236,7 +287,7 @@ async def get_measure_summary(
             )
             back_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
 
-    raw_data = measure.raw
+    raw_data = measure.raw or models.MeasureRaw(measure_id=measure_id)
 
     all_chart = {
         "l_cu": get_scatter_chart(raw_data.all_sec_analyze_raw_l_cu),
@@ -285,20 +336,38 @@ async def get_measure_summary(
 
     cn = {
         "overall": {
-            "l_cu": compare_cn_diff(cn_dict["l_cu"], cn_means_dict["l_cu"]),
-            "l_qu": compare_cn_diff(cn_dict["l_qu"], cn_means_dict["l_qu"]),
-            "l_ch": compare_cn_diff(cn_dict["l_ch"], cn_means_dict["l_ch"]),
-            "r_cu": compare_cn_diff(cn_dict["r_cu"], cn_means_dict["r_cu"]),
-            "r_qu": compare_cn_diff(cn_dict["r_qu"], cn_means_dict["r_qu"]),
-            "r_ch": compare_cn_diff(cn_dict["r_ch"], cn_means_dict["r_ch"]),
+            "l_cu": compare_cn_diff(cn_dict.get("l_cu"), cn_means_dict.get("l_cu")),
+            "l_qu": compare_cn_diff(cn_dict.get("l_qu"), cn_means_dict.get("l_qu")),
+            "l_ch": compare_cn_diff(cn_dict.get("l_ch"), cn_means_dict.get("l_ch")),
+            "r_cu": compare_cn_diff(cn_dict.get("r_cu"), cn_means_dict.get("r_cu")),
+            "r_qu": compare_cn_diff(cn_dict.get("r_qu"), cn_means_dict.get("r_qu")),
+            "r_ch": compare_cn_diff(cn_dict.get("r_ch"), cn_means_dict.get("r_ch")),
         },
         "standard_value": {
-            "l_cu": compare_cn_diff(cn_dict["l_cu"], standard_cn_dict.get("l_cu", {})),
-            "l_qu": compare_cn_diff(cn_dict["l_qu"], standard_cn_dict.get("l_qu", {})),
-            "l_ch": compare_cn_diff(cn_dict["l_ch"], standard_cn_dict.get("l_ch", {})),
-            "r_cu": compare_cn_diff(cn_dict["r_cu"], standard_cn_dict.get("r_cu", {})),
-            "r_qu": compare_cn_diff(cn_dict["r_qu"], standard_cn_dict.get("r_qu", {})),
-            "r_ch": compare_cn_diff(cn_dict["r_ch"], standard_cn_dict.get("r_ch", {})),
+            "l_cu": compare_cn_diff(
+                cn_dict.get("l_cu"),
+                standard_cn_dict.get("l_cu", {}),
+            ),
+            "l_qu": compare_cn_diff(
+                cn_dict.get("l_qu"),
+                standard_cn_dict.get("l_qu", {}),
+            ),
+            "l_ch": compare_cn_diff(
+                cn_dict.get("l_ch"),
+                standard_cn_dict.get("l_ch", {}),
+            ),
+            "r_cu": compare_cn_diff(
+                cn_dict.get("r_cu"),
+                standard_cn_dict.get("r_cu", {}),
+            ),
+            "r_qu": compare_cn_diff(
+                cn_dict.get("r_qu"),
+                standard_cn_dict.get("r_qu", {}),
+            ),
+            "r_ch": compare_cn_diff(
+                cn_dict.get("r_ch"),
+                standard_cn_dict.get("r_ch", {}),
+            ),
         },
     }
 
@@ -319,11 +388,34 @@ async def get_measure_summary(
         if dbp is None:
             dbp = survey_result_value.get("dbp", None)
 
+    # TODO: fixme
+    subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+    subject_tag_dict = {
+        tag.id: {
+            "value": tag.id,
+            "key": tag.name,
+            "type": tag.tag_type,
+        }
+        for tag in subject_tags
+    }
+
+    measure_pulse_28_list = await crud.measure_pulse_28_option.get_all(
+        db_session=db_session,
+    )
+
+    all_subject_tags = await crud.subject_tag.get_all(db_session=db_session)
+
+    branch = await crud.branch.get(
+        db_session=db_session,
+        id=current_user.branch_id,
+    )
     return schemas.MeasureDetailResponse(
         subject=get_subject_schema(org_name=current_user.org.name)(
             **jsonable_encoder(subject),
             standard_measure_info=standard_measure_info,
+            tags=[subject_tag_dict.get(tag_id) for tag_id in subject.tag_ids],
         ),
+        branch=branch,
         measure=schemas.MeasureDetailRead(
             measure_time=measure.measure_time,
             measure_operator=measure.measure_operator,
@@ -340,9 +432,18 @@ async def get_measure_summary(
             irregular_hr_r=measure.irregular_hr_r,
             irregular_hr_type_r=measure.irregular_hr_type_r,
             hr_l=measure.hr_l,
-            hr_l_type=get_hr_type(measure.hr_l, measure.hr_r),
+            # TODO: check without formula with Helen
+            hr_l_type=(
+                get_hr_type(measure.hr_l, measure.hr_r)
+                if measure.hr_l_type is None
+                else measure.hr_l_type
+            ),
             hr_r=measure.hr_r,
-            hr_r_type=get_hr_type(measure.hr_r, measure.hr_l),
+            hr_r_type=(
+                get_hr_type(measure.hr_r, measure.hr_l)
+                if measure.hr_r_type is None
+                else measure.hr_r_type
+            ),
             mean_prop_range_1_l_cu=measure.mean_prop_range_1_l_cu,
             mean_prop_range_2_l_cu=measure.mean_prop_range_2_l_cu,
             mean_prop_range_3_l_cu=measure.mean_prop_range_3_l_cu,
@@ -365,74 +466,45 @@ async def get_measure_summary(
                 static_range_start_hand_position=measure.static_range_start_l_cu,
                 static_range_end_hand_position=measure.static_range_end_l_cu,
                 static_max_amp_hand_position=measure.static_max_amp_l_cu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_l_qu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_l_qu,
                 static_range_end_hand_position=measure.static_range_end_l_qu,
                 static_max_amp_hand_position=measure.static_max_amp_l_qu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_l_ch=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_l_ch,
                 static_range_end_hand_position=measure.static_range_end_l_ch,
                 static_max_amp_hand_position=measure.static_max_amp_l_ch,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_r_cu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_cu,
                 static_range_end_hand_position=measure.static_range_end_r_cu,
                 static_max_amp_hand_position=measure.static_max_amp_r_cu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_r_qu=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_qu,
                 static_range_end_hand_position=measure.static_range_end_r_qu,
                 static_max_amp_hand_position=measure.static_max_amp_r_qu,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
             mean_prop_range_max_r_ch=get_max_amp_depth_of_range(
                 static_range_start_hand_position=measure.static_range_start_r_ch,
                 static_range_end_hand_position=measure.static_range_end_r_ch,
                 static_max_amp_hand_position=measure.static_max_amp_r_ch,
-                ratio=MAX_DEPTH_RATIO,
+                ratio=max_depth_ratio,
             ),
-            max_amp_depth_of_range_l_cu=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_l_cu,
-                static_range_end_hand_position=measure.static_range_end_l_cu,
-                static_max_amp_hand_position=measure.static_max_amp_l_cu,
-                ratio=MAX_DEPTH_RATIO,
-            ),
-            max_amp_depth_of_range_l_qu=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_l_qu,
-                static_range_end_hand_position=measure.static_range_end_l_qu,
-                static_max_amp_hand_position=measure.static_max_amp_l_qu,
-                ratio=MAX_DEPTH_RATIO,
-            ),
-            max_amp_depth_of_range_l_ch=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_l_ch,
-                static_range_end_hand_position=measure.static_range_end_l_ch,
-                static_max_amp_hand_position=measure.static_max_amp_l_ch,
-                ratio=MAX_DEPTH_RATIO,
-            ),
-            max_amp_depth_of_range_r_cu=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_r_cu,
-                static_range_end_hand_position=measure.static_range_end_r_cu,
-                static_max_amp_hand_position=measure.static_max_amp_r_cu,
-                ratio=MAX_DEPTH_RATIO,
-            ),
-            max_amp_depth_of_range_r_qu=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_r_qu,
-                static_range_end_hand_position=measure.static_range_end_r_qu,
-                static_max_amp_hand_position=measure.static_max_amp_r_qu,
-                ratio=MAX_DEPTH_RATIO,
-            ),
-            max_amp_depth_of_range_r_ch=get_max_amp_depth_of_range(
-                static_range_start_hand_position=measure.static_range_start_r_ch,
-                static_range_end_hand_position=measure.static_range_end_r_ch,
-                static_max_amp_hand_position=measure.static_max_amp_r_ch,
-                ratio=MAX_DEPTH_RATIO,
-            ),
+            # TODO: check without formula with Helen
+            max_amp_depth_of_range_l_cu=measure.max_amp_depth_of_range_l_cu,
+            max_amp_depth_of_range_l_qu=measure.max_amp_depth_of_range_l_qu,
+            max_amp_depth_of_range_l_ch=measure.max_amp_depth_of_range_l_ch,
+            max_amp_depth_of_range_r_cu=measure.max_amp_depth_of_range_r_cu,
+            max_amp_depth_of_range_r_qu=measure.max_amp_depth_of_range_r_qu,
+            max_amp_depth_of_range_r_ch=measure.max_amp_depth_of_range_r_ch,
             max_amp_value_l_cu=measure.max_amp_value_l_cu,
             max_amp_value_l_qu=measure.max_amp_value_l_qu,
             max_amp_value_l_ch=measure.max_amp_value_l_ch,
@@ -445,60 +517,19 @@ async def get_measure_summary(
             max_slope_value_r_cu=measure.max_slope_value_r_cu,
             max_slope_value_r_qu=measure.max_slope_value_r_qu,
             max_slope_value_r_ch=measure.max_slope_value_r_ch,
-            strength_l_cu=get_measure_strength(
-                measure.max_slope_value_l_cu,
-                measure.max_amp_value_l_cu,
-            ),
-            strength_l_qu=get_measure_strength(
-                measure.max_slope_value_l_qu,
-                measure.max_amp_value_l_qu,
-            ),
-            strength_l_ch=get_measure_strength(
-                measure.max_slope_value_l_ch,
-                measure.max_amp_value_l_ch,
-            ),
-            strength_r_cu=get_measure_strength(
-                measure.max_slope_value_r_cu,
-                measure.max_amp_value_r_cu,
-            ),
-            strength_r_qu=get_measure_strength(
-                measure.max_slope_value_r_qu,
-                measure.max_amp_value_r_qu,
-            ),
-            strength_r_ch=get_measure_strength(
-                measure.max_slope_value_r_ch,
-                measure.max_amp_value_r_ch,
-            ),
-            width_l_cu=get_measure_width(
-                measure.range_length_l_cu,
-                measure.max_amp_value_l_cu,
-                measure.max_slope_value_l_cu,
-            ),
-            width_l_qu=get_measure_width(
-                measure.range_length_l_qu,
-                measure.max_amp_value_l_qu,
-                measure.max_slope_value_l_qu,
-            ),
-            width_l_ch=get_measure_width(
-                measure.range_length_l_ch,
-                measure.max_amp_value_l_ch,
-                measure.max_slope_value_l_ch,
-            ),
-            width_r_cu=get_measure_width(
-                measure.range_length_r_cu,
-                measure.max_amp_value_r_cu,
-                measure.max_slope_value_r_cu,
-            ),
-            width_r_qu=get_measure_width(
-                measure.range_length_r_qu,
-                measure.max_amp_value_r_qu,
-                measure.max_slope_value_r_qu,
-            ),
-            width_r_ch=get_measure_width(
-                measure.range_length_r_ch,
-                measure.max_amp_value_r_ch,
-                measure.max_slope_value_r_ch,
-            ),
+            # TODO: check with Helen
+            strength_l_cu=measure.strength_l_cu,
+            strength_l_qu=measure.strength_l_qu,
+            strength_l_ch=measure.strength_l_ch,
+            strength_r_cu=measure.strength_r_cu,
+            strength_r_qu=measure.strength_r_qu,
+            strength_r_ch=measure.strength_r_ch,
+            width_l_cu=measure.width_l_cu,
+            width_l_qu=measure.width_l_qu,
+            width_l_ch=measure.width_l_ch,
+            width_r_cu=measure.width_r_cu,
+            width_r_qu=measure.width_r_qu,
+            width_r_ch=measure.width_r_ch,
             width_value_l_cu=round(width_value_l_cu, 1) if width_value_l_cu else None,
             width_value_l_qu=round(width_value_l_qu, 1) if width_value_l_qu else None,
             width_value_l_ch=round(width_value_l_ch, 1) if width_value_l_ch else None,
@@ -506,50 +537,97 @@ async def get_measure_summary(
             width_value_r_qu=round(width_value_r_qu, 1) if width_value_r_qu else None,
             width_value_r_ch=round(width_value_r_ch, 1) if width_value_r_ch else None,
             comment=measure.comment,
+            six_sec_pw_valid_l_cu=measure.six_sec_pw_valid_l_cu,
+            six_sec_pw_valid_l_qu=measure.six_sec_pw_valid_l_qu,
+            six_sec_pw_valid_l_ch=measure.six_sec_pw_valid_l_ch,
+            six_sec_pw_valid_r_cu=measure.six_sec_pw_valid_r_cu,
+            six_sec_pw_valid_r_qu=measure.six_sec_pw_valid_r_qu,
+            six_sec_pw_valid_r_ch=measure.six_sec_pw_valid_r_ch,
+            pulse_memo=measure.pulse_memo,
             # TODO: changme
-            bcq=schemas.BCQ(
-                exist=measure.has_bcq,
-                score_yang=measure.bcq.percentage_yang,
-                score_yin=measure.bcq.percentage_yin,
-                score_phlegm=measure.bcq.percentage_phlegm,
-                score_yang_head=measure.bcq.percentage_yang_head,
-                score_yang_chest=measure.bcq.percentage_yang_chest,
-                score_yang_limbs=measure.bcq.percentage_yang_limbs,
-                score_yang_abdomen=measure.bcq.percentage_yang_abdomen,
-                score_yang_surface=measure.bcq.percentage_yang_surface,
-                score_yin_head=measure.bcq.percentage_yin_head,
-                score_yin_limbs=measure.bcq.percentage_yin_limbs,
-                score_yin_gt=measure.bcq.percentage_yin_gt,
-                score_yin_surface=measure.bcq.percentage_yin_surface,
-                score_yin_abdomen=measure.bcq.percentage_yin_abdomen,
-                score_phlegm_trunk=measure.bcq.percentage_phlegm_trunk,
-                score_phlegm_surface=measure.bcq.percentage_phlegm_surface,
-                score_phlegm_head=measure.bcq.percentage_phlegm_head,
-                score_phlegm_gt=measure.bcq.percentage_phlegm_gt,
-                percentage_yang=measure.bcq.percentage_yang,
-                percentage_yin=measure.bcq.percentage_yin,
-                percentage_phlegm=measure.bcq.percentage_phlegm,
-                percentage_yang_head=0,
-                percentage_yang_chest=0,
-                percentage_yang_limbs=0,
-                percentage_yang_abdomen=0,
-                percentage_yang_surface=0,
-                percentage_yin_head=0,
-                percentage_yin_limbs=0,
-                percentage_yin_gt=0,
-                percentage_yin_surface=0,
-                percentage_yin_abdomen=0,
-                percentage_phlegm_trunk=0,
-                percentage_phlegm_surface=0,
-                percentage_phlegm_head=0,
-                percentage_phlegm_gt=0,
-            )
-            if measure.has_bcq
-            else {},
+            bcq=(
+                schemas.BCQ(
+                    exist=measure.has_bcq,
+                    score_yang=measure.bcq.percentage_yang,
+                    score_yin=measure.bcq.percentage_yin,
+                    score_phlegm=measure.bcq.percentage_phlegm,
+                    score_yang_head=measure.bcq.percentage_yang_head,
+                    score_yang_chest=measure.bcq.percentage_yang_chest,
+                    score_yang_limbs=measure.bcq.percentage_yang_limbs,
+                    score_yang_abdomen=measure.bcq.percentage_yang_abdomen,
+                    score_yang_surface=measure.bcq.percentage_yang_surface,
+                    score_yin_head=measure.bcq.percentage_yin_head,
+                    score_yin_limbs=measure.bcq.percentage_yin_limbs,
+                    score_yin_gt=measure.bcq.percentage_yin_gt,
+                    score_yin_surface=measure.bcq.percentage_yin_surface,
+                    score_yin_abdomen=measure.bcq.percentage_yin_abdomen,
+                    score_phlegm_trunk=measure.bcq.percentage_phlegm_trunk,
+                    score_phlegm_surface=measure.bcq.percentage_phlegm_surface,
+                    score_phlegm_head=measure.bcq.percentage_phlegm_head,
+                    score_phlegm_gt=measure.bcq.percentage_phlegm_gt,
+                    percentage_yang=measure.bcq.percentage_yang,
+                    percentage_yin=measure.bcq.percentage_yin,
+                    percentage_phlegm=measure.bcq.percentage_phlegm,
+                    percentage_yang_head=0,
+                    percentage_yang_chest=0,
+                    percentage_yang_limbs=0,
+                    percentage_yang_abdomen=0,
+                    percentage_yang_surface=0,
+                    percentage_yin_head=0,
+                    percentage_yin_limbs=0,
+                    percentage_yin_gt=0,
+                    percentage_yin_surface=0,
+                    percentage_yin_abdomen=0,
+                    percentage_phlegm_trunk=0,
+                    percentage_phlegm_surface=0,
+                    percentage_phlegm_head=0,
+                    percentage_phlegm_gt=0,
+                )
+                if measure.has_bcq or measure.bcq
+                else {}
+            ),
             all_sec=all_sec,
             cn=cn,
+            pulse_28=schemas.Pulse28(
+                left=schemas.OneSidePulse(
+                    overall=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_l_overall,
+                    ),
+                    cu=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_l_cu,
+                    ),
+                    qu=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_l_qu,
+                    ),
+                    ch=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_l_ch,
+                    ),
+                ),
+                right=schemas.OneSidePulse(
+                    overall=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_r_overall,
+                    ),
+                    cu=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_r_cu,
+                    ),
+                    qu=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_r_qu,
+                    ),
+                    ch=crud.measure_pulse_28_option.format_options(
+                        options=measure_pulse_28_list,
+                        selected_ids=measure.pulse_28_ids_r_ch,
+                    ),
+                ),
+            ),
             tongue=schemas.Tongue(
-                exist=True if tongue else False,
+                exist=True if measure.tongue or measure.tongue_upload else False,
                 info=tongue_info,
                 image=schemas.TongueImage(
                     front=front_tongue_image_url or "",
@@ -557,6 +635,7 @@ async def get_measure_summary(
                 ),
             ),
         ),
+        subject_tags=crud.subject_tag.format_options(options=all_subject_tags),
     )
 
 
@@ -999,7 +1078,7 @@ async def get_measure_six_sec_pw(
             detail=f"Not found measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1017,7 +1096,7 @@ async def get_measure_six_sec_pw(
         ]
         return LineChart(data=data, x_field="x", y_field="y")
 
-    raw_data = measure.raw
+    raw_data = measure.raw or models.MeasureRaw(measure_id=measure_id)
     return {
         "l_cu": gen_data(raw_data.six_sec_l_cu),
         "l_qu": gen_data(raw_data.six_sec_l_qu),
@@ -1047,7 +1126,7 @@ async def update_measure_memo(
             detail=f"Not found measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1084,7 +1163,7 @@ async def update_measure_comment(
             detail=f"Not found measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1101,8 +1180,106 @@ async def update_measure_comment(
     return comment.content
 
 
-@router.patch("/{measure_id}/tongue_info")
-async def update_measure_tongue_info(
+@router.patch("/{measure_id}")
+async def update_measure(
+    measure_id: UUID,
+    measure_in: schemas.MeasureInfoUpdateInput,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if not measure:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
+    if (
+        measure_in.irregular_hr_l is None and measure_in.irregular_hr_type_l is not None
+    ) or (
+        measure_in.irregular_hr_r is None and measure_in.irregular_hr_type_r is not None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="when irregular_hr_l or irregular_hr_r is None, irregular_hr_type_l or irregular_hr_type_r should be None",
+        )
+    elif measure_in.irregular_hr_l not in (0, 1) or measure_in.irregular_hr_r not in (
+        0,
+        1,
+    ):
+        raise HTTPException(status_code=400, detail="irregular_hr allowd: 0, 1")
+    elif (
+        measure_in.irregular_hr_l == 0 and measure_in.irregular_hr_type_l is not None
+    ) or (
+        measure_in.irregular_hr_r == 0 and measure_in.irregular_hr_type_r is not None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="when irregular_hr_l or irregular_hr_r is 0, irregular_hr_type_l or irregular_hr_type_r should be None",
+        )
+    elif (
+        measure_in.irregular_hr_l == 1 and measure_in.irregular_hr_type_l not in (0, 1)
+    ) or (
+        measure_in.irregular_hr_r == 1 and measure_in.irregular_hr_type_r not in (0, 1)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="when irregular_hr = 1, irregular_hr type allowd: 0, 1",
+        )
+
+    if measure_in.memo is not None:
+        if measure_in.memo == "":
+            measure_in.has_memo = False
+        else:
+            measure_in.has_memo = True
+
+    measure_pulse_28_list = await crud.measure_pulse_28_option.get_all(
+        db_session=db_session,
+    )
+    measure_pulse_28_id = set([elm.id for elm in measure_pulse_28_list])
+
+    def is_measure_pulse_28_valid(pulse_28_input: List[UUID], full_id_set: set) -> bool:
+        if pulse_28_input is None:
+            return True
+        return set(pulse_28_input).issubset(full_id_set)
+
+    for column_name, pulse_28_input in [
+        ("pulse_28_ids_l_overall", measure_in.pulse_28_ids_l_overall),
+        ("pulse_28_ids_l_cu", measure_in.pulse_28_ids_l_cu),
+        ("pulse_28_ids_l_qu", measure_in.pulse_28_ids_l_qu),
+        ("pulse_28_ids_l_ch", measure_in.pulse_28_ids_l_ch),
+        ("pulse_28_ids_r_overall", measure_in.pulse_28_ids_r_overall),
+        ("pulse_28_ids_r_cu", measure_in.pulse_28_ids_r_cu),
+        ("pulse_28_ids_r_qu", measure_in.pulse_28_ids_r_qu),
+        ("pulse_28_ids_r_ch", measure_in.pulse_28_ids_r_ch),
+    ]:
+        if not is_measure_pulse_28_valid(pulse_28_input, measure_pulse_28_id):
+            raise HTTPException(
+                status_code=400,
+                detail=f"The ids of {column_name} is invalid",
+            )
+
+    await crud.measure_info.update(
+        db_session=db_session,
+        obj_current=measure,
+        obj_new=schemas.MeasureInfoUpdate(**measure_in.dict(exclude_unset=True)),
+    )
+    return {"status": "ok"}
+
+
+# deprecated
+@router.patch("/{measure_id}/old_tongue_info")
+async def update_old_measure_tongue_info(
     measure_id: UUID,
     tongue_info: schemas.TongueInfo,
     db_session: AsyncSession = Depends(deps.get_db),
@@ -1125,7 +1302,7 @@ async def update_measure_tongue_info(
             detail=f"Not found tongue of measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1134,14 +1311,16 @@ async def update_measure_tongue_info(
     tongue_in = schemas.MeasureTongueUpdate(
         tongue_color=tongue_info.tongue_color,
         tongue_shap=tongue_info.tongue_shap if tongue_info.tongue_shap else None,
-        tongue_status1=tongue_info.tongue_status1
-        if tongue_info.tongue_status1
-        else None,
+        tongue_status1=(
+            tongue_info.tongue_status1 if tongue_info.tongue_status1 else None
+        ),
         tongue_status2=tongue_info.tongue_status2,
         tongue_coating_color=tongue_info.tongue_coating_color,
-        tongue_coating_status=tongue_info.tongue_coating_status
-        if tongue_info.tongue_coating_status
-        else None,
+        tongue_coating_status=(
+            tongue_info.tongue_coating_status
+            if tongue_info.tongue_coating_status
+            else None
+        ),
         tongue_coating_bottom=tongue_info.tongue_coating_bottom,
     )
     await crud.measure_tongue.update(
@@ -1170,7 +1349,7 @@ async def update_measure_irregular_hr(
             detail=f"Not found measure id: {measure_id}",
         )
 
-    if measure.org_id != current_user.org_id:
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
         raise HTTPException(
             status_code=400,
             detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
@@ -1209,3 +1388,836 @@ async def update_measure_irregular_hr(
         obj_new=measure_in,
     )
     return irregular_hr
+
+
+@router.put("/{measure_id}/activate")
+async def activate_measure(
+    measure_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if not measure:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
+    measure_in = schemas.MeasureInfoUpdate(
+        is_active=True,
+    )
+    await crud.measure_info.update(
+        db_session=db_session,
+        obj_current=measure,
+        obj_new=measure_in,
+    )
+    return measure_id
+
+
+@router.put("/{measure_id}/deactivate")
+async def deactivate_measure(
+    measure_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if not measure:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+
+    if current_user.is_superuser is False and measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} not belong to org id: {current_user.org_id}",
+        )
+
+    measure_in = schemas.MeasureInfoUpdate(
+        is_active=False,
+    )
+    await crud.measure_info.update(
+        db_session=db_session,
+        obj_current=measure,
+        obj_new=measure_in,
+    )
+    return measure_id
+
+
+@router.post("/batch/activate", response_model=schemas.BatchResponse)
+async def batch_activate_measures(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        measure_info = await crud.measure_info.get(db_session=db_session, id=obj_id)
+        if measure_info is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            measure_info = await crud.measure_info.update(
+                db_session=db_session,
+                obj_current=measure_info,
+                obj_new=schemas.MeasureInfoUpdate(is_active=True),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.post("/batch/deactivate", response_model=schemas.BatchResponse)
+async def batch_deactivate_measures(
+    body: schemas.BatchRequestBody,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    result = {"success": [], "failure": []}
+    for obj_id in body.ids:
+        measure_info = await crud.measure_info.get(db_session=db_session, id=obj_id)
+        if measure_info is None:
+            result["failure"].append({"id": obj_id, "reason": "not found"})
+        else:
+            measure_info = await crud.measure_info.update(
+                db_session=db_session,
+                obj_current=measure_info,
+                obj_new=schemas.MeasureInfoUpdate(is_active=False),
+            )
+            result["success"].append({"id": obj_id})
+
+    return result
+
+
+@router.get("/{measure_id}/tongue_info", response_model=schemas.AdvancedTongueOutput)
+async def get_tongue(
+    measure_id: UUID,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+        relations=["tongue", "tongue_upload"],
+    )
+    if measure is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+    if measure.is_active is False:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} is not active",
+        )
+    if measure.tongue is None and measure.tongue_upload is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found tongue of measure id: {measure_id}",
+        )
+
+    subject = await crud.subject.get(
+        db_session=db_session,
+        id=measure.subject_id,
+        relations=[models.Subject.standard_measure_info],
+    )
+
+    if measure.tongue:
+        tongue = measure.tongue
+        front_loc = tongue.up_img_cc_uri or tongue.up_img_uri
+        back_loc = tongue.down_img_cc_uri or tongue.down_img_uri
+        front_origin_loc = tongue.up_img_uri
+        back_origin_loc = tongue.down_img_uri
+    elif measure.tongue_upload:
+        tongue_upload = measure.tongue_upload
+        front_loc = (
+            tongue_upload.tongue_front_corrected_loc
+            or tongue_upload.tongue_front_original_loc
+        )
+        back_loc = (
+            tongue_upload.tongue_back_corrected_loc
+            or tongue_upload.tongue_back_original_loc
+        )
+        front_origin_loc = tongue_upload.tongue_front_original_loc
+        back_origin_loc = tongue_upload.tongue_back_original_loc
+    else:
+        front_loc = ""
+        back_loc = ""
+        front_origin_loc = ""
+        back_origin_loc = ""
+    front_tongue_image_url = None
+    back_tongue_image_url = None
+    front_tongue_origin_image_url = None
+    back_tongue_origin_image_url = None
+
+    if front_loc:
+        container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        file_path = front_loc
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        sas_token = generate_blob_sas(
+            account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
+            container_name=container_name,
+            blob_name=file_path,
+            account_key=settings.AZURE_STORAGE_KEY_INTERNET,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            # TODO: add ip
+        )
+        front_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+
+    if front_origin_loc:
+        container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        file_path = front_origin_loc
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        sas_token = generate_blob_sas(
+            account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
+            container_name=container_name,
+            blob_name=file_path,
+            account_key=settings.AZURE_STORAGE_KEY_INTERNET,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            # TODO: add ip
+        )
+        front_tongue_origin_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+
+    if back_loc:
+        container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        file_path = back_loc
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        sas_token = generate_blob_sas(
+            account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
+            container_name=container_name,
+            blob_name=file_path,
+            account_key=settings.AZURE_STORAGE_KEY_INTERNET,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            # TODO: add ip
+        )
+        back_tongue_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+
+    if back_origin_loc:
+        container_name = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        file_path = back_origin_loc
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        sas_token = generate_blob_sas(
+            account_name=settings.AZURE_STORAGE_ACCOUNT_INTERNET,
+            container_name=container_name,
+            blob_name=file_path,
+            account_key=settings.AZURE_STORAGE_KEY_INTERNET,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            # TODO: add ip
+        )
+        back_tongue_origin_image_url = f"https://{settings.AZURE_STORAGE_ACCOUNT_INTERNET}.blob.core.windows.net/{container_name}/{file_path}?{sas_token}"
+
+    advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
+        db_session=db_session,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+    advanced_tongue_exist = advanced_tongue is not None
+
+    advanced_tongue = advanced_tongue or schemas.MeasureAdvancedTongue2Read(
+        id=measure_id,
+        measure_id=measure_id,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+
+    # TODO: merge to func
+    labled_symptom_map = {}
+    labeled_symptom_level_map = {}
+    labeled_symptom_disease_map = {}
+    if advanced_tongue_exist:
+        for column in advanced_tongue.columns:
+            if "tongue" in column and "level" not in column and "disease" not in column:
+                values = getattr(advanced_tongue, column, [])
+                if isinstance(values, list) is False:
+                    values = [] if values is None else [values]
+                labled_symptom_map[column] = set(values)
+
+        for column in advanced_tongue.columns:
+            if "_level_map" in column:
+                item_id = column.replace("_level_map", "")
+                obj = getattr(advanced_tongue, column)
+                labeled_symptom_level_map[item_id] = {
+                    str(key): val for key, val in obj.items()
+                }
+
+        for column in advanced_tongue.columns:
+            if "_disease_map" in column:
+                item_id = column.replace("_disease_map", "")
+                labeled_symptom_disease_map[item_id] = getattr(advanced_tongue, column)
+
+    # prepare component
+    tongue_symptoms = await crud.measure_tongue_symptom.get_all(db_session=db_session)
+    tongue_symptoms = py_.order_by(tongue_symptoms, ["order"])
+    tongue_symptom_diseases = await crud.measure_tongue_symptom_disease.get_all(
+        db_session=db_session,
+    )
+    tongue_symptom_diseases_dict = {}
+    tongue_groups = await crud.measure_tongue_group_symptom.get_all(
+        db_session=db_session,
+    )
+    tongue_groups = sorted(tongue_groups, key=lambda x: f"{x.item_id}:{x.group_id}")
+    tongue_group_dict = dict(
+        [
+            (f"{item.item_id}_{item.group_id}", item.component_type)
+            for item in tongue_groups
+        ],
+    )
+    for item in tongue_symptom_diseases:
+        tongue_symptom_diseases_dict[item.item_id] = tongue_symptom_diseases_dict.get(
+            item.item_id,
+            {},
+        )
+
+        disease_item = Disease(
+            value=item.disease_id,
+            # label=item.tongue_disease.disease_name,  # TODO: item.disease.disease_name
+            label=item.disease_id,  # TODO: item.disease.disease_name
+            selected=item.disease_id
+            in py_.get(
+                labeled_symptom_disease_map,
+                f"{item.item_id}.{item.symptom_id}",
+                [],
+            ),
+        )
+
+        if item.symptom_id in tongue_symptom_diseases_dict[item.item_id]:
+            tongue_symptom_diseases_dict[item.item_id][item.symptom_id].append(
+                disease_item,
+            )
+        else:
+            tongue_symptom_diseases_dict[item.item_id][item.symptom_id] = [disease_item]
+
+    level_map = {
+        1: "輕",
+        2: "中",
+        3: "重",
+    }
+    result = {}
+    result2 = []
+    for item in tongue_symptoms:
+        labeled_symptom_set = py_.get(labled_symptom_map, item.item_id, set())
+
+        append_item = {
+            "id": item.id,
+            "item_id": item.item_id,
+            "item_name": item.item_name,
+            "group_id": item.group_id or "0",
+            "symptom_id": item.symptom_id,
+            "symptom_name": item.symptom_name,
+            "symptom_description": item.symptom_description,
+            "level_options": (
+                [
+                    LevelOption(
+                        label=level_map.get(int(level)),
+                        value=int(level),
+                        selected=int(level)
+                        == py_.get(
+                            labeled_symptom_level_map,
+                            f"{item.item_id}.{item.symptom_id}",
+                        ),
+                    )
+                    for level in item.symptom_levels
+                ]
+                if item.symptom_levels
+                else []
+            ),
+            "is_default": item.is_default or False,
+            "is_normal": item.is_normal or False,
+            "diseases": tongue_symptom_diseases_dict.get(item.item_id, {}).get(
+                item.symptom_id,
+                [],
+            ),
+            "selected": (
+                True
+                if item.symptom_id in labeled_symptom_set
+                else (
+                    (True if item.is_default else False)
+                    if len(labeled_symptom_set) == 0
+                    else False
+                )
+            ),
+        }
+        if item.item_id in result:
+            result[item.item_id].append(append_item)
+        else:
+            result[item.item_id] = [append_item]
+
+        result2 = []
+        for key, value in result.items():
+            result2.append(
+                {
+                    "item_id": key,
+                    "item_name": value[0]["item_name"],
+                    "symptoms": py_.chain(value)
+                    .group_by("group_id")
+                    .map_(
+                        lambda objs, group_id: {
+                            "item_id": key,
+                            "component_id": f"{key}_{group_id}",
+                            "component_type": tongue_group_dict.get(
+                                f"{key}_{group_id}",
+                                "radio",
+                            ),
+                            "children": py_.map_(
+                                objs,
+                                lambda x: py_.pick_by(
+                                    x,
+                                    [
+                                        "id",
+                                        "symptom_id",
+                                        "symptom_name",
+                                        "symptom_description",
+                                        "level_options",
+                                        "is_default",
+                                        "is_normal",
+                                        "selected",
+                                        "diseases",
+                                    ],
+                                ),
+                            ),
+                        },
+                    )
+                    .value(),
+                },
+            )
+
+    return AdvancedTongueOutput(
+        subject=subject,
+        measure_tongue=TongueSampleMeasure(
+            image=schemas.TongueImage(
+                front=front_tongue_image_url or "",
+                back=back_tongue_image_url or "",
+            ),
+            original_image=schemas.TongueImage(
+                front=front_tongue_origin_image_url or "",
+                back=back_tongue_origin_image_url or "",
+            ),
+            measure_time=measure.measure_time.strftime("%Y/%m/%d %H:%M:%S"),
+            symptom=result2,
+            summary=advanced_tongue.tongue_summary,
+            memo=advanced_tongue.tongue_memo,
+            age=measure.age,
+            measure_operator=measure.measure_operator,
+        ),
+    )
+
+
+@router.patch("/{measure_id}/tongue_info")
+async def update_measure_tongue_info(
+    measure_id: UUID,
+    tongue_info: schemas.MeasureAdvancedTongue2UpdateInput,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if measure is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+    if measure.is_active is False:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} is not active",
+        )
+    if (
+        current_user.org_id != measure.org_id
+        and current_user.is_superuser is False
+        and current_user.org.name != "tongue_label"
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Permission Error",
+        )
+
+    advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
+        db_session=db_session,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+
+    def clean_level_map(
+        synptom_id_list: List[str],
+        level_map: Dict[str, int],
+    ) -> Dict[str, int]:
+        return {
+            key: value
+            for key, value in level_map.items()
+            if key in synptom_id_list and key is not None
+        }
+
+    def clean_disease_map(disease_map: Dict[str, str]) -> Dict[str, str]:
+        return disease_map
+
+    # TODO: validate
+    if advanced_tongue:
+        tongue_in = schemas.MeasureAdvancedTongue2Update(
+            tongue_tip=tongue_info.tongue_tip,
+            tongue_tip_disease_map=clean_disease_map(
+                tongue_info.tongue_tip_disease_map,
+            ),
+            tongue_color=tongue_info.tongue_color,
+            tongue_color_disease_map=clean_disease_map(
+                tongue_info.tongue_color_disease_map,
+            ),
+            tongue_shap=tongue_info.tongue_shap,
+            tongue_shap_level_map=clean_level_map(
+                tongue_info.tongue_shap,
+                tongue_info.tongue_shap_level_map,
+            ),
+            tongue_shap_disease_map=clean_disease_map(
+                tongue_info.tongue_shap_disease_map,
+            ),
+            tongue_status1=tongue_info.tongue_status1,
+            tongue_status1_disease_map=clean_disease_map(
+                tongue_info.tongue_status1_disease_map,
+            ),
+            tongue_status2=tongue_info.tongue_status2,
+            tongue_status2_level_map=clean_level_map(
+                tongue_info.tongue_status2,
+                tongue_info.tongue_status2_level_map,
+            ),
+            tongue_status2_disease_map=clean_disease_map(
+                tongue_info.tongue_status2_disease_map,
+            ),
+            tongue_coating_color=tongue_info.tongue_coating_color,
+            tongue_coating_color_level_map=clean_level_map(
+                tongue_info.tongue_coating_color,
+                tongue_info.tongue_coating_color_level_map,
+            ),
+            tongue_coating_color_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_color_disease_map,
+            ),
+            tongue_coating_status=tongue_info.tongue_coating_status,
+            tongue_coating_status_level_map=clean_level_map(
+                tongue_info.tongue_coating_status,
+                tongue_info.tongue_coating_status_level_map,
+            ),
+            tongue_coating_status_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_status_disease_map,
+            ),
+            tongue_coating_bottom=tongue_info.tongue_coating_bottom,
+            tongue_coating_bottom_level_map=clean_level_map(
+                tongue_info.tongue_coating_bottom,
+                tongue_info.tongue_coating_bottom_level_map,
+            ),
+            tongue_coating_bottom_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_bottom_disease_map,
+            ),
+            tongue_summary=tongue_info.tongue_summary,
+            tongue_memo=tongue_info.tongue_memo,
+            has_tongue_label=True,
+        )
+
+        tongue_info = await crud.measure_advanced_tongue2.update(
+            db_session=db_session,
+            obj_current=advanced_tongue,
+            obj_new=tongue_in.dict(exclude_unset=True),
+        )
+    else:
+        tongue_in = schemas.MeasureAdvancedTongue2Create(
+            info_id=measure_id,
+            owner_id=current_user.id,
+            tongue_tip=tongue_info.tongue_tip,
+            tongue_tip_disease_map=clean_disease_map(
+                tongue_info.tongue_tip_disease_map,
+            ),
+            tongue_color=tongue_info.tongue_color,
+            tongue_color_disease_map=clean_disease_map(
+                tongue_info.tongue_color_disease_map,
+            ),
+            tongue_shap=tongue_info.tongue_shap,
+            tongue_shap_level_map=clean_level_map(
+                tongue_info.tongue_shap,
+                tongue_info.tongue_shap_level_map,
+            ),
+            tongue_shap_disease_map=clean_disease_map(
+                tongue_info.tongue_shap_disease_map,
+            ),
+            tongue_status1=tongue_info.tongue_status1,
+            tongue_status1_disease_map=clean_disease_map(
+                tongue_info.tongue_status1_disease_map,
+            ),
+            tongue_status2=tongue_info.tongue_status2,
+            tongue_status2_level_map=clean_level_map(
+                tongue_info.tongue_status2,
+                tongue_info.tongue_status2_level_map,
+            ),
+            tongue_status2_disease_map=clean_disease_map(
+                tongue_info.tongue_status2_disease_map,
+            ),
+            tongue_coating_color=tongue_info.tongue_coating_color,
+            tongue_coating_color_level_map=clean_level_map(
+                tongue_info.tongue_coating_color,
+                tongue_info.tongue_coating_color_level_map,
+            ),
+            tongue_coating_color_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_color_disease_map,
+            ),
+            tongue_coating_status=tongue_info.tongue_coating_status,
+            tongue_coating_status_level_map=clean_level_map(
+                tongue_info.tongue_coating_status,
+                tongue_info.tongue_coating_status_level_map,
+            ),
+            tongue_coating_status_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_status_disease_map,
+            ),
+            tongue_coating_bottom=tongue_info.tongue_coating_bottom,
+            tongue_coating_bottom_level_map=clean_level_map(
+                tongue_info.tongue_coating_bottom,
+                tongue_info.tongue_coating_bottom_level_map,
+            ),
+            tongue_coating_bottom_disease_map=clean_disease_map(
+                tongue_info.tongue_coating_bottom_disease_map,
+            ),
+            tongue_summary=tongue_info.tongue_summary,
+            tongue_memo="",
+            has_tongue_label=True,
+        )
+        tongue_info = await crud.measure_advanced_tongue2.create(
+            db_session=db_session,
+            obj_in=tongue_in,
+        )
+    return tongue_info
+
+
+@router.patch("/{measure_id}/tongue_memo")
+async def update_tongue_memo(
+    measure_id: UUID,
+    memo: Memo,
+    *,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+    )
+    if measure is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+    if measure.is_active is False:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Measure id: {measure_id} is not active",
+        )
+    if (
+        current_user.org_id != measure.org_id
+        and current_user.org.name != "tongue_label"
+        and current_user.is_superuser is False
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Permission Error",
+        )
+
+    advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
+        db_session=db_session,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+    if advanced_tongue:
+        tongue_in = schemas.MeasureAdvancedTongue2Update(
+            tongue_memo=memo.content,
+        )
+        tongue_info = await crud.measure_advanced_tongue2.update(
+            db_session=db_session,
+            obj_current=advanced_tongue,
+            obj_new=tongue_in,
+        )
+    else:
+        tongue_in = schemas.MeasureAdvancedTongue2Create(
+            info_id=measure_id,
+            owner_id=current_user.id,
+            tongue_memo=memo.content,
+        )
+        tongue_info = await crud.measure_advanced_tongue2.create(
+            db_session=db_session,
+            obj_in=tongue_in,
+        )
+
+    return tongue_info
+
+
+@router.post("/{measure_id}/export_report")
+async def export_report(
+    measure_id: UUID,
+    input_payload: ExportReportInputPayload,
+    db_session: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+    ip_allowed: bool = Depends(deps.get_ip_allowed),
+):
+    measure = await crud.measure_info.get(
+        db_session=db_session,
+        id=measure_id,
+        relations=["tongue", "tongue_upload", "subject"],
+    )
+    if not measure:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not found measure id: {measure_id}",
+        )
+    if measure.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=400,
+            detail="The user doesn't have enough privileges",
+        )
+
+    front_loc = ""
+    back_loc = ""
+    empty_image_base64 = ""
+    if measure.tongue:
+        tongue = measure.tongue
+        front_loc = tongue.up_img_uri
+        back_loc = tongue.down_img_uri
+    elif measure.tongue_upload:
+        tongue_upload = measure.tongue_upload
+        front_loc = (
+            tongue_upload.tongue_front_corrected_loc
+            or tongue_upload.tongue_front_original_loc
+        )
+        back_loc = (
+            tongue_upload.tongue_back_corrected_loc
+            or tongue_upload.tongue_back_original_loc
+        )
+
+    branch = None
+    if measure.tongue_upload:
+        branch = await crud.branch.get(
+            db_session=db_session,
+            id=measure.tongue_upload.branch_id,
+        )
+
+    front_tongue_image_base64 = empty_image_base64
+    back_tongue_image_base64 = empty_image_base64
+    if front_loc:
+        tongue_file_path = front_loc
+        category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        image_downloader = download_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=str(tongue_file_path),
+        )
+        front_tongue_image_base64 = base64.b64encode(image_downloader.readall()).decode(
+            "utf8",
+        )
+
+    if back_loc:
+        tongue_file_path = back_loc
+        category = settings.AZURE_STORAGE_CONTAINER_INTERNET_IMAGE
+        image_downloader = download_file(
+            blob_service_client=internet_blob_service,
+            category=category,
+            file_path=str(tongue_file_path),
+        )
+        back_tongue_image_base64 = base64.b64encode(image_downloader.readall()).decode(
+            "utf8",
+        )
+
+    advanced_tongue = await crud.measure_advanced_tongue2.get_by_info_id(
+        db_session=db_session,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+
+    advanced_tongue = advanced_tongue or schemas.MeasureAdvancedTongue2Read(
+        id=measure_id,
+        measure_id=measure_id,
+        info_id=measure_id,
+        owner_id=current_user.id,
+    )
+
+    def format_array(arr):
+        if isinstance(arr, str):
+            return arr
+        return "、".join(arr)
+
+    with open("/app/src/auo_project/html/health_report/report-PDF.html", "r") as f:
+        html_template = f.read()
+    html_content = Template(html_template)
+    html_content = html_content.substitute(
+        number=measure.subject.number,
+        name=measure.subject.name,
+        sex_label=SEX_TYPE_LABEL.get(measure.subject.sex, "未提供"),
+        birth_date=measure.subject.birth_date.strftime("%Y - %m - %d"),
+        height=measure.height or "",
+        weight=measure.weight or "",
+        sbp=measure.sbp or "",
+        dbp=measure.dbp or "",
+        tongue_front_file=f"data:image/jpeg;base64,{str(front_tongue_image_base64)}",
+        tongue_back_file=f"data:image/jpeg;base64,{str(back_tongue_image_base64)}",
+        tongue_tip=format_array(advanced_tongue.tongue_tip),
+        tongue_status2=format_array(advanced_tongue.tongue_status2),
+        tongue_color=format_array(advanced_tongue.tongue_color),
+        tongue_coating_color=format_array(advanced_tongue.tongue_coating_color),
+        tongue_shap=format_array(advanced_tongue.tongue_shap),
+        tongue_coating_status=format_array(advanced_tongue.tongue_coating_status),
+        tongue_status1=format_array(advanced_tongue.tongue_status1),
+        tongue_coating_bottom=format_array(advanced_tongue.tongue_coating_bottom),
+        tongue_memo=advanced_tongue.tongue_memo or "",
+        doctor_name=measure.judge_dr,
+        judge_time=measure.judge_time.strftime("%Y-%m-%d %H:%M:%S"),
+        measure_time=measure.measure_time.strftime("%Y-%m-%d %H:%M:%S"),
+        measure_operator=measure.measure_operator,
+        org_name=measure.org.name,
+        branch_name=branch.name if branch else "",
+        address=branch.address if branch else "",
+        contact_phone=branch.contact_phone if branch else "",
+    )
+
+    output_html_file = f"/tmp/report-{measure_id}.html"
+    with open(output_html_file, "wb") as f:
+        f.write(html_content.encode("utf-8"))
+
+    ouput_filename = f"/tmp/report-{measure_id}.pdf"
+
+    options = {
+        "page-width": "100mm",
+        "page-height": "140mm",
+        "enable-local-file-access": None,
+    }
+    pdfkit.from_file(output_html_file, ouput_filename, options=options)
+
+    download_filename = quote(
+        f"{measure.subject.number}_{measure.measure_time.strftime('%Y%m%d%H%M%S')}.pdf",
+    )
+    headers = {
+        "Access-Control-Expose-Headers": "Content-Disposition, X-Suggested-Filename",
+        "Content-Disposition": "inline; filename*=utf-8"
+        '{}"'.format(download_filename),
+        "Content-Type": "application/octet-stream",
+        "X-Suggested-Filename": download_filename,
+    }
+
+    with open(ouput_filename, "rb") as file:
+        data = BytesIO(file.read())
+
+    os.remove(ouput_filename)
+    data.seek(0)
+    return StreamingResponse(data, media_type="application/pdf", headers=headers)

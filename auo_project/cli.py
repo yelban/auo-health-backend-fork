@@ -50,6 +50,7 @@ cli = typer.Typer(name="project_name API")
 @cli.async_command()
 async def create_user(
     org_name: str,
+    branch_id: str,
     username: str,
     password: str,
     email: str,
@@ -66,6 +67,7 @@ async def create_user(
         raise Exception(f"Not found org name: {org_name}")
     user_in = schemas.UserCreate(
         org_id=org.id,
+        branch_id=branch_id,
         username=username,
         full_name=full_name,
         mobile=mobile,

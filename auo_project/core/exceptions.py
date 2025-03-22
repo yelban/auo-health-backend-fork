@@ -1,3 +1,6 @@
+from typing import Any
+
+
 class AUOException(Exception):
     pass
 
@@ -99,3 +102,10 @@ class FreshTokenRequired(AuthJWTException):
     def __init__(self, status_code: int, message: str):
         self.status_code = status_code
         self.message = message
+
+
+class CustomHTTPException(Exception):
+    def __init__(self, status_code: int, error_code: str, detail: Any):
+        self.status_code = status_code
+        self.error_code = error_code
+        self.detail = detail
