@@ -97,7 +97,7 @@ ssh azure-api-auohealth -t '$HOME/workspace_dev/scripts/up_dev.sh'
 * prd env
 ```bash
 # rsync code to vm $HOME/workspace
-./scripts/rsync_dev.sh
+./scripts/rsync_prd.sh
 # Build image and recreate docker container and would cause short downtime. Recommend deploy to kubernetes or azure container service
 ssh azure-api-auohealth -t '$HOME/workspace/scripts/up_prd.sh'
 ```
