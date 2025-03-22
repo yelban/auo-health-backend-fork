@@ -192,7 +192,7 @@ async def request_recovery_token(
         mail_status = ""
         try:
             email_client = EmailClient.from_connection_string(
-                "endpoint=https://auohealthacs.asiapacific.communication.azure.com/;accesskey=AwrNMPEch11WsFr6AXsQ9Y5wPBnh7SqvfBHd5sScUDFnlupiAUGJJQQJ99AIACULyCpBm7CoAAAAAZCSPfj8",
+                settings.EMAIL_AUTH_ENDPOINT,
             )
             message = {
                 "content": {
@@ -202,7 +202,7 @@ async def request_recovery_token(
                 "recipients": {
                     "to": [{"address": user.email, "displayName": user.username}],
                 },
-                "senderAddress": "<donotreply@service.auohealth.com>",
+                "senderAddress": settings.EMAIL_SENDERR,
             }
             poller = email_client.begin_send(message)
             mail_status = str(poller.result())
