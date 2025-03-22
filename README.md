@@ -20,33 +20,6 @@ You can find swagger documentation at `/api/docs`.
 
 You can read more about poetry here: https://python-poetry.org/
 
-## Docker
-
-You can start the project with docker using this command:
-
-```bash
-docker compose -f deploy/docker-compose.yml --project-directory . up --build -d
-```
-
-If you want to develop in docker with autoreload add `-f deploy/docker-compose.dev.yml` to your docker command.
-Like this:
-
-```bash
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --project-directory . up -d
-```
-
-```bash
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prd.yml --project-directory . up
-```
-
-This command exposes the web application on port 8000, mounts current directory and enables autoreload.
-
-But you have to rebuild image every time you modify `poetry.lock` or `pyproject.toml` with this command:
-
-```bash
-docker compose -f deploy/docker-compose.yml --project-directory . build
-```
-
 ## Project structure
 
 ```bash
@@ -90,25 +63,6 @@ ENVIRONMENT="dev"
 ```
 
 You can read more about BaseSettings class here: https://pydantic-docs.helpmanual.io/usage/settings/
-## Opentelemetry
-
-If you want to start your project with opentelemetry collector
-you can add `-f ./deploy/docker-compose.otlp.yml` to your docker command.
-
-Like this:
-
-```bash
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.otlp.yml --project-directory . up
-```
-
-This command will start opentelemetry collector and jaeger.
-After sending a requests you can see traces in jaeger's UI
-at http://localhost:16686/.
-
-This docker configuration is not supposed to be used in production.
-It's only for demo purpose.
-
-You can read more about opentelemetry here: https://opentelemetry.io/
 
 ## Pre-commit
 
@@ -130,20 +84,22 @@ By default it runs:
 
 You can read more about pre-commit here: https://pre-commit.com/
 
-## Kubernetes
-To run your app in kubernetes
-just run:
+## Deploy code to VM
+
+* dev env
 ```bash
-kubectl apply -f deploy/kube
+# rsync code to vm $HOME/workspace_dev
+./scripts/rsync_dev.sh
+# Build image and recreate docker container and would cause short downtime. Recommend deploy to kubernetes or azure container service
+ssh azure-api-auohealth -t '$HOME/workspace_dev/scripts/up_dev.sh'
 ```
 
-It will create needed components.
-
-If you haven't pushed to docker registry yet, you can build image locally.
-
+* prd env
 ```bash
-docker compose -f deploy/docker-compose.yml --project-directory . build
-docker save --output auo_project.tar auo_project:latest
+# rsync code to vm $HOME/workspace
+./scripts/rsync_dev.sh
+# Build image and recreate docker container and would cause short downtime. Recommend deploy to kubernetes or azure container service
+ssh azure-api-auohealth -t '$HOME/workspace/scripts/up_dev.sh'
 ```
 
 ## Migrations
@@ -468,4 +424,22 @@ user = await crud.user.update(
     obj_in=schemas.UserUpdate(password="")
 )
 
+```
+
+# VM 環境
+```
+# https://docs.docker.com/engine/install/ubuntu/
+sudo apt-get remove docker docker-engine docker.io containerd runc
+
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh ./get-docker.sh
+apt-get install -y uidmap
+dockerd-rootless-setuptool.sh install
+
+# nginx
+sudo apt-get install nginx -y
+
+# edit nginx config to setup ssl/tls
+# https://www.digicert.com/kb/csr-ssl-installation/nginx-openssl.htm
+# ./etc/nginx/sites-available/auo-api
 ```
