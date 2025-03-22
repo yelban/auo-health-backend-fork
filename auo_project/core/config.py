@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     POOL_SIZE = max(DB_POOL_SIZE // WORKERS_COUNT, 5)
     ASYNC_DATABASE_URI: Optional[str]
 
+    EMAIL_AUTH_ENDPOINT: str = ""
+    EMAIL_SENDERR: str = ""
+
     @validator("ASYNC_DATABASE_URI", pre=True)
     def assemble_async_db_connection(
         cls,
