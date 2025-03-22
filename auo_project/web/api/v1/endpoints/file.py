@@ -82,7 +82,6 @@ async def get_files(
     )
 
     file_filters = {
-        "is_dup": False,
         "name__contains": filename.replace("contains__", "") if filename else None,
         "created_at__ge": created_at_start_utc0,
         "created_at__le": created_at_end_utc0,
