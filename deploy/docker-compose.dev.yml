@@ -10,7 +10,7 @@ services:
     - .:/app/src/
     environment:
       # Enables autoreload.
-      RELOAD: "True"
+      RELOAD: "False"
 
   db:
     ports:
