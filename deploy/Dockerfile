@@ -1,7 +1,7 @@
 FROM python:3.9.6-slim-buster
 
 RUN apt-get update -y && \
-   apt-get install -y curl wkhtmltopdf fonts-noto-cjk fonts-noto-cjk-extra && \
+   apt-get install -y curl wkhtmltopdf && \
    apt-get autoremove -y && \
    apt-get clean -y
 
